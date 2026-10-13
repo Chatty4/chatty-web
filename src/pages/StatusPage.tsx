@@ -49,7 +49,13 @@ export function StatusPage() {
           )
         })}
       </ul>
-      <Button variant="outline" onClick={() => setRound((n) => n + 1)}>
+      <Button
+        variant="outline"
+        onClick={() => {
+          setResults({})
+          setRound((n) => n + 1)
+        }}
+      >
         Check again
       </Button>
     </section>
