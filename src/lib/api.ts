@@ -83,6 +83,24 @@ function client(baseUrl: string) {
 export const coreApi = client(CORE_API_URL)
 export const chatApi = client(CHAT_API_URL)
 
+type TokenPair = { access_token: string; refresh_token: string }
+
+/**
+ * Rotate the token pair. Wraps the call in a Web Lock so that two tabs
+ * racing to refresh the same token don't trigger reuse-detection on the
+ * server (which revokes every session). Only one tab proceeds; the rest
+ * wait and will read the fresh access token that the winner wrote.
+ */
+export async function refreshTokens(refreshToken: string): Promise<TokenPair> {
+  return navigator.locks.request("token_refresh", async () => {
+    const data = await coreApi.post<TokenPair>("/auth/refresh", {
+      refresh_token: refreshToken,
+    })
+    setAccessToken(data.access_token)
+    return data
+  })
+}
+
 export type ServiceName = "core" | "chat"
 
 export type HealthResponse = {
