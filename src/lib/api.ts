@@ -50,7 +50,8 @@ export async function request<T>(url: string, options: RequestOptions = {}): Pro
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
       signal: options.signal,
     })
-  } catch {
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "AbortError") throw e
     throw new ApiError(0, "network_error", "The server could not be reached")
   }
 
