@@ -83,21 +83,38 @@ function client(baseUrl: string) {
 export const coreApi = client(CORE_API_URL)
 export const chatApi = client(CHAT_API_URL)
 
-type TokenPair = { access_token: string; refresh_token: string }
+export type TokenPair = { access_token: string; refresh_token: string }
+
+// The refresh token is shared by all tabs, so it lives in localStorage, not in memory.
+const REFRESH_TOKEN_KEY = "refresh_token"
+
+/** Store a new pair. Login and refresh both use this. */
+export function saveTokens(pair: TokenPair): void {
+  localStorage.setItem(REFRESH_TOKEN_KEY, pair.refresh_token)
+  setAccessToken(pair.access_token)
+}
 
 /**
- * Rotate the token pair. Wraps the call in a Web Lock so that two tabs
- * racing to refresh the same token don't trigger reuse-detection on the
- * server (which revokes every session). Only one tab proceeds; the rest
- * wait and will read the fresh access token that the winner wrote.
+ * Rotate the token pair. The Web Lock makes tabs refresh one at a time, and each
+ * tab reads the refresh token inside the lock, so it sends the one the previous
+ * tab just stored. Sending an already-rotated token would trigger reuse detection
+ * on the server, which revokes every session.
  */
-export async function refreshTokens(refreshToken: string): Promise<TokenPair> {
+export async function refreshTokens(): Promise<TokenPair> {
   return navigator.locks.request("token_refresh", async () => {
-    const data = await coreApi.post<TokenPair>("/auth/refresh", {
-      refresh_token: refreshToken,
-    })
-    setAccessToken(data.access_token)
-    return data
+    const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY)
+    if (!refreshToken) throw new ApiError(401, "invalid_refresh_token", "Not logged in")
+
+    try {
+      const data = await coreApi.post<TokenPair>("/auth/refresh", { refresh_token: refreshToken })
+      saveTokens(data)
+      return data
+    } catch (e) {
+      // A dead token must not be sent again: a waiting tab would replay it and wipe
+      // every session, including a new login made in the meantime.
+      if (e instanceof ApiError && e.status === 401) localStorage.removeItem(REFRESH_TOKEN_KEY)
+      throw e
+    }
   })
 }
 
