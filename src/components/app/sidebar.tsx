@@ -1,12 +1,17 @@
-import { Hash, Lock, MessageSquare, Plus, Search, X } from "lucide-react"
-import { Link, useMatches, useParams } from "react-router"
+import { Menu } from "@base-ui/react/menu"
+import { ChevronDown, Hash, Lock, MessageSquare, Plus, Search, Settings, X } from "lucide-react"
+import { Link, useMatches, useNavigate, useParams } from "react-router"
 
 import { Button } from "@/components/ui/button"
 import { useChannels } from "@/features/channels"
 import { useAuth } from "@/features/auth"
+import { useTeams } from "@/features/teams"
 import { cn } from "@/lib/utils"
 
 import { UserMenu } from "./user-menu"
+
+const menuItemClass =
+  "flex h-9 cursor-pointer items-center gap-2 rounded-sm px-2.5 text-sm text-foreground outline-none select-none data-[highlighted]:bg-accent data-[highlighted]:text-primary [&_svg]:size-[15px]"
 
 function useActiveChannelId(): string | null {
   const matches = useMatches()
@@ -38,7 +43,16 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   const activeChannelId = useActiveChannelId()
   const { channels, dms, memberNames } = useChannels()
   const { user } = useAuth()
+  const { teams } = useTeams()
+  const navigate = useNavigate()
   const myUserId = user?.id ?? ""
+
+  const activeTeam = teams.find((t) => t.id === teamId)
+
+  const go = (path: string) => {
+    navigate(path)
+    onClose()
+  }
 
   return (
     <>
@@ -56,9 +70,43 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           open ? "translate-x-0 shadow-[0_8px_28px_var(--shadow)]" : "-translate-x-full",
         )}
       >
-        {/* Header */}
-        <div className="flex h-14 shrink-0 items-center justify-between border-b px-3">
-          <span className="truncate text-sm font-semibold">Channels</span>
+        {/* Header — team selector */}
+        <div className="flex h-14 shrink-0 items-center gap-1 border-b px-2">
+          <Menu.Root>
+            <Menu.Trigger className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-sm px-2 py-1.5 text-sm font-semibold text-foreground outline-none transition-colors hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring data-[popup-open]:bg-surface-hover">
+              <span className="truncate">{activeTeam?.name ?? "Select team"}</span>
+              <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+            </Menu.Trigger>
+            <Menu.Portal>
+              <Menu.Positioner side="bottom" align="start" sideOffset={6} className="z-50 outline-none">
+                <Menu.Popup className="w-[220px] rounded-md border bg-popover p-1 shadow-[0_8px_24px_var(--shadow)] outline-none">
+                  {teams.map((team) => (
+                    <Menu.Item
+                      key={team.id}
+                      className={cn(menuItemClass, team.id === teamId && "font-medium text-primary")}
+                      onClick={() => go(`/teams/${team.id}`)}
+                    >
+                      <span className="flex size-5 shrink-0 items-center justify-center rounded bg-accent text-[11px] font-bold text-primary">
+                        {team.name[0]?.toUpperCase()}
+                      </span>
+                      <span className="truncate">{team.name}</span>
+                    </Menu.Item>
+                  ))}
+                  <Menu.Separator className="my-1 h-px bg-border" />
+                  <Menu.Item className={menuItemClass} onClick={() => go("/teams/new")}>
+                    <Plus className="text-muted-foreground" />
+                    Create team
+                  </Menu.Item>
+                  {teamId && (
+                    <Menu.Item className={menuItemClass} onClick={() => go(`/teams/${teamId}/settings`)}>
+                      <Settings className="text-muted-foreground" />
+                      Team settings
+                    </Menu.Item>
+                  )}
+                </Menu.Popup>
+              </Menu.Positioner>
+            </Menu.Portal>
+          </Menu.Root>
           <Button
             variant="ghost"
             size="icon"
