@@ -1,6 +1,6 @@
 import { useParams } from "react-router"
 
-import { PagePlaceholder } from "@/components/PagePlaceholder"
+import { PagePlaceholder } from "@/components/app/page-placeholder"
 
 export function ChannelPage() {
   const { teamId, channelId } = useParams()
