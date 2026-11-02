@@ -4,6 +4,7 @@ import { Outlet, useLocation, useMatches } from "react-router"
 import { AppHeader } from "@/components/app/app-header"
 import { Sidebar } from "@/components/app/sidebar"
 import { TeamRail } from "@/components/app/team-rail"
+import { TeamsProvider } from "@/features/teams"
 
 /** Routes inside the app set `handle: { title }` for the header. */
 export type RouteHandle = { title?: string; subtitle?: string }
@@ -29,21 +30,23 @@ export function AppLayout() {
   }, [drawerOpen])
 
   return (
-    <div className="flex h-full bg-surface">
-      <TeamRail />
-      <Sidebar open={drawerOpen} onClose={closeDrawer} />
-      <main className="relative flex min-w-0 flex-1 flex-col bg-surface">
-        <AppHeader
-          title={handle.title ?? "Chatty"}
-          subtitle={handle.subtitle}
-          onOpenMenu={() => setDrawerOpenOn(location.pathname)}
-        />
-        <div className="min-h-0 flex-1 overflow-y-auto bg-surface-subtle p-5 md:p-7">
-          <div className="mx-auto max-w-[780px]">
-            <Outlet />
+    <TeamsProvider>
+      <div className="flex h-full bg-surface">
+        <TeamRail />
+        <Sidebar open={drawerOpen} onClose={closeDrawer} />
+        <main className="relative flex min-w-0 flex-1 flex-col bg-surface">
+          <AppHeader
+            title={handle.title ?? "Chatty"}
+            subtitle={handle.subtitle}
+            onOpenMenu={() => setDrawerOpenOn(location.pathname)}
+          />
+          <div className="min-h-0 flex-1 overflow-y-auto bg-surface-subtle p-5 md:p-7">
+            <div className="mx-auto max-w-[780px]">
+              <Outlet />
+            </div>
           </div>
-        </div>
-      </main>
-    </div>
+        </main>
+      </div>
+    </TeamsProvider>
   )
 }
