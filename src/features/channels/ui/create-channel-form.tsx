@@ -38,19 +38,22 @@ export function CreateChannelForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex max-w-sm flex-col gap-4">
+    <form
+      onSubmit={handleSubmit}
+      className="flex max-w-sm flex-col gap-5 rounded-lg border border-border bg-surface p-6"
+    >
       {error && <Alert>{error}</Alert>}
-      <FormField label="Name">
+      <FormField label="Name" hint="Lowercase letters, numbers, hyphens and underscores only.">
         {(control) => (
           <Input
             {...control}
             name="name"
             placeholder="e.g. announcements"
+            autoFocus
             maxLength={80}
             required
             value={name}
             onChange={(e) => {
-              // Enforce lowercase letters, digits, - and _
               setName(e.target.value.toLowerCase().replace(/[^a-z0-9\-_]/g, ""))
               setError(undefined)
             }}
@@ -69,18 +72,22 @@ export function CreateChannelForm() {
           </Select>
         )}
       </FormField>
-      <FormField label="Topic" hint="Optional">
+      <FormField label="Topic" hint="Optional — shown in the sidebar and channel header.">
         {(control) => (
           <Input
             {...control}
             name="topic"
+            placeholder="e.g. Release announcements"
             maxLength={250}
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
           />
         )}
       </FormField>
-      <div>
+      <div className="flex justify-end gap-2 pt-1">
+        <Button type="button" variant="ghost" disabled={submitting} onClick={() => navigate(-1)}>
+          Cancel
+        </Button>
         <Button type="submit" disabled={submitting || !name.trim()}>
           {submitting ? "Creating…" : "Create channel"}
         </Button>

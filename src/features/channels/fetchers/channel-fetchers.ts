@@ -35,7 +35,9 @@ export function createChannelRequest(
   kind: "public" | "private",
   topic?: string,
 ): Promise<CreatedChannel> {
-  return coreApi.post(`/teams/${teamId}/channels`, { name, kind, topic: topic ?? null })
+  const body: Record<string, unknown> = { name, kind }
+  if (topic) body.topic = topic
+  return coreApi.post(`/teams/${teamId}/channels`, body)
 }
 
 export function startDmRequest(
