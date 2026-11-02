@@ -4,6 +4,7 @@ import { Outlet, useLocation, useMatches } from "react-router"
 import { AppHeader } from "@/components/app/app-header"
 import { Sidebar } from "@/components/app/sidebar"
 import { TeamRail } from "@/components/app/team-rail"
+import { ChannelsProvider } from "@/features/channels"
 import { TeamsProvider } from "@/features/teams"
 
 /** Routes inside the app set `handle: { title }` for the header. */
@@ -31,6 +32,7 @@ export function AppLayout() {
 
   return (
     <TeamsProvider>
+      <ChannelsProvider>
       <div className="flex h-full bg-surface">
         <TeamRail />
         <Sidebar open={drawerOpen} onClose={closeDrawer} />
@@ -47,6 +49,7 @@ export function AppLayout() {
           </div>
         </main>
       </div>
+      </ChannelsProvider>
     </TeamsProvider>
   )
 }

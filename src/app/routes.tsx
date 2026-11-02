@@ -5,6 +5,12 @@ import { AuthLayout } from "@/app/layouts/auth-layout"
 import { GuestOnly } from "@/app/layouts/guest-only"
 import { RequireAuth } from "@/app/layouts/require-auth"
 import { LoginPage, RegisterPage } from "@/app/pages/auth-pages"
+import {
+  BrowseChannelsPage,
+  ChannelSettingsPage,
+  CreateChannelPage,
+  StartDmPage,
+} from "@/app/pages/channel-pages"
 import { ChannelPage } from "@/app/pages/channel-page"
 import { HomePage } from "@/app/pages/home-page"
 import { InvitePage } from "@/app/pages/invite-page"
@@ -42,17 +48,39 @@ export const router = createBrowserRouter([
           },
           {
             path: "teams/:teamId",
-            Component: TeamHomePage,
-          },
-          {
-            path: "teams/:teamId/settings",
-            Component: TeamSettingsPage,
-            handle: { title: "Team settings" } satisfies RouteHandle,
-          },
-          {
-            path: "teams/:teamId/channels/:channelId",
-            Component: ChannelPage,
-            handle: { title: "Channel" } satisfies RouteHandle,
+            children: [
+              { index: true, Component: TeamHomePage },
+              {
+                path: "settings",
+                Component: TeamSettingsPage,
+                handle: { title: "Team settings" } satisfies RouteHandle,
+              },
+              {
+                path: "channels/new",
+                Component: CreateChannelPage,
+                handle: { title: "Create channel" } satisfies RouteHandle,
+              },
+              {
+                path: "channels/browse",
+                Component: BrowseChannelsPage,
+                handle: { title: "Browse channels" } satisfies RouteHandle,
+              },
+              {
+                path: "dms/new",
+                Component: StartDmPage,
+                handle: { title: "New message" } satisfies RouteHandle,
+              },
+              {
+                path: "channels/:channelId",
+                Component: ChannelPage,
+                handle: { title: "Channel" } satisfies RouteHandle,
+              },
+              {
+                path: "channels/:channelId/settings",
+                Component: ChannelSettingsPage,
+                handle: { title: "Channel settings" } satisfies RouteHandle,
+              },
+            ],
           },
         ],
       },

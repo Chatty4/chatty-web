@@ -1,5 +1,8 @@
-import { useParams } from "react-router"
+import { useEffect } from "react"
+import { Link, useNavigate, useParams } from "react-router"
 
+import { buttonVariants } from "@/components/ui/button"
+import { useChannels } from "@/features/channels"
 import { CreateTeamForm } from "@/features/teams"
 import { TeamSettings } from "@/features/teams"
 
@@ -23,12 +26,28 @@ export function TeamSettingsPage() {
 }
 
 export function TeamHomePage() {
+  const { teamId = "" } = useParams()
+  const { channels, loading } = useChannels()
+  const navigate = useNavigate()
+
+  // Redirect to the first (default) channel as soon as channels load
+  useEffect(() => {
+    if (loading || channels.length === 0) return
+    const defaultChannel = channels.find((c) => c.is_default) ?? channels[0]
+    navigate(`/teams/${teamId}/channels/${defaultChannel.id}`, { replace: true })
+  }, [loading, channels, teamId, navigate])
+
+  if (loading) return null
+
   return (
-    <div className="flex flex-col items-center justify-center py-20 text-center">
-      <p className="text-lg font-medium">Welcome to your team</p>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Channels are coming in the next update.
+    <div className="flex flex-col items-center justify-center gap-4 py-20 text-center">
+      <p className="text-lg font-medium">No channels yet</p>
+      <p className="text-sm text-muted-foreground">
+        Create your first channel to start collaborating.
       </p>
+      <Link to={`/teams/${teamId}/channels/new`} className={buttonVariants()}>
+        Create a channel
+      </Link>
     </div>
   )
 }
