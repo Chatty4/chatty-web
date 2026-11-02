@@ -10,11 +10,13 @@ import { Select } from "@/components/ui/select"
 import { FullScreenMessage } from "@/components/app/full-screen-message"
 import { useAuth } from "@/features/auth"
 
+import { InviteSettingsPanel } from "@/features/invites/ui/invite-settings-panel"
+
 import { useTeamSettings } from "../hooks/use-team-settings"
 import { describeTeamError } from "../utils/errors"
 import type { Role } from "../types"
 
-type Tab = "general" | "members" | "danger"
+type Tab = "general" | "members" | "invites" | "danger"
 
 // ── General tab ──────────────────────────────────────────────────────────────
 
@@ -258,8 +260,13 @@ export function TeamSettings({ teamId }: { teamId: string }) {
   }
 
   const { team, members } = state
-  const tabs: Tab[] = ["general", "members", "danger"]
-  const tabLabel: Record<Tab, string> = { general: "General", members: "Members", danger: "Danger zone" }
+  const tabs: Tab[] = ["general", "members", "invites", "danger"]
+  const tabLabel: Record<Tab, string> = {
+    general: "General",
+    members: "Members",
+    invites: "Invites",
+    danger: "Danger zone",
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -295,6 +302,7 @@ export function TeamSettings({ teamId }: { teamId: string }) {
             onRemove={removeMember}
           />
         )}
+        {tab === "invites" && <InviteSettingsPanel teamId={teamId} />}
         {tab === "danger" && (
           <DangerTab
             teamName={team.name}
