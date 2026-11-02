@@ -282,26 +282,28 @@ export function TeamSettings({ teamId }: { teamId: string }) {
         ))}
       </div>
 
-      {tab === "general" && (
-        <GeneralTab name={team.name} iconFileId={team.icon_file_id} onRename={renameTeam} />
-      )}
-      {tab === "members" && (
-        <MembersTab
-          myUserId={user?.id ?? ""}
-          myRole={team.my_role}
-          members={members}
-          onChangeRole={changeRole}
-          onRemove={removeMember}
-        />
-      )}
-      {tab === "danger" && (
-        <DangerTab
-          teamName={team.name}
-          myRole={team.my_role}
-          onLeave={leaveTeam}
-          onDelete={deleteTeam}
-        />
-      )}
+      <div className="rounded-md border border-border bg-surface p-[22px]">
+        {tab === "general" && (
+          <GeneralTab name={team.name} iconFileId={team.icon_file_id} onRename={renameTeam} />
+        )}
+        {tab === "members" && (
+          <MembersTab
+            myUserId={user?.id ?? ""}
+            myRole={team.my_role}
+            members={members}
+            onChangeRole={changeRole}
+            onRemove={removeMember}
+          />
+        )}
+        {tab === "danger" && (
+          <DangerTab
+            teamName={team.name}
+            myRole={team.my_role}
+            onLeave={leaveTeam}
+            onDelete={deleteTeam}
+          />
+        )}
+      </div>
     </div>
   )
 }

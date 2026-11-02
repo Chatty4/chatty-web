@@ -73,9 +73,14 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         {/* Header — team selector */}
         <div className="flex h-14 shrink-0 items-center gap-1 border-b px-2">
           <Menu.Root>
-            <Menu.Trigger className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-sm px-2 py-1.5 text-sm font-semibold text-foreground outline-none transition-colors hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring data-[popup-open]:bg-surface-hover">
+            <Menu.Trigger className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm font-semibold text-foreground outline-none transition-colors hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring data-[popup-open]:bg-surface-hover">
+              {activeTeam && (
+                <span className="flex size-[26px] shrink-0 items-center justify-center rounded bg-primary text-[11px] font-bold text-primary-foreground">
+                  {activeTeam.name[0]?.toUpperCase()}
+                </span>
+              )}
               <span className="truncate">{activeTeam?.name ?? "Select team"}</span>
-              <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <ChevronDown className="ml-auto size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
             </Menu.Trigger>
             <Menu.Portal>
               <Menu.Positioner side="bottom" align="start" sideOffset={6} className="z-50 outline-none">
@@ -147,7 +152,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                 className={cn(
                   "flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
                   isActive
-                    ? "bg-surface-hover font-medium text-foreground"
+                    ? "bg-accent font-medium text-accent-foreground"
                     : "text-muted-foreground hover:bg-surface-hover hover:text-foreground",
                   ch.archived && "opacity-50",
                 )}
@@ -195,7 +200,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                 className={cn(
                   "flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
                   isActive
-                    ? "bg-surface-hover font-medium text-foreground"
+                    ? "bg-accent font-medium text-accent-foreground"
                     : "text-muted-foreground hover:bg-surface-hover hover:text-foreground",
                 )}
                 aria-current={isActive ? "page" : undefined}

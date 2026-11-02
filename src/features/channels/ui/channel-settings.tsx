@@ -370,47 +370,49 @@ export function ChannelSettings({ channelId }: { channelId: string }) {
         ))}
       </div>
 
-      {tab === "general" && canManage && (
-        <GeneralTab
-          name={channel.name ?? ""}
-          topic={channel.topic}
-          archived={channel.archived}
-          isDefault={channel.is_default}
-          onRename={handleRename}
-          onArchive={handleArchive}
-        />
-      )}
-      {tab === "general" && !canManage && (
-        <div className="flex flex-col gap-1">
-          <p className="text-sm font-medium">{channel.name}</p>
-          {channel.topic && <p className="text-sm text-muted-foreground">{channel.topic}</p>}
-          <p className="text-[13px] text-faint-foreground">
-            {channel.member_count} member{channel.member_count !== 1 ? "s" : ""}
-          </p>
-        </div>
-      )}
-      {tab === "members" && (
-        <MembersTab
-          members={members}
-          memberNames={memberNames}
-          archived={channel.archived}
-          onRemove={removeMember}
-        />
-      )}
-      {tab === "notifications" && channel.my && (
-        <NotificationsTab
-          notifyLevel={channel.my.notify_level}
-          muted={channel.my.muted}
-          onUpdate={updateNotifications}
-        />
-      )}
-      {tab === "danger" && channel.kind !== "dm" && (
-        <DangerTab
-          channelName={channel.name ?? ""}
-          isDefault={channel.is_default}
-          onLeave={handleLeave}
-        />
-      )}
+      <div className="rounded-md border border-border bg-surface p-[22px]">
+        {tab === "general" && canManage && (
+          <GeneralTab
+            name={channel.name ?? ""}
+            topic={channel.topic}
+            archived={channel.archived}
+            isDefault={channel.is_default}
+            onRename={handleRename}
+            onArchive={handleArchive}
+          />
+        )}
+        {tab === "general" && !canManage && (
+          <div className="flex flex-col gap-1">
+            <p className="text-sm font-medium">{channel.name}</p>
+            {channel.topic && <p className="text-sm text-muted-foreground">{channel.topic}</p>}
+            <p className="text-[13px] text-faint-foreground">
+              {channel.member_count} member{channel.member_count !== 1 ? "s" : ""}
+            </p>
+          </div>
+        )}
+        {tab === "members" && (
+          <MembersTab
+            members={members}
+            memberNames={memberNames}
+            archived={channel.archived}
+            onRemove={removeMember}
+          />
+        )}
+        {tab === "notifications" && channel.my && (
+          <NotificationsTab
+            notifyLevel={channel.my.notify_level}
+            muted={channel.my.muted}
+            onUpdate={updateNotifications}
+          />
+        )}
+        {tab === "danger" && channel.kind !== "dm" && (
+          <DangerTab
+            channelName={channel.name ?? ""}
+            isDefault={channel.is_default}
+            onLeave={handleLeave}
+          />
+        )}
+      </div>
     </div>
   )
 }
