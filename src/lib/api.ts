@@ -1,122 +1,80 @@
-// API client stub for chatty-core and chatty-chat.
-// Real endpoints are added per feature (e.g. `coreApi.post("/auth/login", body)`).
-// Contracts: chatty-infra/docs/api-core.md and api-chat.md.
+// API client for chatty-core and chatty-chat. Contracts: chatty-infra/docs/api-core.md and
+// api-chat.md. Adds the access token, turns the contract error body into an ApiError, and on a
+// 401 `unauthorized` refreshes the token once and repeats the request (lib/session.ts).
 
-const CORE_API_URL = import.meta.env.VITE_CORE_API_URL ?? "/api/core/v1"
-const CHAT_API_URL = import.meta.env.VITE_CHAT_API_URL ?? "/api/chat/v1"
+import { ApiError, networkError, readJson, toApiError } from "@/lib/api-error"
+import { CHAT_API_URL, CORE_API_URL } from "@/lib/config"
+import { getAccessToken, hasStoredSession, refreshSession } from "@/lib/session"
 
-/** The error body every endpoint returns: {"error": {"code", "message", "fields"?}}. */
-type ErrorBody = {
-  error?: { code?: string; message?: string; fields?: Record<string, string> }
-}
-
-export class ApiError extends Error {
-  readonly status: number
-  readonly code: string
-  readonly fields?: Record<string, string>
-
-  constructor(status: number, code: string, message: string, fields?: Record<string, string>) {
-    super(message)
-    this.name = "ApiError"
-    this.status = status
-    this.code = code
-    this.fields = fields
-  }
-}
-
-// The access token lives in memory only. Login, refresh and logout set it later.
-let accessToken: string | null = null
-
-export function setAccessToken(token: string | null): void {
-  accessToken = token
-}
+export { ApiError } from "@/lib/api-error"
 
 type RequestOptions = {
   method?: "GET" | "POST" | "PUT" | "DELETE"
   body?: unknown
   signal?: AbortSignal
+  /** Send the access token (default). False for login, register and other public endpoints. */
+  auth?: boolean
+  /**
+   * Refresh the access token and repeat the request on a 401 (default). False inside
+   * withRefreshLock(), where a refresh would wait for the lock it is holding.
+   */
+  refreshOnExpiry?: boolean
 }
 
-export async function request<T>(url: string, options: RequestOptions = {}): Promise<T> {
+async function send(url: string, options: RequestOptions, token: string | null) {
   const headers: Record<string, string> = { Accept: "application/json" }
   if (options.body !== undefined) headers["Content-Type"] = "application/json"
-  if (accessToken) headers.Authorization = `Bearer ${accessToken}`
+  if (token) headers.Authorization = `Bearer ${token}`
 
-  let response: Response
   try {
-    response = await fetch(url, {
+    return await fetch(url, {
       method: options.method ?? "GET",
       headers,
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
       signal: options.signal,
     })
-  } catch (e) {
-    if (e instanceof DOMException && e.name === "AbortError") throw e
-    throw new ApiError(0, "network_error", "The server could not be reached")
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") throw error
+    throw networkError()
+  }
+}
+
+export async function request<T>(url: string, options: RequestOptions = {}): Promise<T> {
+  const auth = options.auth ?? true
+  const token = auth ? getAccessToken() : null
+
+  let response = await send(url, options, token)
+  let body = response.status === 204 ? null : await readJson(response)
+
+  // The access token expired or was rejected: refresh it once and try again. Other 401 codes
+  // (invalid_credentials, invalid_refresh_token, ...) are answers, not an expired token.
+  const expired =
+    response.status === 401 && toApiError(response, body).code === "unauthorized"
+  if (auth && expired && (options.refreshOnExpiry ?? true) && hasStoredSession()) {
+    const fresh = await refreshSession(token)
+    response = await send(url, options, fresh)
+    body = response.status === 204 ? null : await readJson(response)
   }
 
-  if (response.status === 204) return undefined as T
-
-  const data: unknown = await response.json().catch(() => null)
-  if (!response.ok) {
-    const error = (data as ErrorBody | null)?.error
-    throw new ApiError(
-      response.status,
-      error?.code ?? "unknown_error",
-      error?.message ?? response.statusText,
-      error?.fields,
-    )
-  }
-  return data as T
+  if (!response.ok) throw toApiError(response, body)
+  return body as T
 }
 
 function client(baseUrl: string) {
   return {
-    get: <T>(path: string, signal?: AbortSignal) => request<T>(baseUrl + path, { signal }),
-    post: <T>(path: string, body?: unknown) =>
-      request<T>(baseUrl + path, { method: "POST", body }),
-    put: <T>(path: string, body?: unknown) => request<T>(baseUrl + path, { method: "PUT", body }),
-    delete: <T>(path: string) => request<T>(baseUrl + path, { method: "DELETE" }),
+    get: <T>(path: string, options?: Omit<RequestOptions, "method" | "body">) =>
+      request<T>(baseUrl + path, options),
+    post: <T>(path: string, body?: unknown, options?: Omit<RequestOptions, "method" | "body">) =>
+      request<T>(baseUrl + path, { ...options, method: "POST", body }),
+    put: <T>(path: string, body?: unknown, options?: Omit<RequestOptions, "method" | "body">) =>
+      request<T>(baseUrl + path, { ...options, method: "PUT", body }),
+    delete: <T>(path: string, options?: Omit<RequestOptions, "method" | "body">) =>
+      request<T>(baseUrl + path, { ...options, method: "DELETE" }),
   }
 }
 
 export const coreApi = client(CORE_API_URL)
 export const chatApi = client(CHAT_API_URL)
-
-export type TokenPair = { access_token: string; refresh_token: string }
-
-// The refresh token is shared by all tabs, so it lives in localStorage, not in memory.
-const REFRESH_TOKEN_KEY = "refresh_token"
-
-/** Store a new pair. Login and refresh both use this. */
-export function saveTokens(pair: TokenPair): void {
-  localStorage.setItem(REFRESH_TOKEN_KEY, pair.refresh_token)
-  setAccessToken(pair.access_token)
-}
-
-/**
- * Rotate the token pair. The Web Lock makes tabs refresh one at a time, and each
- * tab reads the refresh token inside the lock, so it sends the one the previous
- * tab just stored. Sending an already-rotated token would trigger reuse detection
- * on the server, which revokes every session.
- */
-export async function refreshTokens(): Promise<TokenPair> {
-  return navigator.locks.request("token_refresh", async () => {
-    const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY)
-    if (!refreshToken) throw new ApiError(401, "invalid_refresh_token", "Not logged in")
-
-    try {
-      const data = await coreApi.post<TokenPair>("/auth/refresh", { refresh_token: refreshToken })
-      saveTokens(data)
-      return data
-    } catch (e) {
-      // A dead token must not be sent again: a waiting tab would replay it and wipe
-      // every session, including a new login made in the meantime.
-      if (e instanceof ApiError && e.status === 401) localStorage.removeItem(REFRESH_TOKEN_KEY)
-      throw e
-    }
-  })
-}
 
 export type ServiceName = "core" | "chat"
 
@@ -128,5 +86,10 @@ export type HealthResponse = {
 
 /** GET /health of a service, through the proxy (/health/core, /health/chat). */
 export function getHealth(service: ServiceName, signal?: AbortSignal): Promise<HealthResponse> {
-  return request<HealthResponse>(`/health/${service}`, { signal })
+  return request<HealthResponse>(`/health/${service}`, { signal, auth: false })
+}
+
+/** True for a failure that says nothing about the request itself: offline, proxy or server down. */
+export function isServerUnavailable(error: unknown): boolean {
+  return error instanceof ApiError && (error.status === 0 || error.status >= 500)
 }

@@ -34,16 +34,16 @@ export function StatusPage() {
   }, [round])
 
   return (
-    <section className="space-y-4">
-      <h1 className="text-xl font-semibold">Backend status</h1>
-      <ul className="space-y-1 text-sm">
+    <section className="flex w-full max-w-[520px] flex-col gap-4 rounded-md border bg-surface p-7">
+      <h1 className="text-xl font-semibold tracking-[-0.02em]">Backend status</h1>
+      <ul className="flex flex-col gap-1 text-sm">
         {services.map((service) => {
           const result = results[service]
           return (
-            <li key={service}>
-              <span className="inline-block w-24 font-medium">chatty-{service}</span>
-              {!result && "checking…"}
-              {result?.ok && <code>{JSON.stringify(result.health)}</code>}
+            <li key={service} className="flex gap-2">
+              <span className="w-24 shrink-0 font-medium">chatty-{service}</span>
+              {!result && <span className="text-muted-foreground">checking…</span>}
+              {result?.ok && <code className="break-all">{JSON.stringify(result.health)}</code>}
               {result && !result.ok && <span className="text-destructive">{result.error}</span>}
             </li>
           )
@@ -51,6 +51,7 @@ export function StatusPage() {
       </ul>
       <Button
         variant="outline"
+        className="self-start"
         onClick={() => {
           setResults({})
           setRound((n) => n + 1)

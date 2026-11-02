@@ -27,8 +27,9 @@ cp .env.example .env    # optional: the defaults point at 127.0.0.1:8000 (core) 
 npm run dev
 ```
 
-Open http://localhost:5173. The screens are placeholders for now. `/status` calls each backend's `/health`
-through the proxy, to check that the wiring works.
+Open http://localhost:5173. You can register, log in and log out; the screens after login are placeholders
+for now. Logging in needs chatty-core running. `/status` calls each backend's `/health` through the proxy,
+to check that the wiring works.
 
 | Path in the browser | Forwarded to |
 |---|---|
@@ -57,20 +58,52 @@ Open http://localhost:8080. Nginx serves the built app and forwards the API path
 `http://chat:8001` on the infra network. Override them with `-e CORE_API_UPSTREAM=...` and
 `-e CHAT_API_UPSTREAM=...`. Nginx starts even if a backend isn't running; its paths then return 502.
 
+## Login and tokens
+
+chatty-core's login returns an access token (a JWT, 15 minutes) and a refresh token (30 days, rotated on every
+refresh); see `chatty-infra/docs/api-core.md`, Authorization. `src/lib/session.ts` keeps them:
+
+- Both tokens are in `localStorage`, shared by the tabs. A reload or a new tab reuses the access token
+  instead of refreshing.
+- The refresh token is only read and rotated inside a Web Lock, so two tabs never send the same one (that
+  would count as theft and log out every device). A tab that waited uses the token the other tab stored.
+- The access token is refreshed about a minute before it expires. A request that still gets
+  `401 unauthorized` refreshes once and is repeated (`src/lib/api.ts`).
+- Logging in or out in one tab does the same in the others (`BroadcastChannel`).
+- A rejected refresh token (`401`) or a deactivated user (`403`) ends the session everywhere. When
+  chatty-core can't be reached, the session is kept and the app offers to try again.
+
 ## Project layout
+
+Each feature keeps its API calls, state and components together; pages only put features together.
 
 ```
 src/
-  main.tsx          entry point, RouterProvider
-  app/              router.tsx (all routes), AppLayout.tsx
-  pages/            one component per screen (placeholders for now)
-  components/       shared components
-    ui/             shadcn components (added with npx shadcn@latest add <name>)
+  main.tsx              entry point: theme, AuthProvider, RouterProvider
+  app/
+    routes.tsx          all routes
+    layouts/            AuthLayout, AppLayout (the shell), RequireAuth, GuestOnly
+    pages/              one thin component per screen
+  components/
+    ui/                 generic components (Button, Input, FormField, ...; shadcn ones too)
+    app/                the app shell: team rail, sidebar, header, user menu, ...
+  features/<name>/      one folder per feature (auth for now)
+    fetchers/           API calls
+    hooks/              state and logic
+    ui/                 the feature's components
+    utils/              pure helpers (validation, error messages, ...)
+    types.ts            the feature's types (from the contracts)
+    index.ts            what other code may import
+  hooks/                shared hooks (useTheme)
   lib/
-    api.ts          API client: base URLs, Authorization header, contract error body -> ApiError
-    utils.ts        cn() helper
-nginx/              Nginx config for the Docker image
+    api.ts              API client: Authorization header, refresh on 401, contract error body -> ApiError
+    session.ts          the tokens: storage, refresh, other tabs
+    theme.ts            light and dark theme
+    utils.ts            cn() helper
+nginx/                  Nginx config for the Docker image
 ```
+
+Other code imports a feature only through its `index.ts`.
 
 ## Contributing
 
