@@ -242,28 +242,22 @@ function DangerTab({
     <div className="flex max-w-sm flex-col gap-4">
       <ConfirmDialog {...confirmProps} />
       {error && <Alert>{error}</Alert>}
-      {myRole !== "owner" && (
-        <div className="rounded-md border border-destructive/40 bg-destructive-soft p-4">
-          <p className="mb-3 text-sm font-medium">Leave team</p>
-          <p className="mb-4 text-[13px] text-muted-foreground">
-            You will lose access to all channels in this team. You can rejoin with an invite.
-          </p>
-          <Button variant="destructive" disabled={busy} onClick={() => void handleLeave()}>
-            Leave team
-          </Button>
+      <div className="rounded-md border border-destructive/40 bg-destructive-soft p-4">
+        <p className="mb-0.5 text-sm font-semibold">Team actions</p>
+        <p className="mb-4 text-[13px] text-muted-foreground">These changes affect your access.</p>
+        <div className="flex flex-wrap gap-2">
+          {myRole !== "owner" && (
+            <Button variant="destructive" disabled={busy} onClick={() => void handleLeave()}>
+              Leave team
+            </Button>
+          )}
+          {myRole === "owner" && (
+            <Button variant="destructive" disabled={busy} onClick={() => void handleDelete()}>
+              Delete team
+            </Button>
+          )}
         </div>
-      )}
-      {myRole === "owner" && (
-        <div className="rounded-md border border-destructive/40 bg-destructive-soft p-4">
-          <p className="mb-3 text-sm font-medium">Delete team</p>
-          <p className="mb-4 text-[13px] text-muted-foreground">
-            All channels and team data will be permanently removed. This cannot be undone.
-          </p>
-          <Button variant="destructive" disabled={busy} onClick={() => void handleDelete()}>
-            Delete team
-          </Button>
-        </div>
-      )}
+      </div>
     </div>
   )
 }
