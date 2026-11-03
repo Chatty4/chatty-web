@@ -1,17 +1,40 @@
 import { useParams, useSearchParams } from "react-router"
 
-import { ChannelDetailsPanel, useChannels } from "@/features/channels"
-import { MessageList } from "@/features/messages"
+import { useAuth } from "@/features/auth"
+import {
+  ChannelDetailsPanel,
+  dmDisplayName,
+  useChannels,
+  type ChannelDetailsTab,
+  type SidebarChannel,
+} from "@/features/channels"
+import { ChannelIntro, MessageList } from "@/features/messages"
 import { useTeams } from "@/features/teams"
+
+const DETAILS_TABS: ChannelDetailsTab[] = ["about", "members", "notifications", "archive"]
 
 export function ChannelPage() {
   const { teamId = "", channelId = "" } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { channels, dms, reload } = useChannels()
+  const { user } = useAuth()
+  const { channels, dms, memberNames, reload } = useChannels()
   const { teams } = useTeams()
   const channel = [...channels, ...dms].find((c) => c.id === channelId) ?? null
   const teamRole = teams.find((t) => t.id === teamId)?.role ?? null
-  const showDetails = searchParams.has("details")
+
+  const detailsParam = searchParams.get("details")
+  const showDetails = detailsParam !== null
+  const detailsTab = DETAILS_TABS.find((t) => t === detailsParam) ?? "about"
+
+  const setDetails = (tab: ChannelDetailsTab | null) =>
+    setSearchParams(
+      (prev) => {
+        if (tab) prev.set("details", tab)
+        else prev.delete("details")
+        return prev
+      },
+      { replace: true },
+    )
 
   if (!channelId) return null
 
@@ -24,24 +47,46 @@ export function ChannelPage() {
           channel={channel}
           teamRole={teamRole}
           onChannelArchived={reload}
+          intro={
+            channel && (
+              <Intro
+                channel={channel}
+                dmName={dmDisplayName(channel.dm_member_ids ?? [], user?.id ?? "", memberNames)}
+                onManagePeople={() => setDetails("members")}
+              />
+            )
+          }
         />
       </div>
       {showDetails && (
         <ChannelDetailsPanel
-          key={channelId}
+          key={`${channelId}:${detailsTab}`}
           channelId={channelId}
           teamId={teamId}
-          onClose={() =>
-            setSearchParams(
-              (prev) => {
-                prev.delete("details")
-                return prev
-              },
-              { replace: true },
-            )
-          }
+          initialTab={detailsTab}
+          onClose={() => setDetails(null)}
         />
       )}
     </div>
+  )
+}
+
+function Intro({
+  channel,
+  dmName,
+  onManagePeople,
+}: {
+  channel: SidebarChannel
+  dmName: string
+  onManagePeople: () => void
+}) {
+  if (channel.kind === "dm") return <ChannelIntro kind="dm" name={dmName} />
+  return (
+    <ChannelIntro
+      kind={channel.kind}
+      name={channel.name ?? ""}
+      topic={channel.topic}
+      onManagePeople={onManagePeople}
+    />
   )
 }

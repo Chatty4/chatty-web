@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { ArrowDown } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -10,6 +10,8 @@ import { useMemberNames } from "../hooks/use-member-names"
 import { MessageItem } from "./message-item"
 import { MessageComposer } from "./message-composer"
 import { MessageListSkeleton } from "./message-skeleton"
+import { DayDivider } from "./day-divider"
+import { dayKey, formatDayLabel } from "../utils/dates"
 import { extractMentionIds } from "../utils/mentions"
 import { canDelete, canEdit, type Actor, type ChannelAccess, type TeamRole } from "../utils/permissions"
 import type { SidebarChannel } from "@/features/channels/types"
@@ -25,6 +27,8 @@ export type MessageListProps = {
   teamRole: TeamRole | null
   /** Refreshes channel data when the server reports the channel was archived. */
   onChannelArchived: () => void
+  /** Welcome block shown above the first message once the start of history is loaded. */
+  intro?: ReactNode
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -35,6 +39,7 @@ export function MessageList({
   channel,
   teamRole,
   onChannelArchived,
+  intro,
 }: MessageListProps) {
   const { user } = useAuth()
   const { getChannel, loadChannel, loadMoreHistory, send, retry, edit, remove } =
@@ -139,6 +144,7 @@ export function MessageList({
     const prev = messages[index - 1]
     if (!prev || !msg) return false
     if (prev.deleted_at !== null) return false
+    if (dayKey(prev.created_at) !== dayKey(msg.created_at)) return false
     return prev.author_id === msg.author_id
   }
 
@@ -162,42 +168,47 @@ export function MessageList({
       >
         {loading && <MessageListSkeleton />}
 
-        {/* Top anchor: load more or beginning-of-history notice */}
+        {/* The welcome block only once the very start of the history is loaded */}
+        {!loading && !hasMore && intro}
+
+        {/* Top anchor: load older history, or the end-of-history notice */}
         {!loading && (
-        <div className="flex justify-center px-4 py-4">
-          {hasMore ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => void loadMoreHistory(channelId)}
-            >
-              Load earlier messages
-            </Button>
-          ) : (
-            <span className="text-sm text-muted-foreground">
-              You've reached the beginning of this channel.
-            </span>
-          )}
-        </div>
+          <div className="pt-[18px] text-center">
+            {hasMore ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => void loadMoreHistory(channelId)}
+              >
+                Load earlier messages
+              </Button>
+            ) : (
+              <span className="text-[11px] text-faint-foreground">You’re all caught up</span>
+            )}
+          </div>
         )}
 
         {/* Empty state */}
         {!loading && messages.length === 0 && (
-          <div className="flex flex-col items-center gap-1 py-16 text-center">
-            <strong className="text-sm">No messages yet</strong>
-            <span className="text-sm text-muted-foreground">
-              Start the conversation below.
-            </span>
-          </div>
+          <>
+            <DayDivider label="Today" />
+            <div className="flex min-h-[150px] flex-col items-center justify-center text-center text-muted-foreground">
+              <strong className="text-foreground">No messages yet</strong>
+              <span>Start the conversation below.</span>
+            </div>
+          </>
         )}
 
-        {/* Message rows */}
-        <div className="pb-2">
+        {/* Message rows, with a divider wherever the day changes */}
+        <div className="pb-[22px]">
           {messages.map((message, index) => {
             const own = !!user && message.author_id === user.id
+            const previous = messages[index - 1]
+            const newDay = !previous || dayKey(previous.created_at) !== dayKey(message.created_at)
             return (
+            <Fragment key={message.id}>
+            {newDay && <DayDivider label={formatDayLabel(message.created_at)} />}
             <MessageItem
-              key={message.id}
               message={message}
               authorName={names[message.author_id] ?? "Unknown member"}
               names={names}
@@ -210,6 +221,7 @@ export function MessageList({
               onRetry={retry}
               onChannelArchived={onChannelArchived}
             />
+            </Fragment>
             )
           })}
         </div>
