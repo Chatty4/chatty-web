@@ -27,8 +27,8 @@ function MessageText({ body, own }: { body: string; own: boolean }) {
           <span
             key={i}
             className={cn(
-              "rounded px-0.5 font-medium text-primary",
-              own ? "bg-surface/70" : "bg-accent",
+              "rounded-[4px] px-1 py-px font-medium text-primary",
+              own ? "bg-surface shadow-[inset_0_0_0_1px_var(--color-border)]" : "bg-accent",
             )}
           >
             {part}
@@ -163,8 +163,8 @@ export function MessageItem({
   const toolbar = !isDeleted && !editing && (
     <div
       className={cn(
-        "absolute top-0 z-10 hidden -translate-y-1/2 items-center gap-0.5 rounded-md border bg-surface shadow-sm group-hover/msg:flex",
-        own ? "left-3" : "right-3",
+        "absolute z-10 hidden -translate-y-1/2 items-center gap-0.5 rounded-md border bg-surface shadow-sm group-hover/msg:flex",
+        own ? "top-1/2 right-full mr-1.5" : "top-0 right-3",
       )}
     >
       {editable && (
@@ -224,22 +224,23 @@ export function MessageItem({
             This message was deleted.
           </p>
         ) : (
-          <div
-            className={cn(
-              "max-w-[75%] rounded-lg bg-accent px-3 py-1.5 text-sm leading-relaxed break-words text-foreground",
-              !grouped && "rounded-tr-sm",
-              message.status === "pending" && "opacity-70",
-              message.status === "failed" && "ring-1 ring-destructive/50",
-            )}
-          >
-            <MessageText body={message.body} own />
-            {isEdited && <span className="ml-1 text-xs text-muted-foreground">(edited)</span>}
+          <div className="relative max-w-[75%]">
+            <div
+              className={cn(
+                "rounded-lg bg-accent px-3 py-1.5 text-sm leading-relaxed break-words text-foreground",
+                !grouped && "rounded-tr-sm",
+                message.status === "pending" && "opacity-70",
+                message.status === "failed" && "ring-1 ring-destructive/50",
+              )}
+            >
+              <MessageText body={message.body} own />
+              {isEdited && <span className="ml-1 text-xs text-muted-foreground">(edited)</span>}
+            </div>
+            {toolbar}
           </div>
         )}
 
         {message.status !== "sent" && !editing && <div className="mt-0.5 px-1">{status}</div>}
-
-        {toolbar}
       </article>
     )
   }
