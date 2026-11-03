@@ -3,6 +3,7 @@ import { ArrowDown } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/features/auth"
+import { cn } from "@/lib/utils"
 
 import { useMessages } from "../context"
 import { useChannelMembers } from "../hooks/use-channel-members"
@@ -82,6 +83,7 @@ export function MessageList({
   const resetScroll: ScrollState = { atBottom: true, farFromBottom: false, newCount: 0 }
   const [scrollState, setScrollState] = useState<ScrollState>(resetScroll)
   const { atBottom, farFromBottom, newCount } = scrollState
+  const showJump = farFromBottom || newCount > 0
 
   const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
     const el = listRef.current
@@ -160,6 +162,7 @@ export function MessageList({
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
+      <div className="relative flex min-h-0 flex-1 flex-col">
       {/* Scrollable message area */}
       <div
         ref={listRef}
@@ -227,23 +230,25 @@ export function MessageList({
         </div>
       </div>
 
-      {/* Jump-to-latest FAB */}
-      {(farFromBottom || newCount > 0) && (
-        <div className="absolute bottom-20 right-6 z-10">
-          <Button
-            size="sm"
-            onClick={() => scrollToBottom()}
-            aria-label={
-              newCount
-                ? `Jump to latest — ${newCount} new message${newCount === 1 ? "" : "s"}`
-                : "Jump to latest"
-            }
-          >
-            <ArrowDown className="size-3.5" />
-            {newCount > 0 && <span>{newCount} new</span>}
-          </Button>
-        </div>
-      )}
+      {/* Jump-to-latest: centred pill just above the composer, fades in when needed */}
+      <Button
+        size={newCount > 0 ? "sm" : "icon"}
+        inert={!showJump}
+        onClick={() => scrollToBottom()}
+        aria-label={
+          newCount
+            ? `Jump to latest, ${newCount} new message${newCount === 1 ? "" : "s"}`
+            : "Jump to latest"
+        }
+        className={cn(
+          "absolute bottom-4 left-1/2 z-10 min-w-[34px] -translate-x-1/2 rounded-full shadow-lg transition-[opacity,translate] duration-150 motion-reduce:transition-none",
+          showJump ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-2 opacity-0",
+        )}
+      >
+        <ArrowDown className="size-[15px]" />
+        {newCount > 0 && <span>{newCount} new</span>}
+      </Button>
+      </div>
 
       {/* Composer */}
       <MessageComposer
