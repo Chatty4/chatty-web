@@ -5,7 +5,8 @@ export { CreateChannelForm } from "./ui/create-channel-form"
 export { BrowseChannelsPage } from "./ui/browse-channels-page"
 export { StartDmPage } from "./ui/start-dm-page"
 export { ChannelDetailsPanel } from "./ui/channel-settings"
-export type { ChannelDetailsPanelProps } from "./ui/channel-settings"
+export type { ChannelDetailsPanelProps, ChannelDetailsTab } from "./ui/channel-settings"
+export { dmDisplayName } from "./utils/dm-name"
 export type {
   ChannelKind,
   NotifyLevel,

@@ -4,7 +4,7 @@ import { Link, useMatches, useNavigate, useParams } from "react-router"
 
 import { Button } from "@/components/ui/button"
 import { initials } from "@/components/ui/avatar"
-import { useChannels } from "@/features/channels"
+import { dmDisplayName, useChannels } from "@/features/channels"
 import { useAuth } from "@/features/auth"
 import { useTeams } from "@/features/teams"
 import { cn } from "@/lib/utils"
@@ -21,16 +21,6 @@ function useActiveChannelId(): string | null {
     if (id) return id
   }
   return null
-}
-
-function dmDisplayName(
-  dmMemberIds: string[],
-  myUserId: string,
-  memberNames: Record<string, string>,
-): string {
-  const others = dmMemberIds.filter((id) => id !== myUserId)
-  if (others.length === 0) return "Just you"
-  return others.map((id) => memberNames[id] ?? "…").join(", ")
 }
 
 type SidebarProps = {
