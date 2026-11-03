@@ -1,7 +1,10 @@
 import { useMemo, useRef, useState, type KeyboardEvent } from "react"
-import { AtSign, Paperclip, Send, Smile } from "lucide-react"
+import { AtSign, Paperclip, Send } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { EmojiPickerButton } from "@/components/ui/emoji-picker"
+
+const MAX_LENGTH = 4000
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -45,6 +48,20 @@ export function MessageComposer({ members, archived = false, onSend }: MessageCo
     setValue("")
     void onSend(body)
     requestAnimationFrame(() => textareaRef.current?.focus())
+  }
+
+  const insertAtCursor = (text: string) => {
+    const el = textareaRef.current
+    const start = el?.selectionStart ?? value.length
+    const end = el?.selectionEnd ?? value.length
+    const next = value.slice(0, start) + text + value.slice(end)
+    if (next.length > MAX_LENGTH) return
+    setValue(next)
+    const caret = start + text.length
+    requestAnimationFrame(() => {
+      el?.focus()
+      el?.setSelectionRange(caret, caret)
+    })
   }
 
   const applyMention = (name: string) => {
@@ -131,7 +148,7 @@ export function MessageComposer({ members, archived = false, onSend }: MessageCo
           ref={textareaRef}
           className="min-h-[60px] w-full resize-none bg-transparent px-3 pt-3 text-sm text-foreground outline-none placeholder:text-faint-foreground disabled:cursor-not-allowed disabled:opacity-50"
           value={value}
-          maxLength={4000}
+          maxLength={MAX_LENGTH}
           rows={2}
           disabled={archived}
           aria-label="Write a message"
@@ -159,15 +176,11 @@ export function MessageComposer({ members, archived = false, onSend }: MessageCo
             >
               <Paperclip />
             </Button>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Add emoji"
+            <EmojiPickerButton
               disabled={archived}
-              onClick={() => setValue((v) => `${v} 🙂`)}
-            >
-              <Smile />
-            </Button>
+              returnFocusRef={textareaRef}
+              onSelect={insertAtCursor}
+            />
             <Button
               variant="ghost"
               size="icon-sm"
@@ -183,7 +196,7 @@ export function MessageComposer({ members, archived = false, onSend }: MessageCo
           <div className="flex items-center gap-2">
             {nearLimit && (
               <span className="text-xs text-muted-foreground">
-                {charCount}/4000
+                {charCount}/{MAX_LENGTH}
               </span>
             )}
             {!nearLimit && (
