@@ -22,11 +22,11 @@ export function InviteLandingPage({ code }: Props) {
   const [joinError, setJoinError] = useState<string>()
 
   useEffect(() => {
-    setLookup(null)
-    setLoadError(undefined)
-    void lookupInviteRequest(code)
-      .then(setLookup)
-      .catch(() => setLoadError("Could not load this invite."))
+    let cancelled = false
+    lookupInviteRequest(code)
+      .then((result) => { if (!cancelled) setLookup(result) })
+      .catch(() => { if (!cancelled) setLoadError("Could not load this invite.") })
+    return () => { cancelled = true }
   }, [code])
 
   const handleJoin = async () => {

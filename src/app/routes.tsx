@@ -16,6 +16,7 @@ import { HomePage } from "@/app/pages/home-page"
 import { InvitePage } from "@/app/pages/invite-page"
 import { NotFoundPage } from "@/app/pages/not-found-page"
 import { StatusPage } from "@/app/pages/status-page"
+import { ProfilePage } from "@/app/pages/profile-page"
 import { CreateTeamPage, TeamHomePage, TeamSettingsPage } from "@/app/pages/team-pages"
 
 export const router = createBrowserRouter([
@@ -41,6 +42,11 @@ export const router = createBrowserRouter([
         Component: AppLayout,
         children: [
           { index: true, Component: HomePage, handle: { title: "Home" } satisfies RouteHandle },
+          {
+            path: "profile",
+            Component: ProfilePage,
+            handle: { title: "Account settings" } satisfies RouteHandle,
+          },
           {
             path: "teams/new",
             Component: CreateTeamPage,

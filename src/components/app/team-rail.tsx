@@ -1,10 +1,8 @@
-import { Plus } from "lucide-react"
+import { Bell, MessageCircle, Plus } from "lucide-react"
 import { Link, useMatches } from "react-router"
 
 import { cn } from "@/lib/utils"
 import { useTeams } from "@/features/teams"
-
-import { BrandMark } from "./brand-mark"
 
 function useActiveTeamId(): string | null {
   const matches = useMatches()
@@ -15,7 +13,10 @@ function useActiveTeamId(): string | null {
   return null
 }
 
-/** The narrow column on the left: brand mark, one tile per team, and a create-team button. */
+const tileBase =
+  "grid size-[34px] shrink-0 place-items-center rounded-md text-[12px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring"
+
+/** The narrow column on the left: brand mark, one tile per team, create team, and a bell. */
 export function TeamRail() {
   const { teams } = useTeams()
   const activeTeamId = useActiveTeamId()
@@ -25,15 +26,16 @@ export function TeamRail() {
       aria-label="Teams"
       className="z-20 hidden w-16 shrink-0 flex-col items-center gap-2 border-r bg-background px-2.5 py-3 md:flex"
     >
+      {/* Brand mark */}
       <Link
         to="/"
         aria-label="Chatty home"
-        className="rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className={cn(tileBase, "bg-accent text-primary hover:text-primary focus-visible:text-primary")}
       >
-        <BrandMark className="size-[34px] rounded-sm" />
+        <MessageCircle className="size-5" strokeWidth={2.2} />
       </Link>
 
-      {teams.length > 0 && <div className="my-0.5 h-px w-7 bg-border" />}
+      <div className="my-0.5 h-px w-7 bg-border" />
 
       {teams.map((team) => {
         const isActive = team.id === activeTeamId
@@ -44,10 +46,11 @@ export function TeamRail() {
             aria-label={team.name}
             title={team.name}
             className={cn(
-              "grid size-[34px] shrink-0 place-items-center rounded-md text-[13px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              tileBase,
+              "border",
               isActive
-                ? "bg-primary text-primary-foreground"
-                : "bg-surface-subtle text-muted-foreground hover:bg-surface-hover hover:text-foreground",
+                ? "border-primary bg-primary text-primary-foreground hover:bg-primary-hover"
+                : "border-border bg-surface text-muted-foreground hover:bg-surface-hover hover:text-foreground",
             )}
           >
             {team.name.slice(0, 1).toUpperCase()}
@@ -59,10 +62,22 @@ export function TeamRail() {
         to="/teams/new"
         aria-label="Create team"
         title="Create team"
-        className="grid size-[34px] shrink-0 place-items-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-surface-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+        className={cn(tileBase, "border border-border bg-surface text-muted-foreground hover:bg-surface-hover hover:text-foreground")}
       >
         <Plus className="size-4" />
       </Link>
+
+      {/* Push bell to the bottom */}
+      <div className="flex-1" />
+
+      <button
+        type="button"
+        aria-label="Notifications"
+        onClick={() => window.alert("You're all caught up")}
+        className={cn(tileBase, "text-muted-foreground hover:bg-surface-hover hover:text-foreground")}
+      >
+        <Bell className="size-[18px]" />
+      </button>
     </aside>
   )
 }

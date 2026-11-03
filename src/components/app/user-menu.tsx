@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { Menu } from "@base-ui/react/menu"
-import { ChevronUp, LogOut, Moon, Sun } from "lucide-react"
+import { ChevronDown, LogOut, Moon, Settings, Sun } from "lucide-react"
 import { useNavigate } from "react-router"
 
 import { Avatar } from "@/components/ui/avatar"
@@ -10,7 +10,7 @@ import { useTheme } from "@/hooks/use-theme"
 const itemClass =
   "flex h-9 cursor-pointer items-center gap-2 rounded-sm px-2.5 text-sm text-foreground outline-none select-none data-[highlighted]:bg-accent data-[highlighted]:text-primary data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50 [&_svg]:size-[15px]"
 
-/** The current user at the bottom of the sidebar, with the theme and logout. */
+/** The current user at the bottom of the sidebar, with account settings and logout. */
 export function UserMenu() {
   const { user, logout } = useAuth()
   const { theme, toggleTheme } = useTheme()
@@ -31,13 +31,17 @@ export function UserMenu() {
         <Avatar name={user.display_name} />
         <span className="flex min-w-0 flex-1 flex-col leading-tight">
           <strong className="truncate font-semibold">{user.display_name}</strong>
-          <small className="truncate text-[11px] text-muted-foreground">{user.email}</small>
+          <small className="truncate text-[11px] text-muted-foreground">Available</small>
         </span>
-        <ChevronUp className="size-[15px] shrink-0 text-muted-foreground" aria-hidden="true" />
+        <ChevronDown className="size-[15px] shrink-0 text-muted-foreground" aria-hidden="true" />
       </Menu.Trigger>
       <Menu.Portal>
         <Menu.Positioner side="top" align="start" sideOffset={8} className="z-50 outline-none">
           <Menu.Popup className="w-[220px] rounded-md border bg-popover p-1 shadow-[0_8px_24px_var(--shadow)] outline-none">
+            <Menu.Item className={itemClass} onClick={() => navigate("/profile")}>
+              <Settings />
+              Account settings
+            </Menu.Item>
             <Menu.Item className={itemClass} onClick={toggleTheme} closeOnClick={false}>
               {theme === "dark" ? <Sun /> : <Moon />}
               Use {theme === "dark" ? "light" : "dark"} theme

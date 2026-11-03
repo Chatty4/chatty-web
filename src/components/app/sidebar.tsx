@@ -1,8 +1,9 @@
 import { Menu } from "@base-ui/react/menu"
-import { ChevronDown, Hash, Lock, MessageSquare, Plus, Search, Settings, X } from "lucide-react"
+import { ChevronDown, Hash, Headphones, Lock, MessageSquare, Plus, Search, Settings, X } from "lucide-react"
 import { Link, useMatches, useNavigate, useParams } from "react-router"
 
 import { Button } from "@/components/ui/button"
+import { initials } from "@/components/ui/avatar"
 import { useChannels } from "@/features/channels"
 import { useAuth } from "@/features/auth"
 import { useTeams } from "@/features/teams"
@@ -37,7 +38,7 @@ type SidebarProps = {
   onClose: () => void
 }
 
-/** The workspace column: team name header, channels, DMs, and user menu. */
+/** The workspace column: team name header, search, channels, DMs, and user menu. */
 export function Sidebar({ open, onClose }: SidebarProps) {
   const { teamId = "" } = useParams()
   const activeChannelId = useActiveChannelId()
@@ -67,20 +68,20 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         aria-label="Workspace"
         className={cn(
           "fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col border-r bg-background transition-transform md:static md:z-auto md:translate-x-0",
-          open ? "translate-x-0 shadow-[0_8px_28px_var(--shadow)]" : "-translate-x-full",
+          open ? "translate-x-0 shadow-[0_12px_30px_var(--shadow)]" : "-translate-x-full",
         )}
       >
         {/* Header — team selector */}
-        <div className="flex h-14 shrink-0 items-center gap-1 border-b px-2">
+        <div className="flex h-16 shrink-0 items-center px-3">
           <Menu.Root>
-            <Menu.Trigger className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm font-semibold text-foreground outline-none transition-colors hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring data-[popup-open]:bg-surface-hover">
+            <Menu.Trigger className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-sm px-2 py-[9px] text-sm font-semibold text-foreground outline-none transition-colors hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring data-[popup-open]:bg-surface-hover">
               {activeTeam && (
-                <span className="flex size-[26px] shrink-0 items-center justify-center rounded bg-primary text-[11px] font-bold text-primary-foreground">
+                <span className="flex size-7 shrink-0 items-center justify-center rounded-sm bg-primary text-[12px] font-semibold text-primary-foreground">
                   {activeTeam.name[0]?.toUpperCase()}
                 </span>
               )}
               <span className="truncate">{activeTeam?.name ?? "Select team"}</span>
-              <ChevronDown className="ml-auto size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <ChevronDown className="ml-auto size-[15px] shrink-0 text-muted-foreground" aria-hidden="true" />
             </Menu.Trigger>
             <Menu.Portal>
               <Menu.Positioner side="bottom" align="start" sideOffset={6} className="z-50 outline-none">
@@ -91,7 +92,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                       className={cn(menuItemClass, team.id === teamId && "font-medium text-primary")}
                       onClick={() => go(`/teams/${team.id}`)}
                     >
-                      <span className="flex size-5 shrink-0 items-center justify-center rounded bg-accent text-[11px] font-bold text-primary">
+                      <span className="flex size-5 shrink-0 items-center justify-center rounded-sm bg-accent text-[11px] font-semibold text-accent-foreground">
                         {team.name[0]?.toUpperCase()}
                       </span>
                       <span className="truncate">{team.name}</span>
@@ -115,7 +116,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           <Button
             variant="ghost"
             size="icon"
-            className="md:hidden"
+            className="ml-1 md:hidden"
             aria-label="Close sidebar"
             onClick={onClose}
           >
@@ -123,21 +124,32 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           </Button>
         </div>
 
+        {/* Search & browse bar */}
+        <button
+          type="button"
+          onClick={() => go(`/teams/${teamId}/channels/browse`)}
+          className="mx-3 mb-3 flex h-[34px] shrink-0 cursor-pointer items-center gap-2 rounded-sm border bg-surface px-[9px] text-[13px] text-muted-foreground outline-none transition-colors hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <Search className="size-[15px] shrink-0" />
+          <span className="flex-1 text-left">Search &amp; browse</span>
+          <kbd className="font-sans text-[11px] text-faint-foreground">⌘K</kbd>
+        </button>
+
         {/* Nav */}
         <nav
           aria-label="Channels and direct messages"
-          className="flex-1 overflow-y-auto px-1.5 py-2"
+          className="flex-1 overflow-y-auto px-2 pb-4"
         >
           {/* Channels section */}
-          <div className="mb-1 flex items-center justify-between px-2 py-1">
-            <span className="text-xs font-semibold text-muted-foreground">Channels</span>
+          <div className="flex h-7 items-center px-2">
+            <span className="flex-1 text-xs font-semibold text-muted-foreground">Channels</span>
             <Link
               to={`/teams/${teamId}/channels/new`}
               aria-label="Create channel"
               onClick={onClose}
-              className="rounded-md p-0.5 text-muted-foreground outline-none hover:bg-surface-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+              className="flex size-[26px] items-center justify-center rounded text-muted-foreground outline-none hover:bg-surface-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <Plus className="size-3.5" />
+              <Plus className="size-[15px]" />
             </Link>
           </div>
 
@@ -150,7 +162,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                 to={`/teams/${teamId}/channels/${ch.id}`}
                 onClick={onClose}
                 className={cn(
-                  "flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+                  "flex h-[34px] w-full items-center gap-2 rounded-sm px-[9px] text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
                   isActive
                     ? "bg-accent font-medium text-accent-foreground"
                     : "text-muted-foreground hover:bg-surface-hover hover:text-foreground",
@@ -158,8 +170,8 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                 )}
                 aria-current={isActive ? "page" : undefined}
               >
-                <Icon className="size-3.5 shrink-0" />
-                <span className="truncate">{ch.name}</span>
+                <Icon className="size-[15px] shrink-0" />
+                <span className="min-w-0 flex-1 truncate">{ch.name}</span>
                 {ch.archived && (
                   <span className="ml-auto shrink-0 text-[10px] text-faint-foreground">archived</span>
                 )}
@@ -170,57 +182,80 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           <Link
             to={`/teams/${teamId}/channels/browse`}
             onClick={onClose}
-            className="mt-0.5 flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-muted-foreground outline-none hover:bg-surface-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            className="mt-0.5 flex h-[34px] w-full items-center gap-2 rounded-sm px-[9px] text-[13px] text-faint-foreground outline-none hover:bg-surface-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <Search className="size-3.5 shrink-0" />
+            <Search className="size-[15px] shrink-0" />
             <span>Browse channels</span>
           </Link>
 
           {/* DMs section */}
-          <div className="mb-1 mt-4 flex items-center justify-between px-2 py-1">
-            <span className="text-xs font-semibold text-muted-foreground">Direct messages</span>
+          <div className="mt-[22px] flex h-7 items-center px-2">
+            <span className="flex-1 text-xs font-semibold text-muted-foreground">Direct messages</span>
             <Link
               to={`/teams/${teamId}/dms/new`}
               aria-label="New direct message"
               onClick={onClose}
-              className="rounded-md p-0.5 text-muted-foreground outline-none hover:bg-surface-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+              className="flex size-[26px] items-center justify-center rounded text-muted-foreground outline-none hover:bg-surface-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <Plus className="size-3.5" />
+              <Plus className="size-[15px]" />
             </Link>
           </div>
 
           {dms.map((dm) => {
             const isActive = dm.id === activeChannelId
             const label = dmDisplayName(dm.dm_member_ids ?? [], myUserId, memberNames)
+            const abbr = initials(label).slice(0, 2)
             return (
               <Link
                 key={dm.id}
                 to={`/teams/${teamId}/channels/${dm.id}`}
                 onClick={onClose}
                 className={cn(
-                  "flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+                  "flex h-[34px] w-full items-center gap-2 rounded-sm px-[9px] text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
                   isActive
                     ? "bg-accent font-medium text-accent-foreground"
                     : "text-muted-foreground hover:bg-surface-hover hover:text-foreground",
                 )}
                 aria-current={isActive ? "page" : undefined}
               >
-                <MessageSquare className="size-3.5 shrink-0" />
-                <span className="truncate">{label}</span>
+                {/* Mini avatar */}
+                <span className="relative flex-none">
+                  <span className="grid size-[22px] place-items-center rounded-full bg-surface-hover text-[9px] font-semibold text-muted-foreground">
+                    {abbr}
+                  </span>
+                  {/* Presence dot */}
+                  <span className="absolute -right-0.5 bottom-0 size-[7px] rounded-full border border-background bg-online" />
+                </span>
+                <span className="min-w-0 flex-1 truncate">{label}</span>
               </Link>
             )
           })}
 
           {dms.length === 0 && channels.length === 0 && (
-            <p className="px-2 pt-2 text-[13px] text-faint-foreground">
-              No channels yet.
-            </p>
+            <p className="px-2 pt-2 text-[13px] text-faint-foreground">No channels yet.</p>
           )}
         </nav>
 
-        {/* User menu */}
-        <div className="flex min-h-[66px] shrink-0 items-center border-t px-2 py-2.5">
+        {/* Footer — user menu + action icons */}
+        <div className="flex min-h-[66px] shrink-0 items-center gap-0.5 border-t px-2 py-2.5">
           <UserMenu />
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Start huddle"
+            className="shrink-0"
+          >
+            <Headphones className="size-[17px]" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="New message"
+            className="shrink-0"
+            onClick={() => go(`/teams/${teamId}/dms/new`)}
+          >
+            <MessageSquare className="size-[17px]" />
+          </Button>
         </div>
       </aside>
     </>
