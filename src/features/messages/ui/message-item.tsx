@@ -9,6 +9,7 @@ import { useConfirm } from "@/hooks/use-confirm"
 import { cn } from "@/lib/utils"
 
 import type { LocalMessage } from "../types"
+import { decodeMentions, encodeMentions, splitMentions } from "../utils/mentions"
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -19,13 +20,20 @@ function formatTime(iso: string): string {
   }).format(new Date(iso))
 }
 
-/** Highlight @mentions in message body text. */
-function MessageText({ body, own }: { body: string; own: boolean }) {
-  const parts = body.split(/(@\w+)/g)
+/** Renders a stored body, showing `<@id>` mentions as `@Display Name`. */
+function MessageText({
+  body,
+  own,
+  names,
+}: {
+  body: string
+  own: boolean
+  names: Record<string, string>
+}) {
   return (
     <span>
-      {parts.map((part, i) =>
-        part.startsWith("@") ? (
+      {splitMentions(body).map((part, i) =>
+        part.type === "mention" ? (
           <span
             key={i}
             className={cn(
@@ -33,10 +41,10 @@ function MessageText({ body, own }: { body: string; own: boolean }) {
               own ? "font-semibold" : "rounded-[4px] bg-accent px-1 py-px",
             )}
           >
-            {part}
+            @{names[part.userId] ?? "unknown user"}
           </span>
         ) : (
-          part
+          part.value
         ),
       )}
     </span>
@@ -48,6 +56,8 @@ function MessageText({ body, own }: { body: string; own: boolean }) {
 export type MessageItemProps = {
   message: LocalMessage
   authorName: string
+  /** userId → display name, used to show and edit `<@id>` mentions. */
+  names: Record<string, string>
   /** Whether this message immediately follows one from the same author. */
   grouped: boolean
   /** True when the message was written by the current user (shown on the right). */
@@ -64,6 +74,7 @@ export type MessageItemProps = {
 export function MessageItem({
   message,
   authorName,
+  names,
   grouped,
   own,
   editable,
@@ -84,13 +95,14 @@ export function MessageItem({
   }, [editing])
 
   const startEditing = () => {
-    setDraft(message.body) // always reset to current body when entering edit mode
+    setDraft(decodeMentions(message.body, names))
     setEditing(true)
   }
 
   const save = () => {
-    const value = draft.trim()
-    if (value && value !== message.body) void onEdit(message.id, value)
+    const candidates = Object.entries(names).map(([id, display_name]) => ({ id, display_name }))
+    const value = encodeMentions(draft.trim(), candidates)
+    if (value && value.length <= 4000 && value !== message.body) void onEdit(message.id, value)
     setEditing(false)
   }
 
@@ -228,7 +240,7 @@ export function MessageItem({
                 message.status === "failed" && "ring-1 ring-destructive/50",
               )}
             >
-              <MessageText body={message.body} own />
+              <MessageText body={message.body} own names={names} />
               {isEdited && <span className="ml-1 text-xs text-muted-foreground">(edited)</span>}
             </div>
             {toolbar}
@@ -267,7 +279,7 @@ export function MessageItem({
           editor
         ) : (
           <p className="text-sm leading-relaxed break-words">
-            <MessageText body={message.body} own={false} />
+            <MessageText body={message.body} own={false} names={names} />
             {isEdited && <span className="ml-1 text-xs text-muted-foreground">(edited)</span>}
             {message.status !== "sent" && <span className="ml-1">{status}</span>}
           </p>

@@ -4,14 +4,11 @@ import { AtSign, Paperclip, Send } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { EmojiPickerButton } from "@/components/ui/emoji-picker"
 
+import { encodeMentions, type MentionCandidate } from "../utils/mentions"
+
 const MAX_LENGTH = 4000
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-
-type MentionCandidate = {
-  id: string
-  display_name: string
-}
 
 export type MessageComposerProps = {
   /** Channel members used for @mention autocomplete. */
@@ -42,9 +39,12 @@ export function MessageComposer({ members, archived = false, onSend }: MessageCo
   // Clamp so activeIndex never points past the end of the current list.
   const clampedIndex = suggestions.length > 0 ? Math.min(activeIndex, suggestions.length - 1) : 0
 
+  const encoded = useMemo(() => encodeMentions(value.trim(), members), [value, members])
+  const tooLong = encoded.length > MAX_LENGTH
+
   const send = () => {
-    const body = value.trim()
-    if (!body || archived) return
+    const body = encoded
+    if (!body || archived || tooLong) return
     setValue("")
     void onSend(body)
     requestAnimationFrame(() => textareaRef.current?.focus())
@@ -65,8 +65,7 @@ export function MessageComposer({ members, archived = false, onSend }: MessageCo
   }
 
   const applyMention = (name: string) => {
-    const firstName = name.split(" ")[0]
-    setValue((prev) => prev.replace(/@[\w]*$/, `@${firstName} `))
+    setValue((prev) => prev.replace(/@[\w]*$/, `@${name} `))
     setActiveIndex(0)
     textareaRef.current?.focus()
   }
@@ -102,7 +101,7 @@ export function MessageComposer({ members, archived = false, onSend }: MessageCo
     }
   }
 
-  const charCount = value.length
+  const charCount = encoded.length
   const nearLimit = charCount > 3600
 
   return (
@@ -207,7 +206,7 @@ export function MessageComposer({ members, archived = false, onSend }: MessageCo
             <Button
               size="icon-sm"
               aria-label="Send message"
-              disabled={!value.trim() || archived}
+              disabled={!value.trim() || archived || tooLong}
               onClick={send}
             >
               <Send />

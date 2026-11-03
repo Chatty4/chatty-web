@@ -5,7 +5,7 @@ import {
   getTeamMemberPreviewsRequest,
 } from "@/features/channels/fetchers/channel-fetchers"
 
-export type MentionCandidate = { id: string; display_name: string }
+import type { MentionCandidate } from "../utils/mentions"
 
 /**
  * Fetches the full member list for a channel and resolves display names.

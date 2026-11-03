@@ -9,6 +9,7 @@ import { useChannelMembers } from "../hooks/use-channel-members"
 import { useMemberNames } from "../hooks/use-member-names"
 import { MessageItem } from "./message-item"
 import { MessageComposer } from "./message-composer"
+import { extractMentionIds } from "../utils/mentions"
 import type { SidebarChannel } from "@/features/channels/types"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -37,15 +38,21 @@ export function MessageList({ channelId, teamId, channel }: MessageListProps) {
   const hasMore = channelState?.hasMore ?? false
   const loading = channelState?.loading ?? true
 
-  // ── Author name resolution (for message rows) ────────────────────────────────
-  const authorIds = useMemo(
-    () => [...new Set(messages.map((m) => m.author_id))],
+  // ── Name resolution for authors and <@id> mentions ───────────────────────────
+  const userIds = useMemo(
+    () => [...new Set(messages.flatMap((m) => [m.author_id, ...extractMentionIds(m.body)]))],
     [messages],
   )
-  const memberNames = useMemberNames(teamId, authorIds)
+  const memberNames = useMemberNames(teamId, userIds)
 
   // ── Channel members (for @mention autocomplete) ──────────────────────────────
   const mentionCandidates = useChannelMembers(channelId, teamId)
+
+  const names = useMemo(() => {
+    const merged: Record<string, string> = {}
+    for (const c of mentionCandidates) merged[c.id] = c.display_name
+    return { ...merged, ...memberNames }
+  }, [mentionCandidates, memberNames])
 
   // ── Scroll management ────────────────────────────────────────────────────────
   const listRef = useRef<HTMLDivElement>(null)
@@ -161,7 +168,8 @@ export function MessageList({ channelId, teamId, channel }: MessageListProps) {
             <MessageItem
               key={message.id}
               message={message}
-              authorName={memberNames[message.author_id] ?? message.author_id}
+              authorName={names[message.author_id] ?? "Unknown member"}
+              names={names}
               grouped={isGrouped(index)}
               own={own}
               editable={own && message.deleted_at === null}
