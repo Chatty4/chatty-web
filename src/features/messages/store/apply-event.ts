@@ -7,10 +7,37 @@ import type { ApiMessage, LocalMessage, Reaction } from "../types"
 // ── Payload shapes (internal to this module) ──────────────────────────────────
 
 type MessageCreatedPayload = { message: ApiMessage }
-type MessageEditedPayload = { message_id: string; body: string; mentions: string[]; edited_at: string }
 type MessageDeletedPayload = { message_id: string; deleted_by: string; deleted_at: string }
 type ReactionPayload = { message_id: string; user_id: string; emoji: string }
 type PinPayload = { message_id: string }
+
+export type MessageEdit = { message_id: string; body: string; mentions: string[]; edited_at: string }
+
+/**
+ * Applies an edit from a message.edited event or a PUT response. Both can arrive for
+ * the same edit in either order, so this is idempotent: deleted messages and edits
+ * older than the one already shown are ignored.
+ */
+export function applyEdit(messages: LocalMessage[], edit: MessageEdit): LocalMessage[] {
+  return messages.map((m) => {
+    if (m.id !== edit.message_id || m.deleted_at !== null) return m
+    if (m.edited_at && Date.parse(m.edited_at) > Date.parse(edit.edited_at)) return m
+    return { ...m, body: edit.body, mentions: edit.mentions, edited_at: edit.edited_at }
+  })
+}
+
+/** Turns a message into the deleted placeholder. Idempotent: a second delete is a no-op. */
+export function applyDelete(
+  messages: LocalMessage[],
+  messageId: string,
+  deletedAt: string,
+): LocalMessage[] {
+  return messages.map((m) =>
+    m.id === messageId && m.deleted_at === null
+      ? { ...m, body: "", deleted_at: deletedAt, file_ids: [], attachments: [], mentions: [], reactions: [], pinned: false }
+      : m,
+  )
+}
 
 function insertSorted(messages: LocalMessage[], msg: LocalMessage): LocalMessage[] {
   // Find the last message with a real seq smaller than msg.seq (pending have seq=0)
@@ -44,20 +71,12 @@ export function applyEvent(
       return insertSorted(messages, confirmed)
     }
 
-    case "message.edited": {
-      const { message_id, body, mentions, edited_at } = event.payload as MessageEditedPayload
-      return messages.map((m) =>
-        m.id === message_id ? { ...m, body, mentions, edited_at } : m,
-      )
-    }
+    case "message.edited":
+      return applyEdit(messages, event.payload as MessageEdit)
 
     case "message.deleted": {
       const { message_id, deleted_at } = event.payload as MessageDeletedPayload
-      return messages.map((m) =>
-        m.id === message_id
-          ? { ...m, body: "", deleted_at, file_ids: [], attachments: [], reactions: [], pinned: false }
-          : m,
-      )
+      return applyDelete(messages, message_id, deleted_at)
     }
 
     case "reaction.added": {

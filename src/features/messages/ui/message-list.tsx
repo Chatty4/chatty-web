@@ -187,8 +187,8 @@ export function MessageList({ channelId, teamId, channel }: MessageListProps) {
               grouped={isGrouped(index)}
               own={own}
               editable={own && message.deleted_at === null}
-              onEdit={edit}
-              onDelete={remove}
+              onEdit={(messageId, body) => edit(channelId, messageId, body)}
+              onDelete={(messageId) => remove(channelId, messageId)}
               onRetry={retry}
             />
             )
