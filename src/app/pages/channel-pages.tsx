@@ -1,9 +1,8 @@
-import { useParams } from "react-router"
+import { Navigate, useParams } from "react-router"
 
 import { BrowseChannelsPage } from "@/features/channels"
 import { CreateChannelForm } from "@/features/channels"
 import { StartDmPage } from "@/features/channels"
-import { ChannelSettings } from "@/features/channels"
 
 export function CreateChannelPage() {
   return (
@@ -21,7 +20,8 @@ export function CreateChannelPage() {
 
 export { BrowseChannelsPage, StartDmPage }
 
+/** Channel settings live in the details panel on the channel view. */
 export function ChannelSettingsPage() {
-  const { channelId = "" } = useParams()
-  return <ChannelSettings channelId={channelId} />
+  const { teamId = "", channelId = "" } = useParams()
+  return <Navigate to={`/teams/${teamId}/channels/${channelId}?details`} replace />
 }

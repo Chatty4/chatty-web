@@ -115,13 +115,18 @@ export function messagesReducer(state: MessagesState, action: MessagesAction): M
       const ch = state[action.channelId]
       if (!ch) return state
       const confirmed: LocalMessage = { ...action.confirmed, status: "sent" }
+      // Events carry no client_msg_id, so a message.created that beat the POST
+      // response is already in the list: keep it and drop the optimistic copy.
+      const alreadyApplied = ch.messages.some(
+        (m) => m.id === confirmed.id && m.client_msg_id !== action.clientMsgId,
+      )
       return {
         ...state,
         [action.channelId]: {
           ...ch,
-          messages: ch.messages.map((m) =>
-            m.client_msg_id === action.clientMsgId ? confirmed : m,
-          ),
+          messages: alreadyApplied
+            ? ch.messages.filter((m) => m.client_msg_id !== action.clientMsgId)
+            : ch.messages.map((m) => (m.client_msg_id === action.clientMsgId ? confirmed : m)),
           lastSeq: Math.max(ch.lastSeq, action.confirmed.seq),
         },
       }
