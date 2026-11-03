@@ -12,25 +12,17 @@ import type { ChangePasswordInput } from "../types"
 
 // ── Timezone options ──────────────────────────────────────────────────────────
 
-const TIMEZONES: Array<{ value: string; label: string }> = [
-  { value: "UTC", label: "UTC" },
-  { value: "America/New_York", label: "Eastern Time (New York)" },
-  { value: "America/Chicago", label: "Central Time (Chicago)" },
-  { value: "America/Denver", label: "Mountain Time (Denver)" },
-  { value: "America/Los_Angeles", label: "Pacific Time (Los Angeles)" },
-  { value: "America/Sao_Paulo", label: "Brasília (São Paulo)" },
-  { value: "Europe/London", label: "London" },
-  { value: "Europe/Paris", label: "Central European Time (Paris)" },
-  { value: "Europe/Bucharest", label: "Eastern European Time (Bucharest)" },
-  { value: "Europe/Moscow", label: "Moscow" },
-  { value: "Asia/Dubai", label: "Dubai" },
-  { value: "Asia/Kolkata", label: "India (Kolkata)" },
-  { value: "Asia/Bangkok", label: "Indochina (Bangkok)" },
-  { value: "Asia/Shanghai", label: "China (Shanghai)" },
-  { value: "Asia/Tokyo", label: "Japan (Tokyo)" },
-  { value: "Australia/Sydney", label: "Sydney" },
-  { value: "Pacific/Auckland", label: "New Zealand (Auckland)" },
-]
+function tzOffset(tz: string): string {
+  const parts = new Intl.DateTimeFormat("en", {
+    timeZone: tz,
+    timeZoneName: "shortOffset",
+  }).formatToParts(new Date())
+  return parts.find((p) => p.type === "timeZoneName")?.value ?? "UTC"
+}
+
+const TIMEZONES: Array<{ value: string; label: string }> = Intl.supportedValuesOf("timeZone").map(
+  (tz) => ({ value: tz, label: `(${tzOffset(tz)}) ${tz}` }),
+)
 
 // ── Profile section ───────────────────────────────────────────────────────────
 
@@ -273,7 +265,7 @@ export function ProfilePage() {
       <ProfileSection
         displayName={user.display_name}
         timezone={user.timezone}
-        onSave={updateProfile}
+        onSave={(displayName, timezone) => updateProfile({ display_name: displayName, timezone })}
       />
 
       <PasswordSection onSave={changePassword} />
