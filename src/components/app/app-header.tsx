@@ -1,7 +1,7 @@
 import { Hash, Lock, Menu, Search, Settings } from "lucide-react"
-import { Link, useLocation, useNavigate, useParams } from "react-router"
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router"
 
-import { Button, buttonVariants } from "@/components/ui/button"
+import { Button } from "@/components/ui/button"
 import { useChannels } from "@/features/channels"
 
 import { ThemeToggle } from "./theme-toggle"
@@ -19,11 +19,18 @@ export function AppHeader({ title, subtitle, onOpenMenu }: AppHeaderProps) {
   const navigate = useNavigate()
   const { channels } = useChannels()
 
-  const isOnChannelSettings = pathname.endsWith("/settings")
-  const channelSettingsPath =
-    teamId && channelId && !isOnChannelSettings
-      ? `/teams/${teamId}/channels/${channelId}/settings`
-      : null
+  const [searchParams, setSearchParams] = useSearchParams()
+  const detailsOpen = searchParams.has("details")
+  const canToggleDetails = !!teamId && !!channelId && !pathname.endsWith("/settings")
+  const toggleDetails = () =>
+    setSearchParams(
+      (prev) => {
+        if (prev.has("details")) prev.delete("details")
+        else prev.set("details", "")
+        return prev
+      },
+      { replace: true },
+    )
 
   const channel = channelId ? channels.find((c) => c.id === channelId) : null
   const displayTitle = channel?.name ?? title
@@ -58,14 +65,17 @@ export function AppHeader({ title, subtitle, onOpenMenu }: AppHeaderProps) {
       </div>
 
       <div className="flex items-center gap-0.5">
-        {channelSettingsPath && (
-          <Link
-            to={channelSettingsPath}
-            aria-label="Channel settings"
-            className={buttonVariants({ variant: "ghost", size: "icon" })}
+        {canToggleDetails && (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Channel details"
+            aria-pressed={detailsOpen}
+            className={detailsOpen ? "bg-surface-hover text-foreground" : undefined}
+            onClick={toggleDetails}
           >
             <Settings className="size-[18px]" />
-          </Link>
+          </Button>
         )}
         <Button
           variant="ghost"

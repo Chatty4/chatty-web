@@ -1,27 +1,27 @@
 import { type FormEvent, useEffect, useState } from "react"
-import { useNavigate, useParams } from "react-router"
+import { useNavigate } from "react-router"
 import { X } from "lucide-react"
 
 import { Alert } from "@/components/ui/alert"
 import { Avatar } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
+import { Dialog } from "@/components/ui/dialog"
 import { FormField } from "@/components/ui/form-field"
 import { Input } from "@/components/ui/input"
 import { Select } from "@/components/ui/select"
-import { FullScreenMessage } from "@/components/app/full-screen-message"
+import { DataList, DataRow, RowMain, SectionTitle, SettingsTabs } from "@/components/ui/settings"
 import { useAuth } from "@/features/auth"
-import { useConfirm } from "@/hooks/use-confirm"
 import { getTeamMembersRequest } from "@/features/teams/fetchers/team-fetchers"
+import { useConfirm } from "@/hooks/use-confirm"
 
-import { useChannelSettings } from "../hooks/use-channel-settings"
 import { useChannels } from "../hooks/channels-context"
+import { useChannelSettings } from "../hooks/use-channel-settings"
+import type { ChannelDetail, ChannelMember, MyChannelSettings, NotifyLevel } from "../types"
 import { describeChannelError } from "../utils/errors"
-import type { NotifyLevel } from "../types"
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-type Tab = "about" | "members" | "notifications" | "archive"
+const TABS = ["about", "members", "notifications", "archive"] as const
+type Tab = (typeof TABS)[number]
 
 const TAB_LABELS: Record<Tab, string> = {
   about: "About",
@@ -30,31 +30,30 @@ const TAB_LABELS: Record<Tab, string> = {
   archive: "Archive",
 }
 
-// ── About tab ─────────────────────────────────────────────────────────────────
+// ── About ────────────────────────────────────────────────────────────────────
 
 function AboutTab({
-  name: initialName,
-  topic: initialTopic,
-  archived,
-  onRename,
+  channel,
+  canManage,
+  onSave,
 }: {
-  name: string
-  topic: string | null
-  archived: boolean
-  onRename: (name: string, topic: string | null) => Promise<void>
+  channel: ChannelDetail
+  canManage: boolean
+  onSave: (name: string, topic: string | null) => Promise<void>
 }) {
-  const [name, setName] = useState(initialName)
-  const [topic, setTopic] = useState(initialTopic ?? "")
+  const [name, setName] = useState(channel.name ?? "")
+  const [topic, setTopic] = useState(channel.topic ?? "")
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string>()
+  const readOnly = !canManage || channel.archived
 
   const save = async (event: FormEvent) => {
     event.preventDefault()
-    if (saving) return
+    if (saving || readOnly) return
     setSaving(true)
     setError(undefined)
     try {
-      await onRename(name.trim(), topic.trim() || null)
+      await onSave(name.trim(), topic.trim() || null)
     } catch (err) {
       setError(describeChannelError(err))
     } finally {
@@ -63,182 +62,172 @@ function AboutTab({
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <form onSubmit={save} className="flex flex-col gap-[18px]">
       {error && <Alert>{error}</Alert>}
-      <form onSubmit={save} className="flex flex-col gap-4">
-        <FormField label="Channel name">
-          {(control) => (
-            <Input
-              {...control}
-              name="name"
-              maxLength={80}
-              required
-              value={name}
-              disabled={archived}
-              onChange={(e) => setName(e.target.value)}
-            />
-          )}
-        </FormField>
-        <FormField label="Topic" hint="Optional">
-          {(control) => (
-            <Input
-              {...control}
-              name="topic"
-              maxLength={250}
-              value={topic}
-              disabled={archived}
-              onChange={(e) => setTopic(e.target.value)}
-            />
-          )}
-        </FormField>
-        {!archived && (
-          <div>
-            <Button type="submit" disabled={saving || !name.trim()}>
-              {saving ? "Saving…" : "Save changes"}
-            </Button>
-          </div>
+      <FormField label="Name">
+        {(control) => (
+          <Input
+            {...control}
+            required
+            maxLength={80}
+            value={name}
+            disabled={readOnly}
+            onChange={(e) => setName(e.target.value)}
+          />
         )}
-      </form>
-    </div>
+      </FormField>
+      <FormField label="Topic">
+        {(control) => (
+          <Input
+            {...control}
+            maxLength={250}
+            value={topic}
+            disabled={readOnly}
+            onChange={(e) => setTopic(e.target.value)}
+          />
+        )}
+      </FormField>
+      {!readOnly && (
+        <Button type="submit" disabled={saving || !name.trim()}>
+          {saving ? "Saving…" : "Save changes"}
+        </Button>
+      )}
+    </form>
   )
 }
 
-// ── Add members modal ─────────────────────────────────────────────────────────
+// ── Add members dialog ───────────────────────────────────────────────────────
 
-function AddMembersModal({
+type Candidate = { user_id: string; display_name: string }
+
+function AddMembersForm({
   teamId,
-  channelName,
   existingMemberIds,
   onAdd,
-  onClose,
+  onCancel,
 }: {
   teamId: string
-  channelName: string
   existingMemberIds: string[]
   onAdd: (userIds: string[]) => Promise<void>
-  onClose: () => void
+  onCancel: () => void
 }) {
-  const [candidates, setCandidates] = useState<Array<{ user_id: string; display_name: string }>>([])
+  const [candidates, setCandidates] = useState<Candidate[] | null>(null)
   const [selected, setSelected] = useState<string[]>([])
-  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string>()
 
   useEffect(() => {
     let cancelled = false
-    void getTeamMembersRequest(teamId).then(({ members }) => {
-      if (!cancelled) {
-        setCandidates(members)
-        setLoading(false)
-      }
-    })
-    return () => { cancelled = true }
+    getTeamMembersRequest(teamId)
+      .then(({ members }) => {
+        if (!cancelled) setCandidates(members.filter((m) => m.is_active))
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCandidates([])
+          setError("Could not load team members.")
+        }
+      })
+    return () => {
+      cancelled = true
+    }
   }, [teamId])
 
-  const nonMembers = candidates.filter((m) => !existingMemberIds.includes(m.user_id))
+  const available = (candidates ?? []).filter((m) => !existingMemberIds.includes(m.user_id))
 
-  const toggle = (userId: string, checked: boolean) =>
-    setSelected((prev) => (checked ? [...prev, userId] : prev.filter((id) => id !== userId)))
-
-  const submit = async (e: FormEvent) => {
-    e.preventDefault()
-    if (!selected.length) return
+  const submit = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!selected.length) {
+      setError("Choose at least one person.")
+      return
+    }
     setSaving(true)
     setError(undefined)
     try {
       await onAdd(selected)
-      onClose()
-    } catch {
-      setError("Could not add members. Please try again.")
+    } catch (err) {
+      setError(describeChannelError(err))
       setSaving(false)
     }
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-      onClick={(e) => { if (e.target === e.currentTarget && !saving) onClose() }}
-    >
-      <div className="w-full max-w-sm rounded-lg border border-border bg-surface p-6 shadow-lg">
-        <h2 className="mb-1 text-base font-semibold">Add members</h2>
-        <p className="mb-4 text-sm text-muted-foreground">
-          Choose people to add to #{channelName}.
-        </p>
-        {error && <Alert className="mb-3">{error}</Alert>}
-        {loading ? (
-          <p className="text-sm text-muted-foreground">Loading…</p>
-        ) : nonMembers.length === 0 ? (
-          <div className="flex flex-col gap-3">
-            <p className="text-sm text-muted-foreground">Everyone is already in this channel.</p>
-            <div className="flex justify-end">
-              <Button variant="ghost" onClick={onClose}>Close</Button>
-            </div>
-          </div>
-        ) : (
-          <form onSubmit={submit} className="flex flex-col gap-3">
-            <div className="flex max-h-60 flex-col divide-y divide-border overflow-y-auto rounded-md border border-border">
-              {nonMembers.map((m) => (
-                <label
-                  key={m.user_id}
-                  className="flex cursor-pointer items-center gap-3 px-3 py-2.5 hover:bg-surface-hover"
-                >
-                  <input
-                    type="checkbox"
-                    checked={selected.includes(m.user_id)}
-                    onChange={(e) => toggle(m.user_id, e.target.checked)}
-                  />
-                  <Avatar name={m.display_name} />
-                  <span className="text-sm">{m.display_name}</span>
-                </label>
-              ))}
-            </div>
-            <div className="flex justify-end gap-2 pt-1">
-              <Button type="button" variant="ghost" disabled={saving} onClick={onClose}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={saving || !selected.length}>
-                {saving ? "Adding…" : "Add members"}
-              </Button>
-            </div>
-          </form>
+    <form onSubmit={submit} className="flex flex-col gap-[18px]">
+      <div className="flex flex-col gap-1">
+        {candidates === null && (
+          <p className="py-6 text-center text-muted-foreground">Loading…</p>
         )}
+        {candidates !== null && available.length === 0 && !error && (
+          <div className="flex min-h-[150px] items-center justify-center">
+            <strong>Everyone is already here</strong>
+          </div>
+        )}
+        {available.map((m) => (
+          <label
+            key={m.user_id}
+            className="flex min-h-[46px] cursor-pointer items-center gap-[9px] rounded-sm px-2 py-1.5 hover:bg-surface-hover"
+          >
+            <input
+              type="checkbox"
+              className="size-4 accent-primary"
+              checked={selected.includes(m.user_id)}
+              onChange={(e) =>
+                setSelected((current) =>
+                  e.target.checked
+                    ? [...current, m.user_id]
+                    : current.filter((id) => id !== m.user_id),
+                )
+              }
+            />
+            <Avatar name={m.display_name} />
+            <span>{m.display_name}</span>
+          </label>
+        ))}
       </div>
-    </div>
+      {error && <span className="text-[11px] text-destructive">{error}</span>}
+      <div className="flex items-center justify-end gap-2">
+        <Button type="button" variant="ghost" disabled={saving} onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button type="submit" disabled={saving || available.length === 0}>
+          {saving ? "Adding…" : "Add members"}
+        </Button>
+      </div>
+    </form>
   )
 }
 
-// ── Members tab ───────────────────────────────────────────────────────────────
+// ── Members ──────────────────────────────────────────────────────────────────
 
 function MembersTab({
+  channel,
   teamId,
-  channelName,
   members,
   memberNames,
-  archived,
   canManage,
   onAdd,
   onRemove,
 }: {
+  channel: ChannelDetail
   teamId: string
-  channelName: string
-  members: Array<{ user_id: string; role: "owner" | "member" }>
+  members: ChannelMember[]
   memberNames: Record<string, string>
-  archived: boolean
   canManage: boolean
   onAdd: (userIds: string[]) => Promise<void>
   onRemove: (userId: string) => Promise<void>
 }) {
+  const [adding, setAdding] = useState(false)
   const [busy, setBusy] = useState<string>()
   const [error, setError] = useState<string>()
-  const [addingMembers, setAddingMembers] = useState(false)
   const { confirm, confirmProps } = useConfirm()
+  const editable = canManage && !channel.archived
 
   const handleRemove = async (userId: string) => {
-    const name = memberNames[userId] ?? userId
+    const name = memberNames[userId] ?? "this member"
     const ok = await confirm({
       title: `Remove ${name}?`,
-      description: "They will lose access to this channel.",
-      action: "Remove",
+      description: `They will lose access to #${channel.name}.`,
+      action: "Remove member",
       destructive: true,
     })
     if (!ok) return
@@ -254,30 +243,22 @@ function MembersTab({
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-2">
       <ConfirmDialog {...confirmProps} />
-      {error && <Alert>{error}</Alert>}
-      {canManage && !archived && (
-        <div>
-          <Button size="sm" onClick={() => setAddingMembers(true)}>
-            Add members
-          </Button>
+      {editable && (
+        <div className="flex items-center justify-end gap-2">
+          <Button onClick={() => setAdding(true)}>Add members</Button>
         </div>
       )}
-      <p className="text-sm text-muted-foreground">
-        {members.length} member{members.length !== 1 ? "s" : ""}
-      </p>
-      <div className="flex flex-col divide-y divide-border rounded-md border border-border bg-surface">
+      {error && <Alert>{error}</Alert>}
+      <DataList>
         {members.map((m) => {
-          const name = memberNames[m.user_id] ?? m.user_id
+          const name = memberNames[m.user_id] ?? "Unknown member"
           return (
-            <div key={m.user_id} className="flex items-center gap-3 px-3 py-2.5">
+            <DataRow key={m.user_id}>
               <Avatar name={name} />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">{name}</p>
-                <p className="text-[11px] text-muted-foreground capitalize">{m.role}</p>
-              </div>
-              {m.role !== "owner" && !archived && canManage && (
+              <RowMain title={name} detail={m.role === "owner" ? "Channel owner" : "Member"} />
+              {editable && m.role !== "owner" && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -287,46 +268,47 @@ function MembersTab({
                   Remove
                 </Button>
               )}
-            </div>
+            </DataRow>
           )
         })}
-      </div>
-      {addingMembers && (
-        <AddMembersModal
+      </DataList>
+      <Dialog
+        open={adding}
+        title="Add members"
+        description={`Choose people to add to #${channel.name}.`}
+        onClose={() => setAdding(false)}
+      >
+        <AddMembersForm
           teamId={teamId}
-          channelName={channelName}
           existingMemberIds={members.map((m) => m.user_id)}
-          onAdd={onAdd}
-          onClose={() => setAddingMembers(false)}
+          onAdd={async (userIds) => {
+            await onAdd(userIds)
+            setAdding(false)
+          }}
+          onCancel={() => setAdding(false)}
         />
-      )}
+      </Dialog>
     </div>
   )
 }
 
-// ── Notifications tab ─────────────────────────────────────────────────────────
+// ── Notifications ────────────────────────────────────────────────────────────
 
 function NotificationsTab({
-  notifyLevel,
-  muted,
+  my,
   onUpdate,
 }: {
-  notifyLevel: NotifyLevel
-  muted: boolean
+  my: MyChannelSettings
   onUpdate: (settings: { notify_level: NotifyLevel; muted: boolean; hidden: boolean }) => Promise<void>
 }) {
-  const [level, setLevel] = useState<NotifyLevel>(notifyLevel)
-  const [isMuted, setIsMuted] = useState(muted)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string>()
 
-  const save = async (event: FormEvent) => {
-    event.preventDefault()
-    if (saving) return
+  const update = async (patch: Partial<{ notify_level: NotifyLevel; muted: boolean }>) => {
     setSaving(true)
     setError(undefined)
     try {
-      await onUpdate({ notify_level: level, muted: isMuted, hidden: false })
+      await onUpdate({ notify_level: my.notify_level, muted: my.muted, hidden: my.hidden, ...patch })
     } catch (err) {
       setError(describeChannelError(err))
     } finally {
@@ -335,175 +317,130 @@ function NotificationsTab({
   }
 
   return (
-    <form onSubmit={save} className="flex flex-col gap-4">
+    <div className="flex flex-col gap-[18px]">
       {error && <Alert>{error}</Alert>}
       <FormField label="Notification level">
         {(control) => (
           <Select
             {...control}
-            value={level}
-            onChange={(e) => setLevel(e.target.value as NotifyLevel)}
+            value={my.notify_level}
+            disabled={saving}
+            onChange={(e) => void update({ notify_level: e.target.value as NotifyLevel })}
           >
             <option value="all">All messages</option>
             <option value="mentions">Mentions only</option>
-            <option value="none">None</option>
+            <option value="none">Nothing</option>
           </Select>
         )}
       </FormField>
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={isMuted}
-          onChange={(e) => setIsMuted(e.target.checked)}
-        />
-        Mute this channel
-      </label>
-      <div>
-        <Button type="submit" disabled={saving}>
-          {saving ? "Saving…" : "Save preferences"}
-        </Button>
-      </div>
-    </form>
+      <Button variant="secondary" disabled={saving} onClick={() => void update({ muted: !my.muted })}>
+        {my.muted ? "Unmute channel" : "Mute channel"}
+      </Button>
+    </div>
   )
 }
 
-// ── Archive tab ───────────────────────────────────────────────────────────────
+// ── Archive ──────────────────────────────────────────────────────────────────
 
 function ArchiveTab({
-  channelName,
-  isDefault,
-  archived,
+  channel,
   canManage,
   onArchive,
   onLeave,
 }: {
-  channelName: string
-  isDefault: boolean
-  archived: boolean
+  channel: ChannelDetail
   canManage: boolean
   onArchive: () => Promise<void>
   onLeave: () => Promise<void>
 }) {
-  const [archiving, setArchiving] = useState(false)
-  const [leaving, setLeaving] = useState(false)
+  const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
   const { confirm, confirmProps } = useConfirm()
 
-  const handleArchive = async () => {
-    const ok = await confirm({
-      title: `Archive #${channelName}?`,
-      description: "Members can still read history, but no one can post new messages.",
-      action: "Archive channel",
-      destructive: true,
-    })
+  const run = async (
+    options: { title: string; description: string; action: string },
+    action: () => Promise<void>,
+  ) => {
+    const ok = await confirm({ ...options, destructive: true })
     if (!ok) return
-    setArchiving(true)
+    setBusy(true)
     setError(undefined)
     try {
-      await onArchive()
+      await action()
     } catch (err) {
       setError(describeChannelError(err))
-      setArchiving(false)
+    } finally {
+      setBusy(false)
     }
   }
 
-  const handleLeave = async () => {
-    const ok = await confirm({
-      title: `Leave #${channelName}?`,
-      description: "You will lose access to messages in this channel. You can rejoin if it's public.",
-      action: "Leave channel",
-      destructive: true,
-    })
-    if (!ok) return
-    setLeaving(true)
-    setError(undefined)
-    try {
-      await onLeave()
-    } catch (err) {
-      setError(describeChannelError(err))
-      setLeaving(false)
-    }
-  }
-
-  if (isDefault) {
+  if (channel.is_default) {
     return (
-      <p className="text-sm text-muted-foreground">
-        You cannot archive or leave the default channel.
-      </p>
+      <SectionTitle
+        title="Default channel"
+        description="The default channel can't be archived or left."
+      />
     )
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-[18px]">
       <ConfirmDialog {...confirmProps} />
       {error && <Alert>{error}</Alert>}
-      {canManage && (
-        <div className="flex flex-col gap-2 rounded-md border border-destructive/40 bg-destructive-soft p-4">
-          <p className="text-sm font-medium">
-            {archived ? "Channel archived" : "Archive channel"}
-          </p>
-          <p className="text-[13px] text-muted-foreground">
-            {archived
-              ? "This channel is read-only. Members can still read message history."
-              : "Members can still read history, but no one can post new messages."}
-          </p>
-          {!archived && (
-            <div>
-              <Button variant="destructive" disabled={archiving} onClick={() => void handleArchive()}>
-                {archiving ? "Archiving…" : "Archive channel"}
-              </Button>
-            </div>
-          )}
-        </div>
-      )}
-      <div className="flex flex-col gap-2 rounded-md border border-border p-4">
-        <p className="text-sm font-medium">Leave channel</p>
-        <p className="text-[13px] text-muted-foreground">
-          You will lose access to messages in this channel.
-        </p>
-        <div>
-          <Button variant="destructive" size="sm" disabled={leaving} onClick={() => void handleLeave()}>
-            {leaving ? "Leaving…" : "Leave channel"}
+      <div>
+        <SectionTitle
+          title={channel.archived ? "Archived" : "Archive channel"}
+          description={
+            channel.archived
+              ? "This channel is read-only."
+              : "Members can still read message history."
+          }
+        />
+        {!channel.archived && canManage && (
+          <Button
+            variant="destructive"
+            className="w-full"
+            disabled={busy}
+            onClick={() =>
+              void run(
+                {
+                  title: `Archive #${channel.name}?`,
+                  description: "The channel will become read-only for every member.",
+                  action: "Archive channel",
+                },
+                onArchive,
+              )
+            }
+          >
+            Archive channel
           </Button>
-        </div>
+        )}
+      </div>
+      <div className="border-t pt-[18px]">
+        <SectionTitle title="Leave channel" description="You can rejoin later if the channel is public." />
+        <Button
+          variant="secondary"
+          className="w-full"
+          disabled={busy}
+          onClick={() =>
+            void run(
+              {
+                title: `Leave #${channel.name}?`,
+                description: "You will stop receiving messages from this channel.",
+                action: "Leave channel",
+              },
+              onLeave,
+            )
+          }
+        >
+          Leave channel
+        </Button>
       </div>
     </div>
   )
 }
 
-// ── Tab bar ───────────────────────────────────────────────────────────────────
-
-const PANEL_TAB_TABS: Tab[] = ["about", "members", "notifications", "archive"]
-
-function PanelTabBar({
-  tab,
-  onSelect,
-}: {
-  tab: Tab
-  onSelect: (t: Tab) => void
-}) {
-  return (
-    <div
-      className="flex shrink-0 border-b border-border px-1"
-      role="tablist"
-      aria-label="Settings sections"
-    >
-      {PANEL_TAB_TABS.map((t) => (
-        <button
-          key={t}
-          role="tab"
-          aria-selected={tab === t}
-          onClick={() => onSelect(t)}
-          className="relative px-2.5 pb-2.5 pt-2.5 text-xs font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:text-foreground aria-selected:text-foreground after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:bg-primary after:opacity-0 aria-selected:after:opacity-100"
-        >
-          {TAB_LABELS[t]}
-        </button>
-      ))}
-    </div>
-  )
-}
-
-// ── Channel details panel (side panel) ───────────────────────────────────────
+// ── Panel ────────────────────────────────────────────────────────────────────
 
 export type ChannelDetailsPanelProps = {
   channelId: string
@@ -511,252 +448,99 @@ export type ChannelDetailsPanelProps = {
   onClose: () => void
 }
 
-/** Side panel rendered alongside the channel view. Toggled from the channel header. */
+/** Right-hand details panel on the channel view: about, members, notifications, archive. */
 export function ChannelDetailsPanel({ channelId, teamId, onClose }: ChannelDetailsPanelProps) {
   const { user } = useAuth()
   const { reload } = useChannels()
-  const {
-    state,
-    renameChannel,
-    archiveChannel,
-    leaveChannel,
-    updateNotifications,
-    addMembers,
-    removeMember,
-  } = useChannelSettings(channelId)
-  const [tab, setTab] = useState<Tab>("about")
   const navigate = useNavigate()
-
-  const panelShell = (children: React.ReactNode, subtitle?: string) => (
-    <aside
-      className="flex w-72 shrink-0 flex-col overflow-hidden border-l border-border bg-surface"
-      aria-label="Channel details"
-    >
-      <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
-        <div className="min-w-0">
-          <p className="text-sm font-semibold leading-tight">Channel details</p>
-          {subtitle && <p className="truncate text-xs text-muted-foreground">{subtitle}</p>}
-        </div>
-        <Button variant="ghost" size="icon-sm" aria-label="Close details" onClick={onClose}>
-          <X className="size-4" />
-        </Button>
-      </div>
-      {children}
-    </aside>
-  )
-
-  if (state.status === "loading") {
-    return panelShell(
-      <div className="flex flex-1 items-center justify-center p-4">
-        <p className="text-sm text-muted-foreground">Loading…</p>
-      </div>,
-    )
-  }
-
-  if (state.status === "error") {
-    return panelShell(
-      <div className="p-4">
-        <Alert>{state.message}</Alert>
-      </div>,
-    )
-  }
-
-  const { channel, members, memberNames } = state
-  const canManage = channel.my?.role === "owner" || user?.id === channel.created_by
-
-  const handleRename = async (name: string, topic: string | null) => {
-    await renameChannel(name, topic)
-    reload()
-  }
-
-  const handleArchive = async () => {
-    await archiveChannel()
-    reload()
-    onClose()
-  }
-
-  const handleLeave = async () => {
-    await leaveChannel()
-    reload()
-    navigate(`/teams/${teamId}`, { replace: true })
-  }
-
-  const handleAddMembers = async (userIds: string[]) => {
-    await addMembers(userIds, teamId)
-  }
-
-  return panelShell(
-    <>
-      <PanelTabBar tab={tab} onSelect={setTab} />
-      <div className="flex-1 overflow-y-auto p-4">
-        {tab === "about" && canManage && (
-          <AboutTab
-            name={channel.name ?? ""}
-            topic={channel.topic}
-            archived={channel.archived}
-            onRename={handleRename}
-          />
-        )}
-        {tab === "about" && !canManage && (
-          <div className="flex flex-col gap-1">
-            <p className="text-sm font-medium">{channel.name}</p>
-            {channel.topic && <p className="text-sm text-muted-foreground">{channel.topic}</p>}
-            <p className="text-[13px] text-faint-foreground">
-              {channel.member_count} member{channel.member_count !== 1 ? "s" : ""}
-            </p>
-          </div>
-        )}
-        {tab === "members" && (
-          <MembersTab
-            teamId={teamId}
-            channelName={channel.name ?? ""}
-            members={members}
-            memberNames={memberNames}
-            archived={channel.archived}
-            canManage={canManage}
-            onAdd={handleAddMembers}
-            onRemove={removeMember}
-          />
-        )}
-        {tab === "notifications" && channel.my && (
-          <NotificationsTab
-            notifyLevel={channel.my.notify_level}
-            muted={channel.my.muted}
-            onUpdate={updateNotifications}
-          />
-        )}
-        {tab === "archive" && channel.kind !== "dm" && (
-          <ArchiveTab
-            channelName={channel.name ?? ""}
-            isDefault={channel.is_default}
-            archived={channel.archived}
-            canManage={canManage}
-            onArchive={handleArchive}
-            onLeave={handleLeave}
-          />
-        )}
-      </div>
-    </>,
-    `#${channel.name}`,
-  )
-}
-
-// ── Channel settings page (settings route) ────────────────────────────────────
-
-/** Full-page settings view for a channel — routed from /channels/:channelId/settings. */
-export function ChannelSettings({ channelId }: { channelId: string }) {
-  const { user } = useAuth()
-  const { reload } = useChannels()
-  const {
-    state,
-    renameChannel,
-    archiveChannel,
-    leaveChannel,
-    updateNotifications,
-    addMembers,
-    removeMember,
-  } = useChannelSettings(channelId)
+  const settings = useChannelSettings(channelId)
+  const { state } = settings
   const [tab, setTab] = useState<Tab>("about")
-  const navigate = useNavigate()
-  const { teamId = "" } = useParams()
 
-  if (state.status === "loading") return <FullScreenMessage title="Loading…" />
-  if (state.status === "error") {
-    return <FullScreenMessage title="Something went wrong" description={state.message} />
-  }
-
-  const { channel, members, memberNames } = state
-  const canManage = channel.my?.role === "owner" || user?.id === channel.created_by
-
-  const handleRename = async (name: string, topic: string | null) => {
-    await renameChannel(name, topic)
-    reload()
-  }
-
-  const handleArchive = async () => {
-    await archiveChannel()
-    reload()
-  }
-
-  const handleLeave = async () => {
-    await leaveChannel()
-    reload()
-    navigate(`/teams/${teamId}`, { replace: true })
-  }
-
-  const handleAddMembers = async (userIds: string[]) => {
-    await addMembers(userIds, channel.team_id)
-  }
+  const channel = state.status === "loaded" ? state.channel : null
+  const canManage = !!channel && (channel.my?.role === "owner" || user?.id === channel.created_by)
+  const tabs = channel?.kind === "dm" ? TABS.filter((t) => t !== "archive") : TABS
 
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-lg font-semibold">#{channel.name ?? "Direct message"}</h1>
-        <p className="text-sm text-muted-foreground">Channel settings</p>
+    <aside
+      aria-label="Channel details"
+      className="flex w-[360px] shrink-0 flex-col border-l bg-surface max-md:fixed max-md:top-16 max-md:right-0 max-md:bottom-0 max-md:z-30 max-md:w-[min(380px,92vw)] max-md:shadow-2xl"
+    >
+      <div className="flex min-h-[66px] shrink-0 items-center justify-between border-b py-2.5 pr-3 pl-[18px]">
+        <div className="flex min-w-0 flex-col">
+          <strong className="font-semibold">Channel details</strong>
+          {channel?.name && (
+            <span className="truncate text-xs text-muted-foreground">#{channel.name}</span>
+          )}
+        </div>
+        <Button variant="ghost" size="icon" aria-label="Close details" onClick={onClose}>
+          <X className="size-[17px]" />
+        </Button>
       </div>
 
-      <div className="flex gap-1 border-b border-border" role="tablist" aria-label="Settings sections">
-        {PANEL_TAB_TABS.map((t) => (
-          <button
-            key={t}
-            role="tab"
-            aria-selected={tab === t}
-            onClick={() => setTab(t)}
-            className="relative px-3 pb-2.5 text-sm font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:text-foreground aria-selected:text-foreground after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:bg-primary after:opacity-0 aria-selected:after:opacity-100"
-          >
-            {TAB_LABELS[t]}
-          </button>
-        ))}
-      </div>
+      {state.status === "loading" && (
+        <p className="p-[18px] text-muted-foreground">Loading…</p>
+      )}
+      {state.status === "error" && (
+        <div className="p-[18px]">
+          <Alert>{state.message}</Alert>
+        </div>
+      )}
 
-      <div className="rounded-md border border-border bg-surface p-[22px]">
-        {tab === "about" && canManage && (
-          <AboutTab
-            name={channel.name ?? ""}
-            topic={channel.topic}
-            archived={channel.archived}
-            onRename={handleRename}
+      {state.status === "loaded" && channel && (
+        <>
+          <SettingsTabs
+            compact
+            className="px-2.5"
+            tabs={tabs}
+            labels={TAB_LABELS}
+            value={tab}
+            onChange={setTab}
           />
-        )}
-        {tab === "about" && !canManage && (
-          <div className="flex flex-col gap-1">
-            <p className="text-sm font-medium">{channel.name}</p>
-            {channel.topic && <p className="text-sm text-muted-foreground">{channel.topic}</p>}
-            <p className="text-[13px] text-faint-foreground">
-              {channel.member_count} member{channel.member_count !== 1 ? "s" : ""}
-            </p>
+          <div className="min-h-0 flex-1 overflow-y-auto p-[18px]">
+            {tab === "about" && (
+              <AboutTab
+                key={`${channel.name}|${channel.topic}`}
+                channel={channel}
+                canManage={canManage}
+                onSave={async (name, topic) => {
+                  await settings.renameChannel(name, topic)
+                  reload()
+                }}
+              />
+            )}
+            {tab === "members" && (
+              <MembersTab
+                channel={channel}
+                teamId={teamId}
+                members={state.members}
+                memberNames={state.memberNames}
+                canManage={canManage}
+                onAdd={(userIds) => settings.addMembers(userIds, teamId)}
+                onRemove={settings.removeMember}
+              />
+            )}
+            {tab === "notifications" && channel.my && (
+              <NotificationsTab my={channel.my} onUpdate={settings.updateNotifications} />
+            )}
+            {tab === "archive" && (
+              <ArchiveTab
+                channel={channel}
+                canManage={canManage}
+                onArchive={async () => {
+                  await settings.archiveChannel()
+                  reload()
+                }}
+                onLeave={async () => {
+                  await settings.leaveChannel()
+                  reload()
+                  navigate(`/teams/${teamId}`, { replace: true })
+                }}
+              />
+            )}
           </div>
-        )}
-        {tab === "members" && (
-          <MembersTab
-            teamId={channel.team_id}
-            channelName={channel.name ?? ""}
-            members={members}
-            memberNames={memberNames}
-            archived={channel.archived}
-            canManage={canManage}
-            onAdd={handleAddMembers}
-            onRemove={removeMember}
-          />
-        )}
-        {tab === "notifications" && channel.my && (
-          <NotificationsTab
-            notifyLevel={channel.my.notify_level}
-            muted={channel.my.muted}
-            onUpdate={updateNotifications}
-          />
-        )}
-        {tab === "archive" && channel.kind !== "dm" && (
-          <ArchiveTab
-            channelName={channel.name ?? ""}
-            isDefault={channel.is_default}
-            archived={channel.archived}
-            canManage={canManage}
-            onArchive={handleArchive}
-            onLeave={handleLeave}
-          />
-        )}
-      </div>
-    </div>
+        </>
+      )}
+    </aside>
   )
 }
