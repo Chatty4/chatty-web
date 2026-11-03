@@ -2,8 +2,10 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { ArrowDown } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { useAuth } from "@/features/auth"
 
 import { useMessages } from "../context"
+import { useChannelMembers } from "../hooks/use-channel-members"
 import { useMemberNames } from "../hooks/use-member-names"
 import { MessageItem } from "./message-item"
 import { MessageComposer } from "./message-composer"
@@ -21,6 +23,7 @@ export type MessageListProps = {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function MessageList({ channelId, teamId, channel }: MessageListProps) {
+  const { user } = useAuth()
   const { getChannel, loadChannel, loadMoreHistory, send, retry, edit, remove } =
     useMessages()
 
@@ -34,12 +37,15 @@ export function MessageList({ channelId, teamId, channel }: MessageListProps) {
   const hasMore = channelState?.hasMore ?? false
   const loading = channelState?.loading ?? true
 
-  // ── Author name resolution ───────────────────────────────────────────────────
+  // ── Author name resolution (for message rows) ────────────────────────────────
   const authorIds = useMemo(
     () => [...new Set(messages.map((m) => m.author_id))],
     [messages],
   )
   const memberNames = useMemberNames(teamId, authorIds)
+
+  // ── Channel members (for @mention autocomplete) ──────────────────────────────
+  const mentionCandidates = useChannelMembers(channelId, teamId)
 
   // ── Scroll management ────────────────────────────────────────────────────────
   const listRef = useRef<HTMLDivElement>(null)
@@ -155,7 +161,7 @@ export function MessageList({ channelId, teamId, channel }: MessageListProps) {
               message={message}
               authorName={memberNames[message.author_id] ?? message.author_id}
               grouped={isGrouped(index)}
-              editable={false /* populated once current user id flows here */}
+              editable={!!user && message.author_id === user.id && message.deleted_at === null}
               onEdit={edit}
               onDelete={remove}
               onRetry={retry}
@@ -184,7 +190,7 @@ export function MessageList({ channelId, teamId, channel }: MessageListProps) {
 
       {/* Composer */}
       <MessageComposer
-        members={[]}
+        members={mentionCandidates}
         archived={archived}
         onSend={(body) => send(channelId, body)}
       />
