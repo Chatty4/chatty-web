@@ -4,9 +4,8 @@ import { AtSign, Paperclip, Send } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { EmojiPickerButton } from "@/components/ui/emoji-picker"
 
+import { MAX_MESSAGE_LENGTH as MAX_LENGTH } from "../constants"
 import { encodeMentions, type MentionCandidate } from "../utils/mentions"
-
-const MAX_LENGTH = 4000
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

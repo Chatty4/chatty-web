@@ -442,20 +442,29 @@ function ArchiveTab({
 
 // ── Panel ────────────────────────────────────────────────────────────────────
 
+export type ChannelDetailsTab = Tab
+
 export type ChannelDetailsPanelProps = {
   channelId: string
   teamId: string
+  /** Tab shown when the panel opens; defaults to About. */
+  initialTab?: ChannelDetailsTab
   onClose: () => void
 }
 
 /** Right-hand details panel on the channel view: about, members, notifications, archive. */
-export function ChannelDetailsPanel({ channelId, teamId, onClose }: ChannelDetailsPanelProps) {
+export function ChannelDetailsPanel({
+  channelId,
+  teamId,
+  initialTab = "about",
+  onClose,
+}: ChannelDetailsPanelProps) {
   const { user } = useAuth()
   const { reload } = useChannels()
   const navigate = useNavigate()
   const settings = useChannelSettings(channelId)
   const { state } = settings
-  const [tab, setTab] = useState<Tab>("about")
+  const [tab, setTab] = useState<Tab>(initialTab)
 
   const channel = state.status === "loaded" ? state.channel : null
   const canManage = !!channel && (channel.my?.role === "owner" || user?.id === channel.created_by)

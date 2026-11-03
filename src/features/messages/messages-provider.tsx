@@ -225,15 +225,33 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
     }
   }, [doDispatch])
 
-  const edit = useCallback(async (messageId: string, body: string) => {
-    await editMessageApi(messageId, body)
-    // The message.edited WS event applies the change.
-  }, [])
+  // Edit and delete apply the REST answer right away, so the change shows even if the
+  // socket is down; the matching WS event later applies the same values (idempotent).
+  const edit = useCallback(async (channelId: string, messageId: string, body: string) => {
+    try {
+      const updated = await editMessageApi(messageId, body)
+      doDispatch({
+        type: "MESSAGE_EDITED",
+        channelId,
+        edit: {
+          message_id: updated.id,
+          body: updated.body,
+          mentions: updated.mentions,
+          edited_at: updated.edited_at ?? new Date().toISOString(),
+        },
+      })
+    } catch (err) {
+      if (err instanceof ApiError && err.code === "message_deleted") {
+        doDispatch({ type: "MESSAGE_DELETED", channelId, messageId, deletedAt: new Date().toISOString() })
+      }
+      throw err
+    }
+  }, [doDispatch])
 
-  const remove = useCallback(async (messageId: string) => {
+  const remove = useCallback(async (channelId: string, messageId: string) => {
     await deleteMessageApi(messageId)
-    // The message.deleted WS event applies the change.
-  }, [])
+    doDispatch({ type: "MESSAGE_DELETED", channelId, messageId, deletedAt: new Date().toISOString() })
+  }, [doDispatch])
 
   return (
     <MessagesContext.Provider value={{ getChannel, loadChannel, loadMoreHistory, send, retry, edit, remove }}>

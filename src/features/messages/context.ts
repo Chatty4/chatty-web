@@ -8,8 +8,10 @@ export type MessagesContextValue = {
   loadMoreHistory: (channelId: string) => Promise<void>
   send: (channelId: string, body: string) => Promise<void>
   retry: (channelId: string, clientMsgId: string) => Promise<void>
-  edit: (messageId: string, body: string) => Promise<void>
-  remove: (messageId: string) => Promise<void>
+  /** PUT /messages/{id}; rejects with ApiError so the editor can stay open on failure. */
+  edit: (channelId: string, messageId: string, body: string) => Promise<void>
+  /** DELETE /messages/{id}; rejects with ApiError. */
+  remove: (channelId: string, messageId: string) => Promise<void>
 }
 
 export const MessagesContext = createContext<MessagesContextValue | null>(null)

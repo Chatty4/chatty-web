@@ -3,7 +3,7 @@
 
 import type { ChannelEvent } from "@/lib/ws/types"
 import type { ApiMessage, ChannelState, LocalMessage } from "../types"
-import { applyEvent } from "./apply-event"
+import { applyDelete, applyEdit, applyEvent, type MessageEdit } from "./apply-event"
 
 export type MessagesState = Record<string, ChannelState>
 
@@ -19,6 +19,10 @@ export type MessagesAction =
   | { type: "OPTIMISTIC_FAIL"; channelId: string; clientMsgId: string }
   | { type: "OPTIMISTIC_RETRY"; channelId: string; clientMsgId: string }
   | { type: "DROP_CHANNEL"; channelId: string }
+  // REST answers to my own edit/delete. They carry no seq, so lastSeq is untouched;
+  // the matching WS event applies the same values later (see applyEdit / applyDelete).
+  | { type: "MESSAGE_EDITED"; channelId: string; edit: MessageEdit }
+  | { type: "MESSAGE_DELETED"; channelId: string; messageId: string; deletedAt: string }
 
 // API returns newest-first; store keeps oldest-first for easy append.
 function newestFirstToAsc(messages: ApiMessage[]): LocalMessage[] {
@@ -156,6 +160,27 @@ export function messagesReducer(state: MessagesState, action: MessagesAction): M
           messages: ch.messages.map((m) =>
             m.client_msg_id === action.clientMsgId ? { ...m, status: "pending" as const } : m,
           ),
+        },
+      }
+    }
+
+    case "MESSAGE_EDITED": {
+      const ch = state[action.channelId]
+      if (!ch) return state
+      return {
+        ...state,
+        [action.channelId]: { ...ch, messages: applyEdit(ch.messages, action.edit) },
+      }
+    }
+
+    case "MESSAGE_DELETED": {
+      const ch = state[action.channelId]
+      if (!ch) return state
+      return {
+        ...state,
+        [action.channelId]: {
+          ...ch,
+          messages: applyDelete(ch.messages, action.messageId, action.deletedAt),
         },
       }
     }
