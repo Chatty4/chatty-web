@@ -1,3 +1,1 @@
-import { Toast } from "@base-ui/react/toast"
-
-export const toastManager = Toast.createToastManager()
+export { toast } from "sonner"

@@ -5,7 +5,7 @@ import { Avatar } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { FormField } from "@/components/ui/form-field"
 import { Input } from "@/components/ui/input"
-import { toastManager } from "@/lib/toast"
+import { toast } from "@/lib/toast"
 
 import { useProfile } from "../hooks/use-profile"
 import type { ChangePasswordInput } from "../types"
@@ -37,7 +37,7 @@ function ProfileSection({
     setError(undefined)
     try {
       await onSave(displayName.trim(), timezone)
-      toastManager.add({ title: "Profile saved" })
+      toast.success("Profile saved")
     } catch {
       setError("Could not save profile. Please try again.")
     } finally {
@@ -130,7 +130,7 @@ function PasswordSection({
       setOldPassword("")
       setNewPassword("")
       setConfirmPassword("")
-      toastManager.add({ title: "Password changed" })
+      toast.success("Password changed")
     } catch (err) {
       const msg =
         err instanceof Error && err.message.includes("wrong_password")
