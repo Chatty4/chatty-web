@@ -79,7 +79,7 @@ export const router = createBrowserRouter([
               {
                 path: "channels/:channelId",
                 Component: ChannelPage,
-                handle: { title: "Channel" } satisfies RouteHandle,
+                handle: { title: "Channel", fullBleed: true } satisfies RouteHandle,
               },
               {
                 path: "channels/:channelId/settings",
