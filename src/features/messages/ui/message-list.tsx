@@ -155,18 +155,22 @@ export function MessageList({ channelId, teamId, channel }: MessageListProps) {
 
         {/* Message rows */}
         <div className="pb-2">
-          {messages.map((message, index) => (
+          {messages.map((message, index) => {
+            const own = !!user && message.author_id === user.id
+            return (
             <MessageItem
               key={message.id}
               message={message}
               authorName={memberNames[message.author_id] ?? message.author_id}
               grouped={isGrouped(index)}
-              editable={!!user && message.author_id === user.id && message.deleted_at === null}
+              own={own}
+              editable={own && message.deleted_at === null}
               onEdit={edit}
               onDelete={remove}
               onRetry={retry}
             />
-          ))}
+            )
+          })}
         </div>
       </div>
 
