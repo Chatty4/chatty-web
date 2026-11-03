@@ -5,24 +5,10 @@ import { Avatar } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { FormField } from "@/components/ui/form-field"
 import { Input } from "@/components/ui/input"
-import { Select } from "@/components/ui/select"
 
 import { useProfile } from "../hooks/use-profile"
 import type { ChangePasswordInput } from "../types"
-
-// ── Timezone options ──────────────────────────────────────────────────────────
-
-function tzOffset(tz: string): string {
-  const parts = new Intl.DateTimeFormat("en", {
-    timeZone: tz,
-    timeZoneName: "shortOffset",
-  }).formatToParts(new Date())
-  return parts.find((p) => p.type === "timeZoneName")?.value ?? "UTC"
-}
-
-const TIMEZONES: Array<{ value: string; label: string }> = Intl.supportedValuesOf("timeZone").map(
-  (tz) => ({ value: tz, label: `(${tzOffset(tz)}) ${tz}` }),
-)
+import { TimezoneSelect } from "./timezone-select"
 
 // ── Profile section ───────────────────────────────────────────────────────────
 
@@ -103,20 +89,14 @@ function ProfileSection({
         </FormField>
         <FormField label="Timezone">
           {(control) => (
-            <Select
+            <TimezoneSelect
               {...control}
               value={timezone}
-              onChange={(e) => {
-                setTimezone(e.target.value)
+              onChange={(val) => {
+                if (val) setTimezone(val)
                 setSaved(false)
               }}
-            >
-              {TIMEZONES.map((tz) => (
-                <option key={tz.value} value={tz.value}>
-                  {tz.label}
-                </option>
-              ))}
-            </Select>
+            />
           )}
         </FormField>
         <div className="flex justify-end">
