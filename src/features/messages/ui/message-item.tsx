@@ -3,7 +3,9 @@ import { Check, MoreHorizontal, Pencil, RotateCcw, Trash2 } from "lucide-react"
 
 import { Avatar } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { Input } from "@/components/ui/input"
+import { useConfirm } from "@/hooks/use-confirm"
 import { cn } from "@/lib/utils"
 
 import type { LocalMessage } from "../types"
@@ -27,8 +29,8 @@ function MessageText({ body, own }: { body: string; own: boolean }) {
           <span
             key={i}
             className={cn(
-              "rounded-[4px] px-1 py-px font-medium text-primary",
-              own ? "bg-surface shadow-[inset_0_0_0_1px_var(--color-border)]" : "bg-accent",
+              "font-medium text-primary",
+              own ? "font-semibold" : "rounded-[4px] bg-accent px-1 py-px",
             )}
           >
             {part}
@@ -71,7 +73,7 @@ export function MessageItem({
 }: MessageItemProps) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(message.body)
-  const [confirmDelete, setConfirmDelete] = useState(false)
+  const { confirm, confirmProps } = useConfirm()
   const editorRef = useRef<HTMLInputElement>(null)
 
   const isDeleted = message.deleted_at !== null
@@ -92,9 +94,14 @@ export function MessageItem({
     setEditing(false)
   }
 
-  const handleDeleteConfirm = () => {
-    setConfirmDelete(false)
-    void onDelete(message.id)
+  const handleDelete = async () => {
+    const ok = await confirm({
+      title: "Delete message?",
+      description: "This message will be removed for everyone in the channel.",
+      action: "Delete",
+      destructive: true,
+    })
+    if (ok) void onDelete(message.id)
   }
 
   const time = (
@@ -172,37 +179,24 @@ export function MessageItem({
           <Pencil />
         </Button>
       )}
-      {editable && !confirmDelete && (
+      {editable && (
         <Button
           variant="ghost"
           size="icon-sm"
           aria-label="Delete message"
-          onClick={() => setConfirmDelete(true)}
+          onClick={() => void handleDelete()}
         >
           <Trash2 />
         </Button>
       )}
-      {confirmDelete && (
-        <div className="flex items-center gap-1 px-1">
-          <span className="text-xs text-destructive">Delete?</span>
-          <Button size="sm" variant="destructive" onClick={handleDeleteConfirm}>
-            Yes
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => setConfirmDelete(false)}>
-            No
-          </Button>
-        </div>
-      )}
-      {!confirmDelete && (
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label="More message options"
-          onClick={() => {/* reactions / thread — future tickets */}}
-        >
-          <MoreHorizontal />
-        </Button>
-      )}
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        aria-label="More message options"
+        onClick={() => {/* reactions / thread — future tickets */}}
+      >
+        <MoreHorizontal />
+      </Button>
     </div>
   )
 
@@ -215,6 +209,7 @@ export function MessageItem({
         )}
         data-message-id={message.id}
       >
+        <ConfirmDialog {...confirmProps} />
         {!grouped && <div className="mb-1 px-1">{time}</div>}
 
         {editing ? (
@@ -253,6 +248,7 @@ export function MessageItem({
       )}
       data-message-id={message.id}
     >
+      <ConfirmDialog {...confirmProps} />
       {/* Avatar column */}
       <div className="w-8 shrink-0">{!grouped && <Avatar name={authorName} />}</div>
 
