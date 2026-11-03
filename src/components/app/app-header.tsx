@@ -1,4 +1,4 @@
-import { Menu, Settings } from "lucide-react"
+import { Menu, Settings, UserCircle } from "lucide-react"
 import { Link, useLocation, useParams } from "react-router"
 
 import { Button, buttonVariants } from "@/components/ui/button"
@@ -48,6 +48,13 @@ export function AppHeader({ title, subtitle, onOpenMenu }: AppHeaderProps) {
             <Settings className="size-[18px]" />
           </Link>
         )}
+        <Link
+          to="/profile"
+          aria-label="Account settings"
+          className={buttonVariants({ variant: "ghost", size: "icon" })}
+        >
+          <UserCircle className="size-[18px]" />
+        </Link>
         <ThemeToggle />
       </div>
     </header>
