@@ -23,6 +23,7 @@ export type MessageComposerProps = {
 
 export function MessageComposer({ members, archived = false, onSend }: MessageComposerProps) {
   const [value, setValue] = useState("")
+  const [activeIndex, setActiveIndex] = useState(0)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // Detect @mention being typed at the cursor end.
@@ -35,22 +36,49 @@ export function MessageComposer({ members, archived = false, onSend }: MessageCo
       .slice(0, 5)
   }, [mentionMatch, members])
 
+  // Clamp so activeIndex never points past the end of the current list.
+  const clampedIndex = suggestions.length > 0 ? Math.min(activeIndex, suggestions.length - 1) : 0
+
   const send = () => {
     const body = value.trim()
     if (!body || archived) return
     setValue("")
     void onSend(body)
-    // Re-focus textarea after clearing.
     requestAnimationFrame(() => textareaRef.current?.focus())
   }
 
   const applyMention = (name: string) => {
     const firstName = name.split(" ")[0]
     setValue((prev) => prev.replace(/@[\w]*$/, `@${firstName} `))
+    setActiveIndex(0)
     textareaRef.current?.focus()
   }
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (suggestions.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault()
+        setActiveIndex((i) => (i + 1) % suggestions.length)
+        return
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault()
+        setActiveIndex((i) => (i - 1 + suggestions.length) % suggestions.length)
+        return
+      }
+      if (e.key === "Tab" || (e.key === "Enter" && suggestions.length > 0)) {
+        e.preventDefault()
+        const candidate = suggestions[clampedIndex]
+        if (candidate) applyMention(candidate.display_name)
+        return
+      }
+      if (e.key === "Escape") {
+        // Dismiss suggestions without closing by inserting a zero-width space
+        // — simplest way to break the @-pattern match without changing visible text.
+        setValue((prev) => prev + "​")
+        return
+      }
+    }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
       send()
@@ -64,19 +92,31 @@ export function MessageComposer({ members, archived = false, onSend }: MessageCo
     <div className="relative px-4 pb-4 pt-2">
       {/* @mention suggestion list */}
       {suggestions.length > 0 && (
-        <div className="absolute bottom-full left-4 right-4 mb-1 rounded-md border bg-surface shadow-md">
-          {suggestions.map((m) => (
+        <div
+          role="listbox"
+          aria-label="Mention suggestions"
+          className="absolute bottom-full left-4 right-4 mb-1 overflow-hidden rounded-md border bg-surface shadow-md"
+        >
+          {suggestions.map((m, i) => (
             <button
               key={m.id}
               type="button"
-              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-surface-hover"
+              role="option"
+              aria-selected={i === clampedIndex}
+              className={[
+                "flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors",
+                i === clampedIndex ? "bg-surface-hover" : "hover:bg-surface-hover",
+              ].join(" ")}
+              onMouseEnter={() => setActiveIndex(i)}
               onMouseDown={(e) => {
-                // Prevent textarea blur before we can apply the mention.
-                e.preventDefault()
+                e.preventDefault() // keep textarea focus
                 applyMention(m.display_name)
               }}
             >
-              <span className="grid size-6 shrink-0 place-items-center rounded-full bg-accent text-[10px] font-semibold text-primary">
+              <span
+                aria-hidden="true"
+                className="grid size-6 shrink-0 place-items-center rounded-full bg-accent text-[10px] font-semibold text-primary"
+              >
                 {m.display_name.charAt(0).toUpperCase()}
               </span>
               <span>{m.display_name}</span>
@@ -96,7 +136,14 @@ export function MessageComposer({ members, archived = false, onSend }: MessageCo
           disabled={archived}
           aria-label="Write a message"
           placeholder={archived ? "This channel has been archived." : "Write a message…"}
-          onChange={(e) => setValue(e.target.value)}
+          onChange={(e) => {
+            const next = e.target.value
+            // Reset suggestion index when the @query changes (new/different mention).
+            const nextQuery = next.match(/@([\w]*)$/)?.[1]
+            const prevQuery = value.match(/@([\w]*)$/)?.[1]
+            if (nextQuery !== prevQuery) setActiveIndex(0)
+            setValue(next)
+          }}
           onKeyDown={handleKeyDown}
         />
 
