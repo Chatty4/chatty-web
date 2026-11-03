@@ -12,6 +12,8 @@ export type AuthContextValue = {
   logout: () => Promise<void>
   /** Try to restore the stored session again (after "unavailable"). */
   retry: () => void
+  /** Patch the in-memory user after a profile update (PUT /me). */
+  updateUser: (user: User) => void
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null)

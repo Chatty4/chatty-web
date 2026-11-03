@@ -113,8 +113,15 @@ export function useAuthState(): AuthContextValue {
     load()
   }, [load, update])
 
+  const updateUser = useCallback(
+    (user: User) => {
+      update({ status: "authenticated", user })
+    },
+    [update],
+  )
+
   return useMemo(
-    () => ({ ...state, login, register, logout, retry }),
-    [state, login, register, logout, retry],
+    () => ({ ...state, login, register, logout, retry, updateUser }),
+    [state, login, register, logout, retry, updateUser],
   )
 }
