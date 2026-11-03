@@ -37,12 +37,10 @@ const TIMEZONES: Array<{ value: string; label: string }> = [
 function ProfileSection({
   displayName: initialDisplayName,
   timezone: initialTimezone,
-  avatarFileId,
   onSave,
 }: {
   displayName: string
   timezone: string
-  avatarFileId: string | null
   onSave: (displayName: string, timezone: string) => Promise<void>
 }) {
   const [displayName, setDisplayName] = useState(initialDisplayName)
@@ -51,9 +49,12 @@ function ProfileSection({
   const [error, setError] = useState<string>()
   const [saved, setSaved] = useState(false)
 
+  const isDirty =
+    displayName.trim() !== initialDisplayName || timezone !== initialTimezone
+
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
-    if (saving || !displayName.trim()) return
+    if (saving || !displayName.trim() || !isDirty) return
     setSaving(true)
     setError(undefined)
     setSaved(false)
@@ -68,24 +69,25 @@ function ProfileSection({
   }
 
   return (
-    <section className="flex flex-col gap-6 rounded-md border border-border bg-surface p-[22px]">
-      <div>
-        <p className="text-sm font-semibold">Profile</p>
-        <p className="text-[13px] text-muted-foreground">Update how teammates see you.</p>
+    <section className="flex flex-col gap-[18px] rounded-md border border-border bg-surface p-[22px]">
+      <div className="mb-0.5 flex flex-col">
+        <strong className="text-sm font-semibold">Profile</strong>
+        <span className="text-[13px] text-muted-foreground">Update how teammates see you.</span>
       </div>
 
-      <div className="flex items-center gap-3">
-        <Avatar name={displayName} className="size-10 text-base" />
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium">Profile photo</p>
-          <p className="text-[13px] text-muted-foreground">Avatar uploads are coming soon.</p>
+      {/* Avatar row */}
+      <div className="flex items-center gap-3 border-b border-border pb-4">
+        <Avatar name={displayName} className="size-12 text-base" />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <strong className="text-sm font-medium">Profile photo</strong>
+          <span className="text-[12px] text-muted-foreground">Avatar uploads are coming soon.</span>
         </div>
         <Button variant="ghost" size="sm" disabled>
           Upload
         </Button>
       </div>
 
-      <form onSubmit={handleSubmit} className="flex max-w-sm flex-col gap-4">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-[18px]">
         {error && <Alert>{error}</Alert>}
         {saved && (
           <p className="text-[13px] text-green-600 dark:text-green-400">Profile saved.</p>
@@ -125,11 +127,8 @@ function ProfileSection({
             </Select>
           )}
         </FormField>
-        <div>
-          <Button
-            type="submit"
-            disabled={saving || !displayName.trim() || displayName.trim() === initialDisplayName && timezone === initialTimezone}
-          >
+        <div className="flex justify-end">
+          <Button type="submit" disabled={saving || !displayName.trim() || !isDirty}>
             {saving ? "Saving…" : "Save profile"}
           </Button>
         </div>
@@ -169,25 +168,25 @@ function PasswordSection({
       setConfirmPassword("")
       setSaved(true)
     } catch (err) {
-      const message =
-        err instanceof Error && err.message === "wrong_password"
+      const msg =
+        err instanceof Error && err.message.includes("wrong_password")
           ? "Current password is incorrect."
-          : "Could not change password. Make sure the new password is at least 10 characters and not a common one."
-      setError(message)
+          : "Could not change password. Make sure it is at least 10 characters and not a common one."
+      setError(msg)
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <section className="flex flex-col gap-6 rounded-md border border-border bg-surface p-[22px]">
-      <div>
-        <p className="text-sm font-semibold">Password</p>
-        <p className="text-[13px] text-muted-foreground">
+    <section className="flex flex-col gap-[18px] rounded-md border border-border bg-surface p-[22px]">
+      <div className="mb-0.5 flex flex-col">
+        <strong className="text-sm font-semibold">Password</strong>
+        <span className="text-[13px] text-muted-foreground">
           Change the password used to access your account.
-        </p>
+        </span>
       </div>
-      <form onSubmit={handleSubmit} className="flex max-w-sm flex-col gap-4">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-[18px]">
         {error && <Alert>{error}</Alert>}
         {saved && (
           <p className="text-[13px] text-green-600 dark:text-green-400">Password changed.</p>
@@ -243,7 +242,7 @@ function PasswordSection({
             />
           )}
         </FormField>
-        <div>
+        <div className="flex justify-end">
           <Button
             type="submit"
             disabled={saving || !oldPassword || !newPassword || !confirmPassword}
@@ -265,16 +264,15 @@ export function ProfilePage() {
   if (!user) return null
 
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-lg font-semibold">Account settings</h1>
+    <div className="flex flex-col gap-[18px]">
+      <div className="flex flex-col gap-1">
+        <h1 className="text-[20px] font-semibold tracking-tight">Account settings</h1>
         <p className="text-sm text-muted-foreground">Manage your profile and security.</p>
       </div>
 
       <ProfileSection
         displayName={user.display_name}
         timezone={user.timezone}
-        avatarFileId={user.avatar_file_id}
         onSave={updateProfile}
       />
 
