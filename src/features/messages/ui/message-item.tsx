@@ -3,7 +3,7 @@ import { Check, MoreHorizontal, Pencil, RotateCcw, Trash2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Avatar, initials } from "@/components/ui/avatar"
+import { Avatar } from "@/components/ui/avatar"
 
 import type { LocalMessage } from "../types"
 
@@ -74,10 +74,10 @@ export function MessageItem({
     if (editing) editorRef.current?.focus()
   }, [editing])
 
-  // Reset draft when the message body changes externally (e.g. WS edit event).
-  useEffect(() => {
-    setDraft(message.body)
-  }, [message.body])
+  const startEditing = () => {
+    setDraft(message.body) // always reset to current body when entering edit mode
+    setEditing(true)
+  }
 
   const save = () => {
     const value = draft.trim()
@@ -184,7 +184,7 @@ export function MessageItem({
               variant="ghost"
               size="icon-sm"
               aria-label="Edit message"
-              onClick={() => setEditing(true)}
+              onClick={startEditing}
             >
               <Pencil />
             </Button>
@@ -226,4 +226,3 @@ export function MessageItem({
   )
 }
 
-export { initials }

@@ -30,7 +30,7 @@ export function MessageList({ channelId, teamId, channel }: MessageListProps) {
   }, [channelId, loadChannel])
 
   const channelState = getChannel(channelId)
-  const messages = channelState?.messages ?? []
+  const messages = useMemo(() => channelState?.messages ?? [], [channelState])
   const hasMore = channelState?.hasMore ?? false
   const loading = channelState?.loading ?? true
 
@@ -44,26 +44,28 @@ export function MessageList({ channelId, teamId, channel }: MessageListProps) {
   // ── Scroll management ────────────────────────────────────────────────────────
   const listRef = useRef<HTMLDivElement>(null)
   const prevLengthRef = useRef(messages.length)
-  const [atBottom, setAtBottom] = useState(true)
-  const [farFromBottom, setFarFromBottom] = useState(false)
-  const [newCount, setNewCount] = useState(0)
+
+  type ScrollState = { atBottom: boolean; farFromBottom: boolean; newCount: number }
+  const resetScroll: ScrollState = { atBottom: true, farFromBottom: false, newCount: 0 }
+  const [scrollState, setScrollState] = useState<ScrollState>(resetScroll)
+  const { atBottom, farFromBottom, newCount } = scrollState
 
   const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
     const el = listRef.current
     if (!el) return
     el.scrollTo({ top: el.scrollHeight, behavior })
-    setAtBottom(true)
-    setFarFromBottom(false)
-    setNewCount(0)
+    setScrollState(resetScroll)
   }
 
   // On channel switch: jump to bottom immediately.
   useEffect(() => {
     prevLengthRef.current = messages.length
-    setNewCount(0)
-    setAtBottom(true)
-    setFarFromBottom(false)
-    requestAnimationFrame(() => scrollToBottom("instant" as ScrollBehavior))
+    // Defer the scroll + state reset into rAF so DOM is ready.
+    requestAnimationFrame(() => {
+      const el = listRef.current
+      if (el) el.scrollTo({ top: el.scrollHeight, behavior: "instant" as ScrollBehavior })
+      setScrollState(resetScroll)
+    })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelId])
 
@@ -75,8 +77,9 @@ export function MessageList({ channelId, teamId, channel }: MessageListProps) {
     if (atBottom) {
       requestAnimationFrame(() => scrollToBottom("smooth"))
     } else {
-      setNewCount((n) => n + added)
+      setScrollState((s) => ({ ...s, newCount: s.newCount + added }))
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages.length, atBottom])
 
   const handleScroll = () => {
@@ -85,9 +88,11 @@ export function MessageList({ channelId, teamId, channel }: MessageListProps) {
     // Load older messages when scrolled near the top.
     if (el.scrollTop < 80 && hasMore) void loadMoreHistory(channelId)
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
-    setAtBottom(distanceFromBottom < 40)
-    setFarFromBottom(distanceFromBottom > el.clientHeight)
-    if (distanceFromBottom < 40) setNewCount(0)
+    setScrollState({
+      atBottom: distanceFromBottom < 40,
+      farFromBottom: distanceFromBottom > el.clientHeight,
+      newCount: distanceFromBottom < 40 ? 0 : scrollState.newCount,
+    })
   }
 
   // ── Grouping helper ──────────────────────────────────────────────────────────
