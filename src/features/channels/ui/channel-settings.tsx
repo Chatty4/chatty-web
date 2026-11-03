@@ -4,11 +4,13 @@ import { useNavigate, useParams } from "react-router"
 import { Alert } from "@/components/ui/alert"
 import { Avatar } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { FormField } from "@/components/ui/form-field"
 import { Input } from "@/components/ui/input"
 import { Select } from "@/components/ui/select"
 import { FullScreenMessage } from "@/components/app/full-screen-message"
 import { useAuth } from "@/features/auth"
+import { useConfirm } from "@/hooks/use-confirm"
 
 import { useChannelSettings } from "../hooks/use-channel-settings"
 import { useChannels } from "../hooks/channels-context"
@@ -39,6 +41,7 @@ function GeneralTab({
   const [saving, setSaving] = useState(false)
   const [archiving, setArchiving] = useState(false)
   const [error, setError] = useState<string>()
+  const { confirm, confirmProps } = useConfirm()
 
   const save = async (event: FormEvent) => {
     event.preventDefault()
@@ -55,7 +58,13 @@ function GeneralTab({
   }
 
   const archive = async () => {
-    if (!window.confirm(`Archive #${initialName}? It will become read-only.`)) return
+    const ok = await confirm({
+      title: `Archive #${initialName}?`,
+      description: "Members can still read history, but no one can post new messages.",
+      action: "Archive channel",
+      destructive: true,
+    })
+    if (!ok) return
     setArchiving(true)
     setError(undefined)
     try {
@@ -69,6 +78,7 @@ function GeneralTab({
 
   return (
     <div className="flex flex-col gap-6">
+      <ConfirmDialog {...confirmProps} />
       {error && <Alert>{error}</Alert>}
       <form onSubmit={save} className="flex max-w-sm flex-col gap-4">
         <FormField label="Channel name">
@@ -137,10 +147,17 @@ function MembersTab({
 }) {
   const [busy, setBusy] = useState<string>()
   const [error, setError] = useState<string>()
+  const { confirm, confirmProps } = useConfirm()
 
   const handleRemove = async (userId: string) => {
     const name = memberNames[userId] ?? userId
-    if (!window.confirm(`Remove ${name} from this channel?`)) return
+    const ok = await confirm({
+      title: `Remove ${name}?`,
+      description: "They will lose access to this channel.",
+      action: "Remove",
+      destructive: true,
+    })
+    if (!ok) return
     setBusy(userId)
     setError(undefined)
     try {
@@ -154,6 +171,7 @@ function MembersTab({
 
   return (
     <div className="flex flex-col gap-3">
+      <ConfirmDialog {...confirmProps} />
       {error && <Alert>{error}</Alert>}
       <p className="text-sm text-muted-foreground">
         {members.length} member{members.length !== 1 ? "s" : ""}
@@ -264,9 +282,16 @@ function DangerTab({
   const [error, setError] = useState<string>()
   const navigate = useNavigate()
   const { teamId = "" } = useParams()
+  const { confirm, confirmProps } = useConfirm()
 
   const handleLeave = async () => {
-    if (!window.confirm(`Leave #${channelName}? You can rejoin if it's public.`)) return
+    const ok = await confirm({
+      title: `Leave #${channelName}?`,
+      description: "You will lose access to messages in this channel. You can rejoin if it's public.",
+      action: "Leave channel",
+      destructive: true,
+    })
+    if (!ok) return
     setBusy(true)
     setError(undefined)
     try {
@@ -280,6 +305,7 @@ function DangerTab({
 
   return (
     <div className="flex max-w-sm flex-col gap-4">
+      <ConfirmDialog {...confirmProps} />
       {error && <Alert>{error}</Alert>}
       {isDefault ? (
         <p className="text-sm text-muted-foreground">

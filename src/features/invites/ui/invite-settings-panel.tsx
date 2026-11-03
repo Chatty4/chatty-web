@@ -3,8 +3,10 @@ import { type FormEvent, useState } from "react"
 
 import { Alert } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { FormField } from "@/components/ui/form-field"
 import { Select } from "@/components/ui/select"
+import { useConfirm } from "@/hooks/use-confirm"
 
 import { useInvites } from "../hooks/use-invites"
 import { describeInviteError } from "../utils/errors"
@@ -119,6 +121,7 @@ export function InviteSettingsPanel({ teamId }: { teamId: string }) {
   const [creating, setCreating] = useState(false)
   const [revoking, setRevoking] = useState<string>()
   const [actionError, setActionError] = useState<string>()
+  const { confirm, confirmProps } = useConfirm()
 
   const copyLink = async (code: string) => {
     await navigator.clipboard.writeText(`${window.location.origin}/invite/${code}`)
@@ -130,7 +133,13 @@ export function InviteSettingsPanel({ teamId }: { teamId: string }) {
   }
 
   const handleRevoke = async (inviteId: string) => {
-    if (!window.confirm("Revoke this invite? The link will stop working immediately.")) return
+    const ok = await confirm({
+      title: "Revoke this invite?",
+      description: "The link will stop working immediately.",
+      action: "Revoke",
+      destructive: true,
+    })
+    if (!ok) return
     setRevoking(inviteId)
     setActionError(undefined)
     try {
@@ -144,6 +153,7 @@ export function InviteSettingsPanel({ teamId }: { teamId: string }) {
 
   return (
     <div className="flex flex-col gap-4">
+      <ConfirmDialog {...confirmProps} />
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm font-medium">Invite links</p>

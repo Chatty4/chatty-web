@@ -4,11 +4,13 @@ import { useNavigate } from "react-router"
 import { Alert } from "@/components/ui/alert"
 import { Avatar } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { FormField } from "@/components/ui/form-field"
 import { Input } from "@/components/ui/input"
 import { Select } from "@/components/ui/select"
 import { FullScreenMessage } from "@/components/app/full-screen-message"
 import { useAuth } from "@/features/auth"
+import { useConfirm } from "@/hooks/use-confirm"
 
 import { InviteSettingsPanel } from "@/features/invites/ui/invite-settings-panel"
 
@@ -90,6 +92,7 @@ function MembersTab({
 }) {
   const [busy, setBusy] = useState<string>()
   const [error, setError] = useState<string>()
+  const { confirm, confirmProps } = useConfirm()
 
   const canManage = myRole === "owner" || myRole === "admin"
 
@@ -106,7 +109,13 @@ function MembersTab({
   }
 
   const handleRemove = async (userId: string, displayName: string) => {
-    if (!window.confirm(`Remove ${displayName} from the team?`)) return
+    const ok = await confirm({
+      title: `Remove ${displayName}?`,
+      description: "They will lose access to all channels in this team.",
+      action: "Remove",
+      destructive: true,
+    })
+    if (!ok) return
     setBusy(userId)
     setError(undefined)
     try {
@@ -120,6 +129,7 @@ function MembersTab({
 
   return (
     <div className="flex flex-col gap-3">
+      <ConfirmDialog {...confirmProps} />
       {error && <Alert>{error}</Alert>}
       <p className="text-sm text-muted-foreground">{members.length} member{members.length !== 1 ? "s" : ""}</p>
       <div className="flex flex-col divide-y divide-border rounded-md border border-border bg-surface">
@@ -188,9 +198,16 @@ function DangerTab({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
   const navigate = useNavigate()
+  const { confirm, confirmProps } = useConfirm()
 
   const handleLeave = async () => {
-    if (!window.confirm(`Leave ${teamName}? You'll lose access until someone invites you again.`)) return
+    const ok = await confirm({
+      title: `Leave ${teamName}?`,
+      description: "You'll lose access to all channels until someone invites you again.",
+      action: "Leave team",
+      destructive: true,
+    })
+    if (!ok) return
     setBusy(true)
     setError(undefined)
     try {
@@ -203,7 +220,13 @@ function DangerTab({
   }
 
   const handleDelete = async () => {
-    if (!window.confirm(`Delete ${teamName}? All channels and data will be permanently removed.`)) return
+    const ok = await confirm({
+      title: `Delete ${teamName}?`,
+      description: "All channels and team data will be permanently removed. This cannot be undone.",
+      action: "Delete team",
+      destructive: true,
+    })
+    if (!ok) return
     setBusy(true)
     setError(undefined)
     try {
@@ -217,6 +240,7 @@ function DangerTab({
 
   return (
     <div className="flex max-w-sm flex-col gap-4">
+      <ConfirmDialog {...confirmProps} />
       {error && <Alert>{error}</Alert>}
       {myRole !== "owner" && (
         <div className="rounded-md border border-destructive/40 bg-destructive-soft p-4">

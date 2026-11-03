@@ -73,7 +73,7 @@ export function TeamRail() {
       <button
         type="button"
         aria-label="Notifications"
-        onClick={() => window.alert("You're all caught up")}
+        onClick={() => {/* notifications — future ticket */}}
         className={cn(tileBase, "text-muted-foreground hover:bg-surface-hover hover:text-foreground")}
       >
         <Bell className="size-[18px]" />
