@@ -36,10 +36,6 @@ export function WsProvider({ children }: { children: ReactNode }) {
   const { logout } = useAuth()
   const [status, setStatus] = useState<WsStatus>("connecting")
 
-  // Stable refs — readable from inside the useEffect closure without stale captures
-  const logoutRef = useRef(logout)
-  logoutRef.current = logout
-
   const clientRef = useRef<WsClient | null>(null)
   const cursorsRef = useRef<SyncCursors>({})
   const msgHandlers = useRef(new Set<(msg: InboundWsMessage) => void>())
@@ -112,7 +108,7 @@ export function WsProvider({ children }: { children: ReactNode }) {
 
           if (code === 4003) {
             setStatus("disconnected")
-            void logoutRef.current()
+            void logout()
             return
           }
 
@@ -149,7 +145,7 @@ export function WsProvider({ children }: { children: ReactNode }) {
       clientRef.current = null
       setStatus("disconnected")
     }
-  }, []) // runs once — WsProvider is only mounted for authenticated users
+  }, [logout]) // logout is stable (useCallback in useAuthState); listed for exhaustive-deps
 
   const send = useCallback((msg: OutboundWsMessage) => {
     clientRef.current?.send(msg)
