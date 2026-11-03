@@ -5,6 +5,7 @@ import { AppHeader } from "@/components/app/app-header"
 import { Sidebar } from "@/components/app/sidebar"
 import { TeamRail } from "@/components/app/team-rail"
 import { ChannelsProvider } from "@/features/channels"
+import { MessagesProvider } from "@/features/messages"
 import { TeamsProvider } from "@/features/teams"
 import { WsProvider } from "@/features/ws"
 
@@ -33,6 +34,7 @@ export function AppLayout() {
 
   return (
     <WsProvider>
+      <MessagesProvider>
       <TeamsProvider>
         <ChannelsProvider>
           <div className="flex h-full bg-surface">
@@ -53,6 +55,7 @@ export function AppLayout() {
           </div>
         </ChannelsProvider>
       </TeamsProvider>
+      </MessagesProvider>
     </WsProvider>
   )
 }
