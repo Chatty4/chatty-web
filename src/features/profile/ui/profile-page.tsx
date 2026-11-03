@@ -5,6 +5,7 @@ import { Avatar } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { FormField } from "@/components/ui/form-field"
 import { Input } from "@/components/ui/input"
+import { toastManager } from "@/lib/toast"
 
 import { useProfile } from "../hooks/use-profile"
 import type { ChangePasswordInput } from "../types"
@@ -25,7 +26,6 @@ function ProfileSection({
   const [timezone, setTimezone] = useState(initialTimezone)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string>()
-  const [saved, setSaved] = useState(false)
 
   const isDirty =
     displayName.trim() !== initialDisplayName || timezone !== initialTimezone
@@ -35,10 +35,9 @@ function ProfileSection({
     if (saving || !displayName.trim() || !isDirty) return
     setSaving(true)
     setError(undefined)
-    setSaved(false)
     try {
       await onSave(displayName.trim(), timezone)
-      setSaved(true)
+      toastManager.add({ title: "Profile saved" })
     } catch {
       setError("Could not save profile. Please try again.")
     } finally {
@@ -67,9 +66,6 @@ function ProfileSection({
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-[18px]">
         {error && <Alert>{error}</Alert>}
-        {saved && (
-          <p className="text-[13px] text-green-600 dark:text-green-400">Profile saved.</p>
-        )}
         <FormField label="Display name">
           {(control) => (
             <Input
@@ -81,7 +77,6 @@ function ProfileSection({
               value={displayName}
               onChange={(e) => {
                 setDisplayName(e.target.value)
-                setSaved(false)
                 setError(undefined)
               }}
             />
@@ -94,7 +89,6 @@ function ProfileSection({
               value={timezone}
               onChange={(val) => {
                 if (val) setTimezone(val)
-                setSaved(false)
               }}
             />
           )}
@@ -121,7 +115,6 @@ function PasswordSection({
   const [confirmPassword, setConfirmPassword] = useState("")
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string>()
-  const [saved, setSaved] = useState(false)
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
@@ -132,13 +125,12 @@ function PasswordSection({
     }
     setSaving(true)
     setError(undefined)
-    setSaved(false)
     try {
       await onSave({ old_password: oldPassword, new_password: newPassword })
       setOldPassword("")
       setNewPassword("")
       setConfirmPassword("")
-      setSaved(true)
+      toastManager.add({ title: "Password changed" })
     } catch (err) {
       const msg =
         err instanceof Error && err.message.includes("wrong_password")
@@ -160,9 +152,6 @@ function PasswordSection({
       </div>
       <form onSubmit={handleSubmit} className="flex flex-col gap-[18px]">
         {error && <Alert>{error}</Alert>}
-        {saved && (
-          <p className="text-[13px] text-green-600 dark:text-green-400">Password changed.</p>
-        )}
         <FormField label="Current password">
           {(control) => (
             <Input
@@ -174,7 +163,6 @@ function PasswordSection({
               value={oldPassword}
               onChange={(e) => {
                 setOldPassword(e.target.value)
-                setSaved(false)
                 setError(undefined)
               }}
             />
@@ -191,7 +179,6 @@ function PasswordSection({
               value={newPassword}
               onChange={(e) => {
                 setNewPassword(e.target.value)
-                setSaved(false)
                 setError(undefined)
               }}
             />
@@ -208,7 +195,6 @@ function PasswordSection({
               value={confirmPassword}
               onChange={(e) => {
                 setConfirmPassword(e.target.value)
-                setSaved(false)
                 setError(undefined)
               }}
             />
