@@ -9,6 +9,7 @@ import { useChannelMembers } from "../hooks/use-channel-members"
 import { useMemberNames } from "../hooks/use-member-names"
 import { MessageItem } from "./message-item"
 import { MessageComposer } from "./message-composer"
+import { MessageListSkeleton } from "./message-skeleton"
 import { extractMentionIds } from "../utils/mentions"
 import type { SidebarChannel } from "@/features/channels/types"
 
@@ -57,6 +58,9 @@ export function MessageList({ channelId, teamId, channel }: MessageListProps) {
   // ── Scroll management ────────────────────────────────────────────────────────
   const listRef = useRef<HTMLDivElement>(null)
   const prevLengthRef = useRef(messages.length)
+  const lastMessage = messages.at(-1)
+  const lastKey = lastMessage ? (lastMessage.client_msg_id ?? lastMessage.id) : undefined
+  const lastKeyRef = useRef<string | undefined>(undefined)
 
   type ScrollState = { atBottom: boolean; farFromBottom: boolean; newCount: number }
   const resetScroll: ScrollState = { atBottom: true, farFromBottom: false, newCount: 0 }
@@ -73,6 +77,7 @@ export function MessageList({ channelId, teamId, channel }: MessageListProps) {
   // On channel switch: jump to bottom immediately.
   useEffect(() => {
     prevLengthRef.current = messages.length
+    lastKeyRef.current = undefined
     // Defer the scroll + state reset into rAF so DOM is ready.
     requestAnimationFrame(() => {
       const el = listRef.current
@@ -82,18 +87,25 @@ export function MessageList({ channelId, teamId, channel }: MessageListProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelId])
 
-  // On new messages: auto-scroll if at bottom, otherwise badge.
+  // React to the newest message changing (older history prepended at the top is ignored):
+  // first load jumps to the bottom, my own send always scrolls, others scroll only
+  // when I'm already at the bottom and otherwise bump the "new" badge.
   useEffect(() => {
+    const previousKey = lastKeyRef.current
     const added = messages.length - prevLengthRef.current
+    lastKeyRef.current = lastKey
     prevLengthRef.current = messages.length
-    if (added <= 0) return
-    if (atBottom) {
+    if (!lastKey || lastKey === previousKey) return
+
+    if (previousKey === undefined) {
+      requestAnimationFrame(() => scrollToBottom("instant" as ScrollBehavior))
+    } else if ((user && lastMessage?.author_id === user.id) || atBottom) {
       requestAnimationFrame(() => scrollToBottom("smooth"))
     } else {
-      setScrollState((s) => ({ ...s, newCount: s.newCount + added }))
+      setScrollState((s) => ({ ...s, newCount: s.newCount + Math.max(added, 1) }))
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messages.length, atBottom])
+  }, [lastKey])
 
   const handleScroll = () => {
     const el = listRef.current
@@ -131,11 +143,12 @@ export function MessageList({ channelId, teamId, channel }: MessageListProps) {
         className="min-h-0 flex-1 overflow-y-auto"
         onScroll={handleScroll}
       >
+        {loading && <MessageListSkeleton />}
+
         {/* Top anchor: load more or beginning-of-history notice */}
+        {!loading && (
         <div className="flex justify-center px-4 py-4">
-          {loading ? (
-            <span className="text-sm text-muted-foreground">Loading…</span>
-          ) : hasMore ? (
+          {hasMore ? (
             <Button
               variant="ghost"
               size="sm"
@@ -149,6 +162,7 @@ export function MessageList({ channelId, teamId, channel }: MessageListProps) {
             </span>
           )}
         </div>
+        )}
 
         {/* Empty state */}
         {!loading && messages.length === 0 && (
