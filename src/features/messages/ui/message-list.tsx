@@ -11,6 +11,7 @@ import { MessageItem } from "./message-item"
 import { MessageComposer } from "./message-composer"
 import { MessageListSkeleton } from "./message-skeleton"
 import { extractMentionIds } from "../utils/mentions"
+import { canDelete, canEdit, type Actor, type ChannelAccess, type TeamRole } from "../utils/permissions"
 import type { SidebarChannel } from "@/features/channels/types"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -18,13 +19,23 @@ import type { SidebarChannel } from "@/features/channels/types"
 export type MessageListProps = {
   channelId: string
   teamId: string
-  /** SidebarChannel used to check archived status and pass members for autocomplete. */
+  /** The channel from my sidebar (channels or DMs); null when I'm not a member. */
   channel: SidebarChannel | null
+  /** My role in this team, for D-05 delete rights. */
+  teamRole: TeamRole | null
+  /** Refreshes channel data when the server reports the channel was archived. */
+  onChannelArchived: () => void
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function MessageList({ channelId, teamId, channel }: MessageListProps) {
+export function MessageList({
+  channelId,
+  teamId,
+  channel,
+  teamRole,
+  onChannelArchived,
+}: MessageListProps) {
   const { user } = useAuth()
   const { getChannel, loadChannel, loadMoreHistory, send, retry, edit, remove } =
     useMessages()
@@ -133,6 +144,12 @@ export function MessageList({ channelId, teamId, channel }: MessageListProps) {
 
   const archived = channel?.archived ?? false
 
+  // ── Permissions (D-05) ───────────────────────────────────────────────────────
+  const actor: Actor | null = user ? { userId: user.id, teamRole } : null
+  const access: ChannelAccess | null = channel
+    ? { kind: channel.kind, archived: channel.archived, myRole: channel.my.role }
+    : null
+
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
@@ -186,10 +203,12 @@ export function MessageList({ channelId, teamId, channel }: MessageListProps) {
               names={names}
               grouped={isGrouped(index)}
               own={own}
-              editable={own && message.deleted_at === null}
+              canEdit={!!actor && canEdit(message, actor, access)}
+              canDelete={!!actor && canDelete(message, actor, access)}
               onEdit={(messageId, body) => edit(channelId, messageId, body)}
               onDelete={(messageId) => remove(channelId, messageId)}
               onRetry={retry}
+              onChannelArchived={onChannelArchived}
             />
             )
           })}

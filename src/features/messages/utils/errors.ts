@@ -23,7 +23,7 @@ export function describeMessageError(error: unknown): string {
   }
 }
 
-/** True when the error means the channel became read-only. */
-export function isChannelArchivedError(error: unknown): boolean {
-  return error instanceof ApiError && error.code === "channel_archived"
+/** The API error code, or undefined for network and unknown errors. */
+export function messageErrorCode(error: unknown): string | undefined {
+  return error instanceof ApiError ? error.code : undefined
 }

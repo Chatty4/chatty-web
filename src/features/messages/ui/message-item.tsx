@@ -1,15 +1,17 @@
-import { useEffect, useRef, useState } from "react"
-import { Check, MoreHorizontal, Pencil, RotateCcw, Trash2 } from "lucide-react"
+import { useState } from "react"
+import { MoreHorizontal, Pencil, RotateCcw, Trash2 } from "lucide-react"
 
 import { Avatar } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
-import { Input } from "@/components/ui/input"
 import { useConfirm } from "@/hooks/use-confirm"
+import { toast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
 
 import type { LocalMessage } from "../types"
+import { describeMessageError, messageErrorCode } from "../utils/errors"
 import { decodeMentions, encodeMentions, splitMentions } from "../utils/mentions"
+import { MessageEditor } from "./message-editor"
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -62,11 +64,17 @@ export type MessageItemProps = {
   grouped: boolean
   /** True when the message was written by the current user (shown on the right). */
   own: boolean
-  /** True when the current user can edit / delete this message. */
-  editable: boolean
+  /** From canEdit (D-05): my own sent message in a channel I can write in. */
+  canEdit: boolean
+  /** From canDelete (D-05). */
+  canDelete: boolean
+  /** Rejects with ApiError on failure. */
   onEdit: (messageId: string, body: string) => Promise<void>
+  /** Rejects with ApiError on failure. */
   onDelete: (messageId: string) => Promise<void>
   onRetry: (channelId: string, clientMsgId: string) => Promise<void>
+  /** Called when the server says the channel is archived, so the view can go read-only. */
+  onChannelArchived: () => void
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -77,43 +85,57 @@ export function MessageItem({
   names,
   grouped,
   own,
-  editable,
+  canEdit,
+  canDelete,
   onEdit,
   onDelete,
   onRetry,
+  onChannelArchived,
 }: MessageItemProps) {
   const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(message.body)
   const { confirm, confirmProps } = useConfirm()
-  const editorRef = useRef<HTMLInputElement>(null)
 
   const isDeleted = message.deleted_at !== null
   const isEdited = message.edited_at !== null && !isDeleted
+  // Close the editor if the message gets deleted (e.g. from another tab) while open.
+  const showEditor = editing && !isDeleted
 
-  useEffect(() => {
-    if (editing) editorRef.current?.focus()
-  }, [editing])
+  const candidates = Object.entries(names).map(([id, display_name]) => ({ id, display_name }))
+  const encode = (text: string) => encodeMentions(text, candidates)
 
-  const startEditing = () => {
-    setDraft(decodeMentions(message.body, names))
-    setEditing(true)
-  }
-
-  const save = () => {
-    const candidates = Object.entries(names).map(([id, display_name]) => ({ id, display_name }))
-    const value = encodeMentions(draft.trim(), candidates)
-    if (value && value.length <= 4000 && value !== message.body) void onEdit(message.id, value)
-    setEditing(false)
+  // Errors that end the edit close the editor with a toast; the rest reject so the
+  // editor stays open and shows them inline.
+  const saveEdit = async (text: string) => {
+    try {
+      await onEdit(message.id, encode(text))
+      setEditing(false)
+    } catch (err) {
+      const code = messageErrorCode(err)
+      if (code === "message_deleted" || code === "channel_archived") {
+        toast.error(describeMessageError(err))
+        if (code === "channel_archived") onChannelArchived()
+        setEditing(false)
+        return
+      }
+      throw err
+    }
   }
 
   const handleDelete = async () => {
     const ok = await confirm({
-      title: "Delete message?",
-      description: "This message will be removed for everyone in the channel.",
-      action: "Delete",
+      title: "Delete this message?",
+      description: "Its contents will be replaced with a deleted message placeholder.",
+      action: "Delete message",
       destructive: true,
     })
-    if (ok) void onDelete(message.id)
+    if (!ok) return
+    try {
+      await onDelete(message.id)
+      toast.success("Message deleted")
+    } catch (err) {
+      toast.error(describeMessageError(err))
+      if (messageErrorCode(err) === "channel_archived") onChannelArchived()
+    }
   }
 
   const time = (
@@ -146,52 +168,36 @@ export function MessageItem({
     </>
   )
 
-  const editor = (
-    <div className="flex w-full flex-col gap-1">
-      <Input
-        ref={editorRef}
-        value={draft}
-        maxLength={4000}
-        onChange={(e) => setDraft(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Escape") {
-            setDraft(message.body)
-            setEditing(false)
-          }
-          if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault()
-            save()
-          }
-        }}
-      />
-      <div
-        className={cn(
-          "flex items-center gap-2 text-xs text-muted-foreground",
-          own && "justify-end",
-        )}
-      >
-        <span>Esc to cancel · Enter to save</span>
-        <Button size="sm" onClick={save}>
-          <Check className="size-3.5" />
-          Save
-        </Button>
-      </div>
-    </div>
+  const editor = showEditor && (
+    <MessageEditor
+      initialValue={decodeMentions(message.body, names)}
+      measure={(text) => encode(text).length}
+      allowEmpty={message.file_ids.length > 0}
+      align={own ? "end" : "start"}
+      onSave={saveEdit}
+      onCancel={() => setEditing(false)}
+      describeError={describeMessageError}
+    />
   )
 
-  const toolbar = !isDeleted && !editing && (
+  const toolbar = !isDeleted && !showEditor && (
     <div
       className={cn(
         "absolute z-10 hidden -translate-y-1/2 items-center gap-0.5 rounded-md border bg-surface shadow-sm group-hover/msg:flex",
         own ? "top-1/2 right-full mr-1.5" : "top-0 right-3",
       )}
     >
-      {editable && (
-        <Button variant="ghost" size="icon-sm" aria-label="Edit message" onClick={startEditing}>
+      {canEdit && (
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Edit message"
+          onClick={() => setEditing(true)}
+        >
           <Pencil />
         </Button>
       )}
-      {editable && (
+      {canDelete && (
         <Button
           variant="ghost"
           size="icon-sm"
@@ -224,7 +230,7 @@ export function MessageItem({
         <ConfirmDialog {...confirmProps} />
         {!grouped && <div className="mb-1 px-1">{time}</div>}
 
-        {editing ? (
+        {showEditor ? (
           <div className="w-full max-w-[75%]">{editor}</div>
         ) : isDeleted ? (
           <p className="rounded-lg border border-dashed px-3 py-1.5 text-sm italic text-muted-foreground">
@@ -234,7 +240,7 @@ export function MessageItem({
           <div className="relative max-w-[75%]">
             <div
               className={cn(
-                "rounded-lg bg-accent px-3 py-1.5 text-sm leading-relaxed break-words text-foreground",
+                "rounded-lg bg-accent px-3 py-1.5 text-sm leading-relaxed break-words whitespace-pre-wrap text-foreground",
                 !grouped && "rounded-tr-sm",
                 message.status === "pending" && "opacity-70",
                 message.status === "failed" && "ring-1 ring-destructive/50",
@@ -247,7 +253,7 @@ export function MessageItem({
           </div>
         )}
 
-        {message.status !== "sent" && !editing && <div className="mt-0.5 px-1">{status}</div>}
+        {message.status !== "sent" && !showEditor && <div className="mt-0.5 px-1">{status}</div>}
       </article>
     )
   }
@@ -275,10 +281,10 @@ export function MessageItem({
 
         {isDeleted ? (
           <p className="text-sm italic text-muted-foreground">This message was deleted.</p>
-        ) : editing ? (
+        ) : showEditor ? (
           editor
         ) : (
-          <p className="text-sm leading-relaxed break-words">
+          <p className="text-sm leading-relaxed break-words whitespace-pre-wrap">
             <MessageText body={message.body} own={false} names={names} />
             {isEdited && <span className="ml-1 text-xs text-muted-foreground">(edited)</span>}
             {message.status !== "sent" && <span className="ml-1">{status}</span>}
