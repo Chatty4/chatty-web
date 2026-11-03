@@ -31,10 +31,12 @@ function buildWsUrl(token: string): string {
  */
 export class WsClient {
   private readonly socket: WebSocket
+  private readonly callbacks: WsClientCallbacks
   private heartbeatTimer: ReturnType<typeof setInterval> | undefined
   private intentional = false
 
-  constructor(token: string, private readonly callbacks: WsClientCallbacks) {
+  constructor(token: string, callbacks: WsClientCallbacks) {
+    this.callbacks = callbacks
     this.socket = new WebSocket(buildWsUrl(token))
     this.socket.addEventListener("open", this.handleOpen)
     this.socket.addEventListener("message", this.handleMessage)
