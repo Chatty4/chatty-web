@@ -8,7 +8,7 @@ import {
   type ChannelDetailsTab,
   type SidebarChannel,
 } from "@/features/channels"
-import { ChannelIntro, MessageList } from "@/features/messages"
+import { ChannelIntro, MessageList, PinsPanel } from "@/features/messages"
 import { useTeams } from "@/features/teams"
 
 const DETAILS_TABS: ChannelDetailsTab[] = ["about", "members", "notifications", "archive"]
@@ -25,10 +25,13 @@ export function ChannelPage() {
   const detailsParam = searchParams.get("details")
   const showDetails = detailsParam !== null
   const detailsTab = DETAILS_TABS.find((t) => t === detailsParam) ?? "about"
+  const showPins = searchParams.has("pins")
 
+  // Only one right-hand panel at a time, so opening one clears the other.
   const setDetails = (tab: ChannelDetailsTab | null) =>
     setSearchParams(
       (prev) => {
+        prev.delete("pins")
         if (tab) prev.set("details", tab)
         else prev.delete("details")
         return prev
@@ -36,7 +39,18 @@ export function ChannelPage() {
       { replace: true },
     )
 
+  const closePins = () =>
+    setSearchParams(
+      (prev) => {
+        prev.delete("pins")
+        return prev
+      },
+      { replace: true },
+    )
+
   if (!channelId) return null
+
+  const dmName = dmDisplayName(channel?.dm_member_ids ?? [], user?.id ?? "", memberNames)
 
   return (
     <div className="flex min-h-0 flex-1">
@@ -51,7 +65,7 @@ export function ChannelPage() {
             channel && (
               <Intro
                 channel={channel}
-                dmName={dmDisplayName(channel.dm_member_ids ?? [], user?.id ?? "", memberNames)}
+                dmName={dmName}
                 onManagePeople={() => setDetails("members")}
               />
             )
@@ -65,6 +79,17 @@ export function ChannelPage() {
           teamId={teamId}
           initialTab={detailsTab}
           onClose={() => setDetails(null)}
+        />
+      )}
+      {showPins && (
+        <PinsPanel
+          key={channelId}
+          channelId={channelId}
+          teamId={teamId}
+          label={channel?.kind === "dm" ? dmName : `#${channel?.name ?? ""}`}
+          canUnpin={!!channel && !channel.archived}
+          onClose={closePins}
+          onChannelArchived={reload}
         />
       )}
     </div>

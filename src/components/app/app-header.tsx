@@ -1,8 +1,10 @@
-import { Hash, Lock, Menu, Search, Settings } from "lucide-react"
+import { Hash, Lock, Menu, Pin, Search, Settings } from "lucide-react"
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router"
 
 import { Button } from "@/components/ui/button"
 import { useChannels } from "@/features/channels"
+import { usePins } from "@/features/messages"
+import { cn } from "@/lib/utils"
 
 import { ThemeToggle } from "./theme-toggle"
 
@@ -21,12 +23,18 @@ export function AppHeader({ title, subtitle, onOpenMenu }: AppHeaderProps) {
 
   const [searchParams, setSearchParams] = useSearchParams()
   const detailsOpen = searchParams.has("details")
-  const canToggleDetails = !!teamId && !!channelId && !pathname.endsWith("/settings")
-  const toggleDetails = () =>
+  const pinsOpen = searchParams.has("pins")
+  const inChannel = !!teamId && !!channelId && !pathname.endsWith("/settings")
+  const pinCount = usePins(inChannel ? channelId : undefined)?.items.length ?? 0
+
+  // Only one right-hand panel at a time: opening one closes the other.
+  const togglePanel = (panel: "details" | "pins") =>
     setSearchParams(
       (prev) => {
-        if (prev.has("details")) prev.delete("details")
-        else prev.set("details", "")
+        const wasOpen = prev.has(panel)
+        prev.delete("details")
+        prev.delete("pins")
+        if (!wasOpen) prev.set(panel, "")
         return prev
       },
       { replace: true },
@@ -65,14 +73,31 @@ export function AppHeader({ title, subtitle, onOpenMenu }: AppHeaderProps) {
       </div>
 
       <div className="flex items-center gap-0.5">
-        {canToggleDetails && (
+        {inChannel && (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={pinCount > 0 ? `Pinned messages, ${pinCount}` : "Pinned messages"}
+            aria-pressed={pinsOpen}
+            className={cn("relative", pinsOpen && "bg-surface-hover text-foreground")}
+            onClick={() => togglePanel("pins")}
+          >
+            <Pin className="size-[18px]" />
+            {pinCount > 0 && (
+              <span className="absolute -top-[3px] -right-[3px] grid h-[17px] min-w-[17px] place-items-center rounded-full border-2 border-surface bg-primary px-1 text-[9px] leading-none text-primary-foreground">
+                {pinCount}
+              </span>
+            )}
+          </Button>
+        )}
+        {inChannel && (
           <Button
             variant="ghost"
             size="icon"
             aria-label="Channel details"
             aria-pressed={detailsOpen}
             className={detailsOpen ? "bg-surface-hover text-foreground" : undefined}
-            onClick={toggleDetails}
+            onClick={() => togglePanel("details")}
           >
             <Settings className="size-[18px]" />
           </Button>
