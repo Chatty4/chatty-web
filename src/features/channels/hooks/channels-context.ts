@@ -10,6 +10,8 @@ export type ChannelsContextValue = {
   /** userId → displayName map, resolved from DM participants. */
   memberNames: Record<string, string>
   loading: boolean
+  /** The list couldn't be fetched: not the same as a team with no channels. */
+  failed: boolean
   reload: () => void
 }
 

@@ -83,11 +83,13 @@ export function ChannelsProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(() => {
     const loaded = state.status === "loaded" && state.forTeamId === teamId
+    const failed = state.status === "error" && state.forTeamId === teamId
     return {
       channels: loaded ? state.channels : [],
       dms: loaded ? state.dms : [],
       memberNames: loaded ? state.memberNames : {},
-      loading: !!teamId && !loaded,
+      loading: !!teamId && !loaded && !failed,
+      failed,
       reload,
     }
   }, [state, teamId, reload])

@@ -32,7 +32,7 @@ type SidebarProps = {
 export function Sidebar({ open, onClose }: SidebarProps) {
   const { teamId = "" } = useParams()
   const activeChannelId = useActiveChannelId()
-  const { channels, dms, memberNames } = useChannels()
+  const { channels, dms, memberNames, failed, reload } = useChannels()
   const { user } = useAuth()
   const { teams } = useTeams()
   const navigate = useNavigate()
@@ -221,8 +221,20 @@ export function Sidebar({ open, onClose }: SidebarProps) {
             )
           })}
 
-          {dms.length === 0 && channels.length === 0 && (
-            <p className="px-2 pt-2 text-[13px] text-faint-foreground">No channels yet.</p>
+          {failed ? (
+            <div className="flex flex-col items-start gap-1 px-2 pt-2">
+              <p role="alert" className="text-[13px] text-destructive">
+                Couldn't load channels.
+              </p>
+              <Button variant="secondary" size="sm" onClick={reload}>
+                Try again
+              </Button>
+            </div>
+          ) : (
+            dms.length === 0 &&
+            channels.length === 0 && (
+              <p className="px-2 pt-2 text-[13px] text-faint-foreground">No channels yet.</p>
+            )
           )}
         </nav>
 
