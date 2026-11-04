@@ -5,6 +5,7 @@ import { Alert } from "@/components/ui/alert"
 import { BrandMark } from "@/components/app/brand-mark"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { useAuth } from "@/features/auth"
+import { ApiError } from "@/lib/api"
 
 import { joinInviteRequest, lookupInviteRequest } from "../fetchers/invite-fetchers"
 import { describeInviteError } from "../utils/errors"
@@ -17,7 +18,9 @@ export function InviteLandingPage({ code }: Props) {
   const navigate = useNavigate()
 
   const [lookup, setLookup] = useState<InviteLookup | null>(null)
-  const [loadError, setLoadError] = useState<string>()
+  // "invalid": no such invite. "failed": we couldn't find out, so the link may be fine.
+  const [loadError, setLoadError] = useState<"invalid" | "failed">()
+  const [attempt, setAttempt] = useState(0)
   const [joining, setJoining] = useState(false)
   const [joinError, setJoinError] = useState<string>()
 
@@ -25,9 +28,17 @@ export function InviteLandingPage({ code }: Props) {
     let cancelled = false
     lookupInviteRequest(code)
       .then((result) => { if (!cancelled) setLookup(result) })
-      .catch(() => { if (!cancelled) setLoadError("Could not load this invite.") })
+      .catch((error: unknown) => {
+        if (cancelled) return
+        setLoadError(error instanceof ApiError && error.status === 404 ? "invalid" : "failed")
+      })
     return () => { cancelled = true }
-  }, [code])
+  }, [code, attempt])
+
+  const retryLookup = () => {
+    setLoadError(undefined)
+    setAttempt((current) => current + 1)
+  }
 
   const handleJoin = async () => {
     setJoining(true)
@@ -48,7 +59,17 @@ export function InviteLandingPage({ code }: Props) {
         Chatty
       </div>
 
-      {loadError && (
+      {loadError === "failed" && (
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1">
+            <h1 className="text-xl font-semibold tracking-[-0.02em]">Couldn't load this invite</h1>
+            <p className="text-muted-foreground">Check your connection and try again.</p>
+          </div>
+          <Button onClick={retryLookup}>Try again</Button>
+        </div>
+      )}
+
+      {loadError === "invalid" && (
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-1">
             <h1 className="text-xl font-semibold tracking-[-0.02em]">Invite unavailable</h1>
