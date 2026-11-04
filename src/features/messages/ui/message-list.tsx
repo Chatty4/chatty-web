@@ -17,7 +17,14 @@ import { MessageListSkeleton } from "./message-skeleton"
 import { DayDivider } from "./day-divider"
 import { dayKey, formatDayLabel } from "../utils/dates"
 import { extractMentionIds } from "../utils/mentions"
-import { canDelete, canEdit, type Actor, type ChannelAccess, type TeamRole } from "../utils/permissions"
+import {
+  canDelete,
+  canEdit,
+  canReact,
+  type Actor,
+  type ChannelAccess,
+  type TeamRole,
+} from "../utils/permissions"
 import type { SidebarChannel } from "@/features/channels/types"
 
 /** Start fetching older messages this far before the user reaches the top. */
@@ -49,7 +56,7 @@ export function MessageList({
   intro,
 }: MessageListProps) {
   const { user } = useAuth()
-  const { getChannel, loadChannel, loadMoreHistory, send, retry, edit, remove } =
+  const { getChannel, loadChannel, loadMoreHistory, send, retry, edit, remove, setReaction } =
     useMessages()
 
   // Load this channel on mount / when channelId changes.
@@ -242,6 +249,8 @@ export function MessageList({
               own={own}
               canEdit={!!actor && canEdit(message, actor, access)}
               canDelete={!!actor && canDelete(message, actor, access)}
+              canReact={canReact(message, access)}
+              onSetReaction={(messageId, emoji, on) => setReaction(channelId, messageId, emoji, on)}
               onEdit={(messageId, body) => edit(channelId, messageId, body)}
               onDelete={(messageId) => remove(channelId, messageId)}
               onRetry={retry}

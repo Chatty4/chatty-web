@@ -1,17 +1,20 @@
 import { useState } from "react"
-import { MoreHorizontal, Pencil, RotateCcw, Trash2 } from "lucide-react"
+import { MoreHorizontal, Pencil, RotateCcw, SmilePlus, Trash2 } from "lucide-react"
 
 import { Avatar } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
+import { EmojiPickerButton } from "@/components/ui/emoji-picker"
 import { useConfirm } from "@/hooks/use-confirm"
 import { toast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
 
+import { useReactionToggle } from "../hooks/use-reaction-toggle"
 import type { LocalMessage } from "../types"
 import { describeMessageError, messageErrorCode } from "../utils/errors"
 import { decodeMentions, encodeMentions, splitMentions } from "../utils/mentions"
 import { MessageEditor } from "./message-editor"
+import { ReactionChips } from "./reaction-chips"
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -68,8 +71,12 @@ export type MessageItemProps = {
   canEdit: boolean
   /** From canDelete (D-05). */
   canDelete: boolean
+  /** From canReact: a sent message in a channel I can write in. */
+  canReact: boolean
+  /** Adds or removes my reaction. Rejects with ApiError on failure. */
+  onSetReaction: (messageId: string, emoji: string, on: boolean) => Promise<void>
   /** Rejects with ApiError on failure. */
-  onEdit: (messageId: string, body: string) => Promise<void>
+  onEdit:(messageId: string, body: string) => Promise<void>
   /** Rejects with ApiError on failure. */
   onDelete: (messageId: string) => Promise<void>
   onRetry: (channelId: string, clientMsgId: string) => Promise<void>
@@ -87,13 +94,21 @@ export function MessageItem({
   own,
   canEdit,
   canDelete,
+  canReact,
+  onSetReaction,
   onEdit,
   onDelete,
   onRetry,
   onChannelArchived,
 }: MessageItemProps) {
   const [editing, setEditing] = useState(false)
+  // The picker's popover is outside this row, so hover can't keep the toolbar open.
+  const [pickingReaction, setPickingReaction] = useState(false)
   const { confirm, confirmProps } = useConfirm()
+  const { busy, change: changeReaction } = useReactionToggle({
+    setReaction: (emoji, on) => onSetReaction(message.id, emoji, on),
+    onChannelArchived,
+  })
 
   const isDeleted = message.deleted_at !== null
   const isEdited = message.edited_at !== null && !isDeleted
@@ -183,10 +198,19 @@ export function MessageItem({
   const toolbar = !isDeleted && !showEditor && (
     <div
       className={cn(
-        "absolute z-10 hidden -translate-y-1/2 items-center gap-0.5 rounded-md border bg-surface shadow-sm group-hover/msg:flex",
+        "absolute z-10 -translate-y-1/2 items-center gap-0.5 rounded-md border bg-surface shadow-sm",
+        pickingReaction ? "flex" : "hidden group-hover/msg:flex",
         own ? "top-1/2 right-full mr-1.5" : "top-0 right-3",
       )}
     >
+      {canReact && (
+        <EmojiPickerButton
+          label="Add reaction"
+          icon={<SmilePlus />}
+          onOpenChange={setPickingReaction}
+          onSelect={(emoji) => void changeReaction(emoji, true)}
+        />
+      )}
       {canEdit && (
         <Button
           variant="ghost"
@@ -216,6 +240,16 @@ export function MessageItem({
         <MoreHorizontal />
       </Button>
     </div>
+  )
+
+  const reactions = !isDeleted && (
+    <ReactionChips
+      reactions={message.reactions}
+      busy={busy}
+      canReact={canReact}
+      align={own ? "end" : "start"}
+      onToggle={(reaction) => void changeReaction(reaction.emoji, !reaction.me)}
+    />
   )
 
   if (own) {
@@ -253,6 +287,7 @@ export function MessageItem({
           </div>
         )}
 
+        {reactions}
         {message.status !== "sent" && !showEditor && <div className="mt-0.5 px-1">{status}</div>}
       </article>
     )
@@ -290,6 +325,7 @@ export function MessageItem({
             {message.status !== "sent" && <span className="ml-1">{status}</span>}
           </p>
         )}
+        {reactions}
       </div>
 
       {toolbar}
