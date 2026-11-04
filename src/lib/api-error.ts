@@ -53,6 +53,14 @@ export function toApiError(response: Response, body: unknown): ApiError {
   })
 }
 
+/**
+ * True when the server turned the session down: a rejected token or a deactivated user.
+ * Anything else (429, 5xx, offline) says nothing about the session, so it must survive.
+ */
+export function isSessionRejected(error: unknown): boolean {
+  return error instanceof ApiError && (error.status === 401 || error.status === 403)
+}
+
 /** The response body as JSON, or null when it is empty or not JSON (a proxy error page). */
 export async function readJson(response: Response): Promise<unknown> {
   try {

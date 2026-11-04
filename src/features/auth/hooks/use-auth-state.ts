@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
-import { ApiError, isServerUnavailable } from "@/lib/api"
+import { isSessionRejected } from "@/lib/api-error"
 import {
   endSession,
   freshAccessToken,
@@ -30,10 +30,13 @@ async function loadSession(): Promise<State> {
     const me = await meRequest()
     return { status: "authenticated", user: toUser(me) }
   } catch (error) {
-    if (isServerUnavailable(error)) return { status: "unavailable", user: null }
     // Refresh token rejected, user deactivated, ...: the stored session is over.
-    if (error instanceof ApiError) endSession()
-    return ANONYMOUS
+    if (isSessionRejected(error)) {
+      endSession()
+      return ANONYMOUS
+    }
+    // Offline, rate limited, server down: keep the tokens and offer to try again.
+    return { status: "unavailable", user: null }
   }
 }
 
