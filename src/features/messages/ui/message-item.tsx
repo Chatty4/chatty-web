@@ -200,7 +200,9 @@ export function MessageItem({
       className={cn(
         "absolute z-10 -translate-y-1/2 items-center gap-0.5 rounded-md border bg-surface shadow-sm",
         pickingReaction ? "flex" : "hidden group-hover/msg:flex",
-        own ? "top-1/2 right-full mr-1.5" : "top-0 right-3",
+        own ? "top-1/2 right-full mr-1.5" : "top-1/2 left-full ml-1.5",
+        // A wide bubble leaves no room beside it on a phone, so sit on its top edge there.
+        "max-sm:inset-auto max-sm:top-0 max-sm:right-0 max-sm:mx-0",
       )}
     >
       {canReact && (
@@ -296,7 +298,7 @@ export function MessageItem({
   return (
     <article
       className={cn(
-        "group/msg relative flex gap-2.5 px-4 py-0.5 hover:bg-surface-hover",
+        "group/msg relative flex gap-2.5 px-4 py-0.5",
         grouped ? "mt-0" : "mt-3",
       )}
       data-message-id={message.id}
@@ -315,20 +317,28 @@ export function MessageItem({
         )}
 
         {isDeleted ? (
-          <p className="text-sm italic text-muted-foreground">This message was deleted.</p>
+          <p className="w-fit max-w-[75%] rounded-lg border border-dashed px-3 py-1.5 text-sm italic text-muted-foreground">
+            This message was deleted.
+          </p>
         ) : showEditor ? (
           editor
         ) : (
-          <p className="text-sm leading-relaxed break-words whitespace-pre-wrap">
-            <MessageText body={message.body} own={false} names={names} />
-            {isEdited && <span className="ml-1 text-xs text-muted-foreground">(edited)</span>}
-            {message.status !== "sent" && <span className="ml-1">{status}</span>}
-          </p>
+          <div className="relative w-fit max-w-[75%]">
+            <div
+              className={cn(
+                "rounded-lg bg-surface-hover px-3 py-1.5 text-sm leading-relaxed break-words whitespace-pre-wrap text-foreground",
+                !grouped && "rounded-tl-sm",
+              )}
+            >
+              <MessageText body={message.body} own={false} names={names} />
+              {isEdited && <span className="ml-1 text-xs text-muted-foreground">(edited)</span>}
+              {message.status !== "sent" && <span className="ml-1">{status}</span>}
+            </div>
+            {toolbar}
+          </div>
         )}
         {reactions}
       </div>
-
-      {toolbar}
     </article>
   )
 }
