@@ -31,6 +31,18 @@ describe("encodeMentions", () => {
     expect(encodeMentions("@Ana Maria", [ANA, ANA_MARIA])).toBe(`<@${ANA_MARIA.id}>`)
   })
 
+  it("uses the people picked when two share a name", () => {
+    const first = { id: "33333333-3333-3333-3333-333333333333", display_name: "Ana Pop" }
+    const second = { id: "44444444-4444-4444-4444-444444444444", display_name: "Ana Pop" }
+    const members = [first, second]
+
+    expect(encodeMentions("@Ana Pop", members, [second])).toBe(`<@${second.id}>`)
+    expect(encodeMentions("@Ana Pop @Ana Pop", members, [second, first])).toBe(
+      `<@${second.id}> <@${first.id}>`,
+    )
+    expect(encodeMentions("@Ana Pop", members)).toBe(`<@${first.id}>`)
+  })
+
   it("leaves email addresses alone", () => {
     expect(encodeMentions("contact@ana.ro", [ANA])).toBe("contact@ana.ro")
   })

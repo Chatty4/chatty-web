@@ -66,8 +66,16 @@ export function findMentionQuery(
  * Turns `@Display Name` into `<@id>` for every candidate written in the text.
  * Longest names match first so "@Ana Maria" is not read as "@Ana". An @ inside a word
  * (an email address) and anything in a code span stay as typed.
+ *
+ * Text alone can't tell two people with the same name apart, so `picks` lists who was
+ * chosen, in text order: each @name takes the next pick with that name, then the first
+ * candidate with it.
  */
-export function encodeMentions(text: string, candidates: MentionCandidate[]): string {
+export function encodeMentions(
+  text: string,
+  candidates: MentionCandidate[],
+  picks: MentionCandidate[] = [],
+): string {
   const byName = new Map<string, string>()
   for (const c of candidates) {
     const key = c.display_name.toLowerCase()
@@ -75,10 +83,18 @@ export function encodeMentions(text: string, candidates: MentionCandidate[]): st
   }
   if (byName.size === 0) return text
 
+  const picked = new Map<string, string[]>()
+  for (const pick of picks) {
+    const key = pick.display_name.toLowerCase()
+    picked.set(key, [...(picked.get(key) ?? []), pick.id])
+  }
+
   const names = [...byName.keys()].sort((a, b) => b.length - a.length).map(escapeRegExp)
   const pattern = new RegExp(`${CODE_SPAN}|${NOT_IN_WORD}@(${names.join("|")})(?![\\p{L}\\p{N}_])`, "giu")
   return text.replace(pattern, (match, name: string | undefined) => {
-    const id = name && byName.get(name.toLowerCase())
+    if (!name) return match
+    const key = name.toLowerCase()
+    const id = picked.get(key)?.shift() ?? byName.get(key)
     return id ? `<@${id}>` : match
   })
 }

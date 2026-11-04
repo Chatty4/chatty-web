@@ -5,7 +5,12 @@ import { Button } from "@/components/ui/button"
 import { EmojiPickerButton } from "@/components/ui/emoji-picker"
 
 import { MAX_MESSAGE_LENGTH as MAX_LENGTH } from "../constants"
-import { encodeMentions, findMentionQuery, type MentionCandidate } from "../utils/mentions"
+import {
+  encodeMentions,
+  extractMentionIds,
+  findMentionQuery,
+  type MentionCandidate,
+} from "../utils/mentions"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -35,6 +40,8 @@ export function MessageComposer({
   const [caret, setCaret] = useState(initialDraft.length)
   // The @ whose suggestions were closed with Esc: they stay closed for that mention.
   const [dismissedAt, setDismissedAt] = useState<number | null>(null)
+  // Who was chosen from the list: the text alone can't tell two people with one name apart.
+  const [picks, setPicks] = useState<MentionCandidate[]>([])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const setValue = (next: string) => {
@@ -53,13 +60,17 @@ export function MessageComposer({
   // Clamp so activeIndex never points past the end of the current list.
   const clampedIndex = suggestions.length > 0 ? Math.min(activeIndex, suggestions.length - 1) : 0
 
-  const encoded = useMemo(() => encodeMentions(value.trim(), members), [value, members])
+  const encoded = useMemo(
+    () => encodeMentions(value.trim(), members, picks),
+    [value, members, picks],
+  )
   const tooLong = encoded.length > MAX_LENGTH
 
   const send = () => {
     const body = encoded
     if (!body || archived || tooLong) return
     setValue("")
+    setPicks([])
     void onSend(body)
     requestAnimationFrame(() => textareaRef.current?.focus())
   }
@@ -82,9 +93,13 @@ export function MessageComposer({
     moveCaret(start + text.length)
   }
 
-  const applyMention = (name: string) => {
+  const applyMention = (candidate: MentionCandidate) => {
     if (!mention) return
-    const inserted = `@${name} `
+    const inserted = `@${candidate.display_name} `
+    // In text order, so each @name finds its own pick.
+    const earlier = encodeMentions(value.slice(0, mention.start), members, picks)
+    const position = extractMentionIds(earlier).length
+    setPicks([...picks.slice(0, position), candidate, ...picks.slice(position)])
     setValue(value.slice(0, mention.start) + inserted + value.slice(caret))
     setActiveIndex(0)
     moveCaret(mention.start + inserted.length)
@@ -105,7 +120,7 @@ export function MessageComposer({
       if (e.key === "Tab" || (e.key === "Enter" && suggestions.length > 0)) {
         e.preventDefault()
         const candidate = suggestions[clampedIndex]
-        if (candidate) applyMention(candidate.display_name)
+        if (candidate) applyMention(candidate)
         return
       }
       if (e.key === "Escape") {
@@ -146,7 +161,7 @@ export function MessageComposer({
               onMouseEnter={() => setActiveIndex(i)}
               onMouseDown={(e) => {
                 e.preventDefault() // keep textarea focus
-                applyMention(m.display_name)
+                applyMention(m)
               }}
             >
               <span

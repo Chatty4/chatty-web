@@ -22,7 +22,7 @@ import { useReactionToggle } from "../hooks/use-reaction-toggle"
 import type { LocalMessage } from "../types"
 import { describeMessageError, messageErrorCode } from "../utils/errors"
 import { MARKDOWN_BLOCK_CLASS } from "../utils/markdown"
-import { decodeMentions, encodeMentions } from "../utils/mentions"
+import { decodeMentions, encodeMentions, extractMentionIds } from "../utils/mentions"
 import { MessageEditor } from "./message-editor"
 import { MessageMarkdown } from "./message-markdown"
 import { PinnedMark } from "./pinned-mark"
@@ -111,7 +111,11 @@ export function MessageItem({
   const showEditor = editing && !isDeleted
 
   const candidates = Object.entries(names).map(([id, display_name]) => ({ id, display_name }))
-  const encode = (text: string) => encodeMentions(text, candidates)
+  // Keeps the people already mentioned when two share a name.
+  const existingMentions = extractMentionIds(message.body).flatMap((id) =>
+    names[id] ? [{ id, display_name: names[id] }] : [],
+  )
+  const encode = (text: string) => encodeMentions(text, candidates, existingMentions)
 
   // Errors that end the edit close the editor with a toast; the rest reject so the
   // editor stays open and shows them inline.
