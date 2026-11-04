@@ -279,8 +279,16 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
     [doDispatch],
   )
 
+  // Refs, not state: only the composer of the open channel reads these, when it mounts.
+  const draftsRef = useRef(new Map<string, string>())
+  const getDraft = useCallback((channelId: string) => draftsRef.current.get(channelId) ?? "", [])
+  const setDraft = useCallback((channelId: string, text: string) => {
+    if (text) draftsRef.current.set(channelId, text)
+    else draftsRef.current.delete(channelId)
+  }, [])
+
   return (
-    <MessagesContext.Provider value={{ getChannel, loadChannel, loadMoreHistory, send, retry, edit, remove, setReaction, setPinned, loadPins }}>
+    <MessagesContext.Provider value={{ getChannel, loadChannel, loadMoreHistory, send, retry, edit, remove, setReaction, setPinned, loadPins, getDraft, setDraft }}>
       {children}
     </MessagesContext.Provider>
   )

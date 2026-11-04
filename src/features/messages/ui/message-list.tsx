@@ -67,6 +67,8 @@ export function MessageList({
     remove,
     setReaction,
     setPinned,
+    getDraft,
+    setDraft,
   } = useMessages()
 
   const channelState = getChannel(channelId)
@@ -310,9 +312,13 @@ export function MessageList({
       </div>
 
       {/* Composer */}
+      {/* Keyed so a draft can never be sent to the channel opened after it. */}
       <MessageComposer
+        key={channelId}
         members={mentionCandidates}
         archived={archived}
+        initialDraft={getDraft(channelId)}
+        onDraftChange={(text) => setDraft(channelId, text)}
         onSend={(body) => send(channelId, body)}
       />
     </div>

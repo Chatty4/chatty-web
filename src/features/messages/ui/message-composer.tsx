@@ -14,16 +14,30 @@ export type MessageComposerProps = {
   members: MentionCandidate[]
   /** When true the textarea is disabled and shows an archived notice. */
   archived?: boolean
+  /** The text to start with, such as what was left here before switching channel. */
+  initialDraft?: string
+  onDraftChange?: (text: string) => void
   /** Called when the user submits a message. */
   onSend: (body: string) => Promise<void>
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function MessageComposer({ members, archived = false, onSend }: MessageComposerProps) {
-  const [value, setValue] = useState("")
+export function MessageComposer({
+  members,
+  archived = false,
+  initialDraft = "",
+  onDraftChange,
+  onSend,
+}: MessageComposerProps) {
+  const [value, setStoredValue] = useState(initialDraft)
   const [activeIndex, setActiveIndex] = useState(0)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const setValue = (next: string) => {
+    setStoredValue(next)
+    onDraftChange?.(next)
+  }
 
   // Detect @mention being typed at the cursor end.
   const mentionMatch = value.match(/@([\w]*)$/)
@@ -64,7 +78,7 @@ export function MessageComposer({ members, archived = false, onSend }: MessageCo
   }
 
   const applyMention = (name: string) => {
-    setValue((prev) => prev.replace(/@[\w]*$/, `@${name} `))
+    setValue(value.replace(/@[\w]*$/, () => `@${name} `))
     setActiveIndex(0)
     textareaRef.current?.focus()
   }
@@ -90,7 +104,7 @@ export function MessageComposer({ members, archived = false, onSend }: MessageCo
       if (e.key === "Escape") {
         // Dismiss suggestions without closing by inserting a zero-width space
         // — simplest way to break the @-pattern match without changing visible text.
-        setValue((prev) => prev + "​")
+        setValue(value + "​")
         return
       }
     }
@@ -184,7 +198,7 @@ export function MessageComposer({ members, archived = false, onSend }: MessageCo
               size="icon-sm"
               aria-label="Mention someone"
               disabled={archived}
-              onClick={() => setValue((v) => `${v}@`)}
+              onClick={() => setValue(`${value}@`)}
             >
               <AtSign />
             </Button>

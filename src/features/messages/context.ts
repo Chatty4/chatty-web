@@ -21,6 +21,9 @@ export type MessagesContextValue = {
   setPinned: (channelId: string, messageId: string, on: boolean) => Promise<void>
   /** Fetches the channel's pins into ChannelState.pins. Ignored while one is running. */
   loadPins: (channelId: string) => Promise<void>
+  /** The unsent text of a channel's composer, kept while another channel is open. */
+  getDraft: (channelId: string) => string
+  setDraft: (channelId: string, text: string) => void
 }
 
 export const MessagesContext = createContext<MessagesContextValue | null>(null)
