@@ -6,7 +6,7 @@ import { Avatar } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useAuth } from "@/features/auth"
-import { coreApi } from "@/lib/api"
+import { getAllTeamMembersRequest } from "@/features/teams/fetchers/team-fetchers"
 
 import { startDmRequest } from "../fetchers/channel-fetchers"
 import { useChannels } from "../hooks/channels-context"
@@ -23,10 +23,8 @@ async function fetchTeamMembersForPicker(
   myUserId: string,
 ): Promise<MembersState> {
   try {
-    const data = await coreApi.get<{ members: MemberPreview[]; next_cursor: string | null }>(
-      `/teams/${teamId}/members?limit=200`,
-    )
-    const others = data.members.filter((m) => m.user_id !== myUserId)
+    const members = await getAllTeamMembersRequest(teamId)
+    const others = members.filter((m) => m.user_id !== myUserId)
     return { status: "loaded", members: others }
   } catch {
     return { status: "error", message: "Could not load team members. Try again." }

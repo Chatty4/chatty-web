@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import {
   changeRoleRequest,
   deleteTeamRequest,
-  getTeamMembersRequest,
+  getAllTeamMembersRequest,
   getTeamRequest,
   leaveTeamRequest,
   removeMemberRequest,
@@ -19,11 +19,11 @@ export type SettingsState =
 
 async function fetchSettings(teamId: string): Promise<SettingsState> {
   try {
-    const [team, membersPage] = await Promise.all([
+    const [team, members] = await Promise.all([
       getTeamRequest(teamId),
-      getTeamMembersRequest(teamId),
+      getAllTeamMembersRequest(teamId),
     ])
-    return { status: "loaded", forTeamId: teamId, team, members: membersPage.members }
+    return { status: "loaded", forTeamId: teamId, team, members }
   } catch {
     return { status: "error", forTeamId: teamId, message: "Could not load team settings. Try again." }
   }

@@ -12,7 +12,7 @@ import { Select } from "@/components/ui/select"
 import { DataList, DataRow, RowMain, SectionTitle, SettingsTabs } from "@/components/ui/settings"
 import { SidePanel } from "@/components/ui/side-panel"
 import { useAuth } from "@/features/auth"
-import { getTeamMembersRequest } from "@/features/teams/fetchers/team-fetchers"
+import { getAllTeamMembersRequest } from "@/features/teams/fetchers/team-fetchers"
 import { useConfirm } from "@/hooks/use-confirm"
 
 import { useChannels } from "../hooks/channels-context"
@@ -118,8 +118,8 @@ function AddMembersForm({
 
   useEffect(() => {
     let cancelled = false
-    getTeamMembersRequest(teamId)
-      .then(({ members }) => {
+    getAllTeamMembersRequest(teamId)
+      .then((members) => {
         if (!cancelled) setCandidates(members.filter((m) => m.is_active))
       })
       .catch(() => {

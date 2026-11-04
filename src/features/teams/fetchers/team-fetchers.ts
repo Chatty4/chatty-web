@@ -1,4 +1,5 @@
 import { coreApi } from "@/lib/api"
+import { fetchAllPages } from "@/lib/fetch-all-pages"
 
 import type { CreateTeamResult, Role, Team, TeamListItem, TeamMember } from "../types"
 
@@ -31,10 +32,16 @@ export function leaveTeamRequest(teamId: string): Promise<void> {
   return coreApi.post(`/teams/${teamId}/leave`)
 }
 
-export function getTeamMembersRequest(
-  teamId: string,
-): Promise<{ members: TeamMember[]; next_cursor: string | null }> {
-  return coreApi.get(`/teams/${teamId}/members`)
+/** Every member of the team, however many pages that takes. */
+export function getAllTeamMembersRequest(teamId: string): Promise<TeamMember[]> {
+  return fetchAllPages(async (cursor) => {
+    const params = new URLSearchParams({ limit: "200" })
+    if (cursor) params.set("cursor", cursor)
+    const page = await coreApi.get<{ members: TeamMember[]; next_cursor: string | null }>(
+      `/teams/${teamId}/members?${params}`,
+    )
+    return { items: page.members, next_cursor: page.next_cursor }
+  })
 }
 
 export function changeRoleRequest(
