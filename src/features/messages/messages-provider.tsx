@@ -23,8 +23,11 @@ import {
   editMessageApi,
   getChannelEvents,
   getMessages,
+  listPinsApi,
+  pinMessageApi,
   removeReactionApi,
   sendMessageApi,
+  unpinMessageApi,
 } from "./fetchers/message-fetchers"
 import {
   messagesReducer,
@@ -35,6 +38,7 @@ import {
 import { createEventSequencer, type EventSequencer } from "./store/event-sequencer"
 import { planSync, selectCursors } from "./store/sequence"
 import type { ApiMessage, ChannelState } from "./types"
+import { describePinError } from "./utils/errors"
 
 // ── Provider ──────────────────────────────────────────────────────────────────
 
@@ -238,8 +242,44 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
     [doDispatch],
   )
 
+  // Both answers apply right away, so a pin shows even with the socket down. The matching
+  // event sets the same values, so getting both is safe.
+  const setPinned = useCallback(
+    async (channelId: string, messageId: string, on: boolean) => {
+      try {
+        if (on) {
+          const pin = await pinMessageApi(channelId, messageId)
+          doDispatch({ type: "MESSAGE_PINNED", channelId, info: pin })
+        } else {
+          await unpinMessageApi(channelId, messageId)
+          doDispatch({ type: "MESSAGE_UNPINNED", channelId, messageId })
+        }
+      } catch (err) {
+        if (err instanceof ApiError && err.code === "message_deleted") {
+          doDispatch({ type: "MESSAGE_DELETED", channelId, messageId, deletedAt: new Date().toISOString() })
+        }
+        throw err
+      }
+    },
+    [doDispatch],
+  )
+
+  const loadPins = useCallback(
+    async (channelId: string) => {
+      if (stateRef.current[channelId]?.pins?.status === "loading") return
+      doDispatch({ type: "PINS_LOAD_START", channelId })
+      try {
+        const { pins } = await listPinsApi(channelId)
+        doDispatch({ type: "PINS_LOADED", channelId, pins })
+      } catch (err) {
+        doDispatch({ type: "PINS_LOAD_FAIL", channelId, error: describePinError(err) })
+      }
+    },
+    [doDispatch],
+  )
+
   return (
-    <MessagesContext.Provider value={{ getChannel, loadChannel, loadMoreHistory, send, retry, edit, remove, setReaction }}>
+    <MessagesContext.Provider value={{ getChannel, loadChannel, loadMoreHistory, send, retry, edit, remove, setReaction, setPinned, loadPins }}>
       {children}
     </MessagesContext.Provider>
   )

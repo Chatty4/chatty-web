@@ -7,6 +7,8 @@ import type {
   ApiMessage,
   GetEventsResponse,
   GetMessagesResponse,
+  GetPinsResponse,
+  PinMessageResponse,
   SendMessageResponse,
 } from "../types"
 
@@ -45,6 +47,18 @@ export function addReactionApi(messageId: string, emoji: string): Promise<unknow
 
 export function removeReactionApi(messageId: string, emoji: string): Promise<unknown> {
   return chatApi.delete(reactionPath(messageId, emoji))
+}
+
+export function pinMessageApi(channelId: string, messageId: string): Promise<PinMessageResponse> {
+  return chatApi.post<PinMessageResponse>(`/channels/${channelId}/pins/${messageId}`)
+}
+
+export function unpinMessageApi(channelId: string, messageId: string): Promise<void> {
+  return chatApi.delete<void>(`/channels/${channelId}/pins/${messageId}`)
+}
+
+export function listPinsApi(channelId: string): Promise<GetPinsResponse> {
+  return chatApi.get<GetPinsResponse>(`/channels/${channelId}/pins`)
 }
 
 /** GET /channels/{id}/events — fetch events after a known seq (gap-fill). */
