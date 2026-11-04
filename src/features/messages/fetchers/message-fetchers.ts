@@ -34,6 +34,19 @@ export function deleteMessageApi(messageId: string): Promise<void> {
   return chatApi.delete<void>(`/messages/${messageId}`)
 }
 
+const reactionPath = (messageId: string, emoji: string) =>
+  `/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`
+
+// The answers carry the new reactions, but counts only change from events (see apply-event):
+// the event for my own reaction also arrives, and applying both would count it twice.
+export function addReactionApi(messageId: string, emoji: string): Promise<unknown> {
+  return chatApi.put(reactionPath(messageId, emoji))
+}
+
+export function removeReactionApi(messageId: string, emoji: string): Promise<unknown> {
+  return chatApi.delete(reactionPath(messageId, emoji))
+}
+
 /** GET /channels/{id}/events — fetch events after a known seq (gap-fill). */
 export function getChannelEvents(channelId: string, afterSeq: number): Promise<GetEventsResponse> {
   return chatApi.get<GetEventsResponse>(`/channels/${channelId}/events?after_seq=${afterSeq}`)

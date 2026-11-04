@@ -12,6 +12,11 @@ export type MessagesContextValue = {
   edit: (channelId: string, messageId: string, body: string) => Promise<void>
   /** DELETE /messages/{id}; rejects with ApiError. */
   remove: (channelId: string, messageId: string) => Promise<void>
+  /**
+   * Adds or removes my reaction. Resolves when the server accepted it; the count changes
+   * when the matching event arrives. Rejects with ApiError.
+   */
+  setReaction: (channelId: string, messageId: string, emoji: string, on: boolean) => Promise<void>
 }
 
 export const MessagesContext = createContext<MessagesContextValue | null>(null)
