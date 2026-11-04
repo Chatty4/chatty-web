@@ -31,6 +31,9 @@ import { ReactionChips } from "./reaction-chips"
 /** jumpToMessage sets data-flash on the row for a moment. */
 const ROW_FLASH_CLASS = "rounded-md transition-colors duration-200 data-[flash]:bg-accent/60"
 
+/** Rows take focus so the toolbar also opens from the keyboard and with a tap. */
+const ROW_FOCUS_CLASS = "outline-none focus-visible:ring-2 focus-visible:ring-ring"
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function formatTime(iso: string): string {
@@ -198,7 +201,7 @@ export function MessageItem({
     <div
       className={cn(
         "absolute z-10 -translate-y-1/2 items-center gap-0.5 rounded-md border bg-surface shadow-sm",
-        pickingReaction ? "flex" : "hidden group-hover/msg:flex",
+        pickingReaction ? "flex" : "hidden group-hover/msg:flex group-focus-within/msg:flex",
         own ? "top-1/2 right-full mr-1.5" : "top-1/2 left-full ml-1.5",
         // A wide bubble leaves no room beside it on a phone, so sit on its top edge there.
         "max-sm:inset-auto max-sm:top-0 max-sm:right-0 max-sm:mx-0",
@@ -270,8 +273,10 @@ export function MessageItem({
         className={cn(
           "group/msg relative flex flex-col items-end px-4 py-0.5",
           ROW_FLASH_CLASS,
+          ROW_FOCUS_CLASS,
           grouped ? "mt-0" : "mt-3",
         )}
+        tabIndex={0}
         data-message-id={message.id}
       >
         <ConfirmDialog {...confirmProps} />
@@ -317,8 +322,10 @@ export function MessageItem({
       className={cn(
         "group/msg relative flex gap-2.5 px-4 py-0.5",
         ROW_FLASH_CLASS,
+        ROW_FOCUS_CLASS,
         grouped ? "mt-0" : "mt-3",
       )}
+      tabIndex={0}
       data-message-id={message.id}
     >
       <ConfirmDialog {...confirmProps} />
