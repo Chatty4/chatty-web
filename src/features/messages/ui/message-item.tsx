@@ -12,8 +12,10 @@ import { cn } from "@/lib/utils"
 import { useReactionToggle } from "../hooks/use-reaction-toggle"
 import type { LocalMessage } from "../types"
 import { describeMessageError, messageErrorCode } from "../utils/errors"
-import { decodeMentions, encodeMentions, splitMentions } from "../utils/mentions"
+import { MARKDOWN_BLOCK_CLASS } from "../utils/markdown"
+import { decodeMentions, encodeMentions } from "../utils/mentions"
 import { MessageEditor } from "./message-editor"
+import { MessageMarkdown } from "./message-markdown"
 import { ReactionChips } from "./reaction-chips"
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -23,37 +25,6 @@ function formatTime(iso: string): string {
     hour: "numeric",
     minute: "2-digit",
   }).format(new Date(iso))
-}
-
-/** Renders a stored body, showing `<@id>` mentions as `@Display Name`. */
-function MessageText({
-  body,
-  own,
-  names,
-}: {
-  body: string
-  own: boolean
-  names: Record<string, string>
-}) {
-  return (
-    <span>
-      {splitMentions(body).map((part, i) =>
-        part.type === "mention" ? (
-          <span
-            key={i}
-            className={cn(
-              "font-medium text-primary",
-              own ? "font-semibold" : "rounded-[4px] bg-accent px-1 py-px",
-            )}
-          >
-            @{names[part.userId] ?? "unknown user"}
-          </span>
-        ) : (
-          part.value
-        ),
-      )}
-    </span>
-  )
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -276,13 +247,14 @@ export function MessageItem({
           <div className="relative max-w-[75%]">
             <div
               className={cn(
-                "rounded-lg bg-accent px-3 py-1.5 text-sm leading-relaxed break-words whitespace-pre-wrap text-foreground",
+                "rounded-lg bg-accent px-3 py-1.5 text-sm leading-relaxed break-words text-foreground",
+                MARKDOWN_BLOCK_CLASS,
                 !grouped && "rounded-tr-sm",
                 message.status === "pending" && "opacity-70",
                 message.status === "failed" && "ring-1 ring-destructive/50",
               )}
             >
-              <MessageText body={message.body} own names={names} />
+              <MessageMarkdown body={message.body} own names={names} />
               {isEdited && <span className="ml-1 text-xs text-muted-foreground">(edited)</span>}
             </div>
             {toolbar}
@@ -326,11 +298,12 @@ export function MessageItem({
           <div className="relative w-fit max-w-[75%]">
             <div
               className={cn(
-                "rounded-lg bg-surface-hover px-3 py-1.5 text-sm leading-relaxed break-words whitespace-pre-wrap text-foreground",
+                "rounded-lg bg-surface-hover px-3 py-1.5 text-sm leading-relaxed break-words text-foreground",
+                MARKDOWN_BLOCK_CLASS,
                 !grouped && "rounded-tl-sm",
               )}
             >
-              <MessageText body={message.body} own={false} names={names} />
+              <MessageMarkdown body={message.body} own={false} names={names} />
               {isEdited && <span className="ml-1 text-xs text-muted-foreground">(edited)</span>}
               {message.status !== "sent" && <span className="ml-1">{status}</span>}
             </div>
