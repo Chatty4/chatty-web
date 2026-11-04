@@ -44,6 +44,7 @@ export function TeamsProvider({ children }: { children: ReactNode }) {
     () => ({
       teams: state.status === "loaded" ? state.teams : [],
       loading: state.status === "loading",
+      failed: state.status === "error",
       reload,
     }),
     [state, reload],
