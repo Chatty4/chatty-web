@@ -66,7 +66,14 @@ describe("older history", () => {
     messages: ReturnType<typeof apiMessage>[],
     hasMore: boolean,
     beforeSeq = 5,
-  ): MessagesAction => ({ type: "PREPEND", channelId: CHANNEL, messages, hasMore, beforeSeq })
+  ): MessagesAction => ({
+    type: "PREPEND",
+    channelId: CHANNEL,
+    messages,
+    hasMore,
+    beforeSeq,
+    lastSeq: 5,
+  })
 
   it("marks the fetch while it runs", () => {
     expect(channel(reduce(loaded(5, [localMessage(5)], true), start)).loadingMore).toBe(true)

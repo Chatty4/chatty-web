@@ -12,10 +12,12 @@ import { classifyEvent, planSync, selectCursors } from "./sequence"
 import {
   CHANNEL,
   ME,
+  OTHER,
   apiMessage,
   created,
   deleted,
   edited,
+  event,
   pendingMessage,
 } from "./test-fixtures"
 
@@ -140,6 +142,35 @@ describe("offline client reconnects", () => {
       "msg-4",
       "c1",
     ])
+  })
+
+  it("counts a reaction once when an older page already included it", () => {
+    // Offline, someone reacted to old message 1. The user scrolls up: REST still works, so
+    // the page already has the reaction, and then the sync replays the same event.
+    const reaction = event("reaction.added", 4, {
+      message_id: "msg-0",
+      user_id: OTHER,
+      emoji: "👍",
+    })
+    const start = messagesReducer(
+      {},
+      { type: "LOAD_DONE", channelId: CHANNEL, messages: [apiMessage(3)], lastSeq: 3, hasMore: true },
+    )
+    const scrolledUp = messagesReducer(start, {
+      type: "PREPEND",
+      channelId: CHANNEL,
+      messages: [
+        apiMessage(1, { id: "msg-0", reactions: [{ emoji: "👍", count: 1, me: false }] }),
+      ],
+      hasMore: false,
+      beforeSeq: 3,
+      lastSeq: 4,
+    })
+
+    const state = applySync(scrolledUp, syncAnswer(scrolledUp, [reaction]))
+
+    expect(state[CHANNEL]!.messages[0]!.reactions).toEqual([{ emoji: "👍", count: 1, me: false }])
+    expect(state[CHANNEL]!.lastSeq).toBe(4)
   })
 
   it("catches up an empty channel too", () => {

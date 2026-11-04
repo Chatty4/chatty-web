@@ -136,7 +136,14 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
     doDispatch({ type: "LOAD_MORE_START", channelId })
     try {
       const res = await getMessages(channelId, beforeSeq)
-      doDispatch({ type: "PREPEND", channelId, messages: res.messages, hasMore: res.has_more, beforeSeq })
+      doDispatch({
+        type: "PREPEND",
+        channelId,
+        messages: res.messages,
+        hasMore: res.has_more,
+        beforeSeq,
+        lastSeq: res.last_seq,
+      })
     } catch {
       doDispatch({ type: "LOAD_MORE_FAIL", channelId })
     }
