@@ -39,7 +39,7 @@ import {
 import { createEventSequencer, type EventSequencer } from "./store/event-sequencer"
 import { planSync, selectCursors } from "./store/sequence"
 import type { ApiMessage, ChannelState } from "./types"
-import { describePinError } from "./utils/errors"
+import { describePinError, describeSendFailure, messageErrorCode } from "./utils/errors"
 
 // ── Provider ──────────────────────────────────────────────────────────────────
 
@@ -184,8 +184,9 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
     try {
       const confirmed: ApiMessage = await sendMessageApi(channelId, body, clientMsgId)
       doDispatch({ type: "OPTIMISTIC_CONFIRM", channelId, clientMsgId, confirmed })
-    } catch {
-      doDispatch({ type: "OPTIMISTIC_FAIL", channelId, clientMsgId })
+    } catch (err) {
+      doDispatch({ type: "OPTIMISTIC_FAIL", channelId, clientMsgId, failure: describeSendFailure(err) })
+      return messageErrorCode(err)
     }
   }, [doDispatch])
 
@@ -197,9 +198,14 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
     try {
       const confirmed = await sendMessageApi(channelId, msg.body, clientMsgId)
       doDispatch({ type: "OPTIMISTIC_CONFIRM", channelId, clientMsgId, confirmed })
-    } catch {
-      doDispatch({ type: "OPTIMISTIC_FAIL", channelId, clientMsgId })
+    } catch (err) {
+      doDispatch({ type: "OPTIMISTIC_FAIL", channelId, clientMsgId, failure: describeSendFailure(err) })
+      return messageErrorCode(err)
     }
+  }, [doDispatch])
+
+  const discard = useCallback((channelId: string, clientMsgId: string) => {
+    doDispatch({ type: "OPTIMISTIC_DISCARD", channelId, clientMsgId })
   }, [doDispatch])
 
   // Edit and delete apply the REST answer right away, so the change shows even if the
@@ -289,7 +295,7 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <MessagesContext.Provider value={{ getChannel, loadChannel, loadMoreHistory, send, retry, edit, remove, setReaction, setPinned, loadPins, getDraft, setDraft }}>
+    <MessagesContext.Provider value={{ getChannel, loadChannel, loadMoreHistory, send, retry, discard, edit, remove, setReaction, setPinned, loadPins, getDraft, setDraft }}>
       {children}
     </MessagesContext.Provider>
   )

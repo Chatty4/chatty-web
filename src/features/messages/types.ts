@@ -49,7 +49,11 @@ export type LocalMessage = ApiMessage & {
    * reaction counts already include events up to here, even if they arrive later.
    */
   asOfSeq?: number
+  /** Why a failed message wasn't sent. A retry can't help unless `retryable`. */
+  failure?: SendFailure
 }
+
+export type SendFailure = { message: string; retryable: boolean }
 
 // ── Pins ──────────────────────────────────────────────────────────────────────
 

@@ -63,6 +63,7 @@ export function MessageList({
     loadMoreHistory,
     send,
     retry,
+    discard,
     edit,
     remove,
     setReaction,
@@ -283,6 +284,7 @@ export function MessageList({
               onEdit={(messageId, body) => edit(channelId, messageId, body)}
               onDelete={(messageId) => remove(channelId, messageId)}
               onRetry={retry}
+              onDiscard={discard}
               onChannelArchived={onChannelArchived}
             />
             </Fragment>
@@ -319,7 +321,9 @@ export function MessageList({
         archived={archived}
         initialDraft={getDraft(channelId)}
         onDraftChange={(text) => setDraft(channelId, text)}
-        onSend={(body) => send(channelId, body)}
+        onSend={async (body) => {
+          if ((await send(channelId, body)) === "channel_archived") onChannelArchived()
+        }}
       />
     </div>
   )

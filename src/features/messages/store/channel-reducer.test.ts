@@ -288,6 +288,7 @@ describe("optimistic send", () => {
   it("marks a failed send and lets it retry", () => {
     const failed = reduce(loaded(3), add, {
       type: "OPTIMISTIC_FAIL",
+      failure: { message: "Not sent", retryable: true },
       channelId: CHANNEL,
       clientMsgId: "c1",
     })
@@ -299,6 +300,24 @@ describe("optimistic send", () => {
       clientMsgId: "c1",
     })
     expect(channel(retrying).messages[1]!.status).toBe("pending")
+    expect(channel(retrying).messages[1]!.failure).toBeUndefined()
+  })
+
+  it("removes a failed message when it is dismissed", () => {
+    const failed = reduce(loaded(3), add, {
+      type: "OPTIMISTIC_FAIL",
+      failure: { message: "Not sent", retryable: false },
+      channelId: CHANNEL,
+      clientMsgId: "c1",
+    })
+    expect(channel(failed).messages[1]!.failure?.retryable).toBe(false)
+
+    const dismissed = reduce(failed, {
+      type: "OPTIMISTIC_DISCARD",
+      channelId: CHANNEL,
+      clientMsgId: "c1",
+    })
+    expect(ids(dismissed)).toEqual(["msg-3"])
   })
 })
 

@@ -70,7 +70,10 @@ export type MessageItemProps = {
   onEdit:(messageId: string, body: string) => Promise<void>
   /** Rejects with ApiError on failure. */
   onDelete: (messageId: string) => Promise<void>
-  onRetry: (channelId: string, clientMsgId: string) => Promise<void>
+  /** Resolves with the error code when sending failed again. */
+  onRetry: (channelId: string, clientMsgId: string) => Promise<string | undefined>
+  /** Removes a message that failed to send. */
+  onDiscard: (channelId: string, clientMsgId: string) => void
   /** Called when the server says the channel is archived, so the view can go read-only. */
   onChannelArchived: () => void
 }
@@ -92,6 +95,7 @@ export function MessageItem({
   onEdit,
   onDelete,
   onRetry,
+  onDiscard,
   onChannelArchived,
 }: MessageItemProps) {
   const [editing, setEditing] = useState(false)
@@ -155,6 +159,12 @@ export function MessageItem({
     }
   }
 
+  const retrySend = async () => {
+    if (!message.client_msg_id) return
+    const code = await onRetry(message.channel_id, message.client_msg_id)
+    if (code === "channel_archived") onChannelArchived()
+  }
+
   const time = (
     <time className="text-xs text-muted-foreground" dateTime={message.created_at}>
       {formatTime(message.created_at)}
@@ -168,17 +178,27 @@ export function MessageItem({
       )}
       {message.status === "failed" && (
         <span className="text-xs text-destructive">
-          Not sent{" "}
+          {message.failure?.message ?? "Not sent"}{" "}
+          {(message.failure?.retryable ?? true) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-auto px-1 py-0 text-xs"
+              onClick={() => void retrySend()}
+            >
+              <RotateCcw className="size-3" />
+              Retry
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"
             className="h-auto px-1 py-0 text-xs"
             onClick={() =>
-              message.client_msg_id && void onRetry(message.channel_id, message.client_msg_id)
+              message.client_msg_id && onDiscard(message.channel_id, message.client_msg_id)
             }
           >
-            <RotateCcw className="size-3" />
-            Retry
+            Dismiss
           </Button>
         </span>
       )}

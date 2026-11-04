@@ -2,7 +2,7 @@
 // Handles loading, pagination, event application, gap-fill and optimistic send.
 
 import type { ChannelEvent } from "@/lib/ws/types"
-import type { ApiMessage, ChannelState, LocalMessage, Pin } from "../types"
+import type { ApiMessage, ChannelState, LocalMessage, Pin, SendFailure } from "../types"
 import { applyDelete, applyEdit, applyEvent, setPinned, type MessageEdit } from "./apply-event"
 import { addPin, applyEventToPins, editPin, removePin, type PinInfo } from "./pins"
 
@@ -28,7 +28,8 @@ export type MessagesAction =
   | { type: "APPLY_EVENTS"; channelId: string; events: ChannelEvent[]; lastSeq: number; currentUserId: string }
   | { type: "OPTIMISTIC_ADD"; channelId: string; message: LocalMessage }
   | { type: "OPTIMISTIC_CONFIRM"; channelId: string; clientMsgId: string; confirmed: ApiMessage }
-  | { type: "OPTIMISTIC_FAIL"; channelId: string; clientMsgId: string }
+  | { type: "OPTIMISTIC_FAIL"; channelId: string; clientMsgId: string; failure: SendFailure }
+  | { type: "OPTIMISTIC_DISCARD"; channelId: string; clientMsgId: string }
   | { type: "OPTIMISTIC_RETRY"; channelId: string; clientMsgId: string }
   | { type: "DROP_CHANNEL"; channelId: string }
   // REST answers to my own edit/delete. They carry no seq, so lastSeq is untouched;
@@ -240,7 +241,23 @@ export function messagesReducer(state: MessagesState, action: MessagesAction): M
         [action.channelId]: {
           ...ch,
           messages: ch.messages.map((m) =>
-            m.client_msg_id === action.clientMsgId ? { ...m, status: "failed" as const } : m,
+            m.client_msg_id === action.clientMsgId
+              ? { ...m, status: "failed" as const, failure: action.failure }
+              : m,
+          ),
+        },
+      }
+    }
+
+    case "OPTIMISTIC_DISCARD": {
+      const ch = state[action.channelId]
+      if (!ch) return state
+      return {
+        ...state,
+        [action.channelId]: {
+          ...ch,
+          messages: ch.messages.filter(
+            (m) => !(m.client_msg_id === action.clientMsgId && m.status === "failed"),
           ),
         },
       }
@@ -254,7 +271,9 @@ export function messagesReducer(state: MessagesState, action: MessagesAction): M
         [action.channelId]: {
           ...ch,
           messages: ch.messages.map((m) =>
-            m.client_msg_id === action.clientMsgId ? { ...m, status: "pending" as const } : m,
+            m.client_msg_id === action.clientMsgId
+              ? { ...m, status: "pending" as const, failure: undefined }
+              : m,
           ),
         },
       }
