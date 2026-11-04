@@ -24,7 +24,12 @@ import {
   getMessages,
   sendMessageApi,
 } from "./fetchers/message-fetchers"
-import { messagesReducer, type MessagesAction, type MessagesState } from "./store/channel-reducer"
+import {
+  messagesReducer,
+  oldestLoadedSeq,
+  type MessagesAction,
+  type MessagesState,
+} from "./store/channel-reducer"
 import { createEventSequencer, type EventSequencer } from "./store/event-sequencer"
 import { planSync, selectCursors } from "./store/sequence"
 import type { ApiMessage, ChannelState } from "./types"
@@ -124,11 +129,17 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
 
   const loadMoreHistory = useCallback(async (channelId: string) => {
     const ch = stateRef.current[channelId]
-    if (!ch || !ch.hasMore || ch.loading) return
-    const oldestSeq = ch.messages.find((m) => m.seq > 0)?.seq
-    if (!oldestSeq) return
-    const res = await getMessages(channelId, oldestSeq)
-    doDispatch({ type: "PREPEND", channelId, messages: res.messages, hasMore: res.has_more })
+    if (!ch || !ch.hasMore || ch.loading || ch.loadingMore) return
+    const beforeSeq = oldestLoadedSeq(ch.messages)
+    if (beforeSeq === undefined) return
+
+    doDispatch({ type: "LOAD_MORE_START", channelId })
+    try {
+      const res = await getMessages(channelId, beforeSeq)
+      doDispatch({ type: "PREPEND", channelId, messages: res.messages, hasMore: res.has_more, beforeSeq })
+    } catch {
+      doDispatch({ type: "LOAD_MORE_FAIL", channelId })
+    }
   }, [doDispatch])
 
   const send = useCallback(async (channelId: string, body: string) => {

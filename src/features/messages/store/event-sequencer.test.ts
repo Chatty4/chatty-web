@@ -22,7 +22,14 @@ function setup({
   >
 } = {}) {
   let state: MessagesState = {
-    [CHANNEL]: { messages: [localMessage(lastSeq)], lastSeq, hasMore: false, loading },
+    [CHANNEL]: {
+      messages: [localMessage(lastSeq)],
+      lastSeq,
+      hasMore: false,
+      loading,
+      loadingMore: false,
+      loadMoreFailed: false,
+    },
   }
   const dispatch = (action: MessagesAction) => {
     state = messagesReducer(state, action)

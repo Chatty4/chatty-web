@@ -57,6 +57,10 @@ export type ChannelState = {
   hasMore: boolean
   /** True while the initial page is being fetched. */
   loading: boolean
+  /** True while an older page is being fetched; blocks further fetches. */
+  loadingMore: boolean
+  /** The last older page failed. Stops automatic fetches until the user retries. */
+  loadMoreFailed: boolean
 }
 
 // ── API response shapes ───────────────────────────────────────────────────────

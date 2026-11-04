@@ -8,6 +8,9 @@ import { cn } from "@/lib/utils"
 import { useMessages } from "../context"
 import { useChannelMembers } from "../hooks/use-channel-members"
 import { useMemberNames } from "../hooks/use-member-names"
+import { useScrollAnchor } from "../hooks/use-scroll-anchor"
+import { useWhenVisible } from "../hooks/use-when-visible"
+import { HistoryTop } from "./history-top"
 import { MessageItem } from "./message-item"
 import { MessageComposer } from "./message-composer"
 import { MessageListSkeleton } from "./message-skeleton"
@@ -16,6 +19,9 @@ import { dayKey, formatDayLabel } from "../utils/dates"
 import { extractMentionIds } from "../utils/mentions"
 import { canDelete, canEdit, type Actor, type ChannelAccess, type TeamRole } from "../utils/permissions"
 import type { SidebarChannel } from "@/features/channels/types"
+
+/** Start fetching older messages this far before the user reaches the top. */
+const PREFETCH_MARGIN = "300px 0px 0px 0px"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -55,6 +61,8 @@ export function MessageList({
   const messages = useMemo(() => channelState?.messages ?? [], [channelState])
   const hasMore = channelState?.hasMore ?? false
   const loading = channelState?.loading ?? true
+  const loadingMore = channelState?.loadingMore ?? false
+  const loadMoreFailed = channelState?.loadMoreFailed ?? false
 
   // ── Name resolution for authors and <@id> mentions ───────────────────────────
   const userIds = useMemo(
@@ -85,7 +93,27 @@ export function MessageList({
   const { atBottom, farFromBottom, newCount } = scrollState
   const showJump = farFromBottom || newCount > 0
 
-  const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
+  // ── Older history ────────────────────────────────────────────────────────────
+  const { capture: captureAnchor, clear: clearAnchor } = useScrollAnchor(
+    listRef,
+    `${messages[0]?.id}:${hasMore}`,
+  )
+
+  const loadOlder = () => {
+    captureAnchor()
+    void loadMoreHistory(channelId)
+  }
+
+  const sentinelRef = useWhenVisible<HTMLDivElement>({
+    rootRef: listRef,
+    // A failed page waits for the user: retrying by itself would hammer the server.
+    enabled: hasMore && !loading && !loadingMore && !loadMoreFailed,
+    resetKey: channelId,
+    rootMargin: PREFETCH_MARGIN,
+    onVisible: loadOlder,
+  })
+
+  const scrollToBottom =(behavior: ScrollBehavior = "smooth") => {
     const el = listRef.current
     if (!el) return
     el.scrollTo({ top: el.scrollHeight, behavior })
@@ -96,6 +124,7 @@ export function MessageList({
   useEffect(() => {
     prevLengthRef.current = messages.length
     lastKeyRef.current = undefined
+    clearAnchor()
     // Defer the scroll + state reset into rAF so DOM is ready.
     requestAnimationFrame(() => {
       const el = listRef.current
@@ -128,8 +157,8 @@ export function MessageList({
   const handleScroll = () => {
     const el = listRef.current
     if (!el) return
-    // Load older messages when scrolled near the top.
-    if (el.scrollTop < 80 && hasMore) void loadMoreHistory(channelId)
+    // The user can keep scrolling during the fetch: hold on to what they see now.
+    if (loadingMore) captureAnchor()
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
     setScrollState({
       atBottom: distanceFromBottom < 40,
@@ -174,21 +203,15 @@ export function MessageList({
         {/* The welcome block only once the very start of the history is loaded */}
         {!loading && !hasMore && intro}
 
-        {/* Top anchor: load older history, or the end-of-history notice */}
         {!loading && (
-          <div className="pt-[18px] text-center">
-            {hasMore ? (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => void loadMoreHistory(channelId)}
-              >
-                Load earlier messages
-              </Button>
-            ) : (
-              <span className="text-[11px] text-faint-foreground">You’re all caught up</span>
-            )}
-          </div>
+          <HistoryTop
+            hasMore={hasMore}
+            loadingMore={loadingMore}
+            failed={loadMoreFailed}
+            endLabel={channel?.kind === "dm" ? "Beginning of conversation" : "Beginning of channel"}
+            onLoadMore={loadOlder}
+            sentinelRef={sentinelRef}
+          />
         )}
 
         {/* Empty state */}
