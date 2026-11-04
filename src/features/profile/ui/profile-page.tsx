@@ -9,6 +9,7 @@ import { toast } from "@/lib/toast"
 
 import { useProfile } from "../hooks/use-profile"
 import type { ChangePasswordInput } from "../types"
+import { describePasswordError } from "../utils/errors"
 import { TimezoneSelect } from "./timezone-select"
 
 // ── Profile section ───────────────────────────────────────────────────────────
@@ -132,11 +133,7 @@ function PasswordSection({
       setConfirmPassword("")
       toast.success("Password changed")
     } catch (err) {
-      const msg =
-        err instanceof Error && err.message.includes("wrong_password")
-          ? "Current password is incorrect."
-          : "Could not change password. Make sure it is at least 10 characters and not a common one."
-      setError(msg)
+      setError(describePasswordError(err))
     } finally {
       setSaving(false)
     }
