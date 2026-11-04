@@ -103,7 +103,8 @@ describe("gaps", () => {
   it("follows has_more through every page", async () => {
     const getEvents = vi
       .fn<(channelId: string, afterSeq: number) => Promise<GetEventsResponse>>()
-      .mockResolvedValueOnce({ events: [created(4)], last_seq: 4, has_more: true })
+      // last_seq is the channel's newest seq on every page, not the end of the page.
+      .mockResolvedValueOnce({ events: [created(4)], last_seq: 5, has_more: true })
       .mockResolvedValueOnce({ events: [created(5)], last_seq: 5, has_more: false })
     const { sequencer, seqs } = setup({ getEvents })
 

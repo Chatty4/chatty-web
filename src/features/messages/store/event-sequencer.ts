@@ -58,7 +58,10 @@ export function createEventSequencer(deps: EventSequencerDeps): EventSequencer {
         })
         return
       }
-      cursor = page.last_seq
+      // Not page.last_seq: that is the channel's newest seq, past what this page returned.
+      const lastInPage = page.events.at(-1)?.seq
+      if (lastInPage === undefined) throw new Error("has_more with an empty page")
+      cursor = lastInPage
     }
   }
 
