@@ -167,6 +167,27 @@ describe("reactions", () => {
     expect(applyEvent(messages, removed(ME), ME)[0]!.reactions).toEqual([])
   })
 
+  it("ignores a reaction on a deleted message", () => {
+    const messages = [localMessage(1, { body: "", deleted_at: "2026-10-05T14:10:00Z" })]
+    expect(applyEvent(messages, added(ME), ME)[0]!.reactions).toEqual([])
+  })
+
+  it("skips a reaction event the message's page already included", () => {
+    const fromPage = localMessage(1, {
+      reactions: [{ emoji: "👍", count: 1, me: true }],
+      asOfSeq: 2,
+    })
+    expect(applyEvent([fromPage], added(ME), ME)[0]!.reactions[0]!.count).toBe(1)
+  })
+
+  it("still counts a reaction event newer than the page", () => {
+    const fromPage = localMessage(1, {
+      reactions: [{ emoji: "👍", count: 2, me: true }],
+      asOfSeq: 2,
+    })
+    expect(applyEvent([fromPage], removed(OTHER), ME)[0]!.reactions[0]!.count).toBe(1)
+  })
+
   it("keeps me when someone else removes theirs", () => {
     const messages = [localMessage(1, { reactions: [{ emoji: "👍", count: 2, me: true }] })]
     expect(applyEvent(messages, removed(OTHER), ME)[0]!.reactions).toEqual([

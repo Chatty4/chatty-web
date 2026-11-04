@@ -6,7 +6,7 @@ import {
   type EmojiPickerListRowProps,
 } from "frimousse"
 import { Smile } from "lucide-react"
-import { type RefObject, useRef, useState } from "react"
+import { type ReactNode, type RefObject, useRef, useState } from "react"
 
 import { cn } from "@/lib/utils"
 
@@ -103,27 +103,43 @@ type EmojiPickerButtonProps = {
   disabled?: boolean
   /** Element to focus after the picker closes (e.g. the composer textarea). */
   returnFocusRef?: RefObject<HTMLElement | null>
+  label?: string
+  icon?: ReactNode
+  /** Lets a parent stay visible while the picker is open, like a hover toolbar. */
+  onOpenChange?: (open: boolean) => void
 }
 
-/** Smiley button that opens the emoji picker in a popover. */
-export function EmojiPickerButton({ onSelect, disabled, returnFocusRef }: EmojiPickerButtonProps) {
+/** Button that opens the emoji picker in a popover. */
+export function EmojiPickerButton({
+  onSelect,
+  disabled,
+  returnFocusRef,
+  label = "Add emoji",
+  icon = <Smile />,
+  onOpenChange,
+}: EmojiPickerButtonProps) {
   const [open, setOpen] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
 
+  const changeOpen = (next: boolean) => {
+    setOpen(next)
+    onOpenChange?.(next)
+  }
+
   return (
-    <Popover.Root open={open} onOpenChange={setOpen}>
+    <Popover.Root open={open} onOpenChange={changeOpen}>
       <Popover.Trigger
         render={
           <Button
             variant="ghost"
             size="icon-sm"
-            aria-label="Add emoji"
+            aria-label={label}
             disabled={disabled}
             className={open ? "bg-surface-hover text-foreground" : undefined}
           />
         }
       >
-        <Smile />
+        {icon}
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Positioner side="top" align="start" sideOffset={8} className="z-50">
@@ -136,7 +152,7 @@ export function EmojiPickerButton({ onSelect, disabled, returnFocusRef }: EmojiP
               searchRef={searchRef}
               onSelect={(emoji) => {
                 onSelect(emoji)
-                setOpen(false)
+                changeOpen(false)
               }}
             />
           </Popover.Popup>

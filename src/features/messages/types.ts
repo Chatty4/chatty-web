@@ -44,6 +44,11 @@ export type ApiMessage = {
 /** A message as the store and UI see it — includes local send state. */
 export type LocalMessage = ApiMessage & {
   status: MessageStatus
+  /**
+   * The channel's seq when this copy was fetched, for messages from an older page. Its
+   * reaction counts already include events up to here, even if they arrive later.
+   */
+  asOfSeq?: number
 }
 
 // ── Channel state ─────────────────────────────────────────────────────────────

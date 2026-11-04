@@ -28,6 +28,11 @@ function isActionable(message: LocalMessage): boolean {
   return message.deleted_at === null && message.status === "sent"
 }
 
+/** Anyone who can write in the channel can react. */
+export function canReact(message: LocalMessage, channel: ChannelAccess | null): boolean {
+  return !!channel && !channel.archived && isActionable(message)
+}
+
 /** Only the author can edit, and only while they can write in the channel. */
 export function canEdit(message: LocalMessage, me: Actor, channel: ChannelAccess | null): boolean {
   if (!channel || channel.archived || !isActionable(message)) return false

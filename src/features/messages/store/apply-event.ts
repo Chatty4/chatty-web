@@ -39,6 +39,14 @@ export function applyDelete(
   )
 }
 
+/**
+ * Reaction events move a count, so unlike edits they aren't safe to apply twice.
+ * Skip deleted messages, and events the message's copy already includes.
+ */
+function acceptsReaction(message: LocalMessage, eventSeq: number): boolean {
+  return message.deleted_at === null && eventSeq > (message.asOfSeq ?? 0)
+}
+
 function insertSorted(messages: LocalMessage[], msg: LocalMessage): LocalMessage[] {
   // Find the last message with a real seq smaller than msg.seq (pending have seq=0)
   let i = messages.length - 1
@@ -85,7 +93,7 @@ export function applyEvent(
     case "reaction.added": {
       const { message_id, user_id, emoji } = event.payload as ReactionPayload
       return messages.map((m) => {
-        if (m.id !== message_id) return m
+        if (m.id !== message_id || !acceptsReaction(m, event.seq)) return m
         const existing = m.reactions.find((r) => r.emoji === emoji)
         const reactions: Reaction[] = existing
           ? m.reactions.map((r) =>
@@ -101,7 +109,7 @@ export function applyEvent(
     case "reaction.removed": {
       const { message_id, user_id, emoji } = event.payload as ReactionPayload
       return messages.map((m) => {
-        if (m.id !== message_id) return m
+        if (m.id !== message_id || !acceptsReaction(m, event.seq)) return m
         return {
           ...m,
           reactions: m.reactions

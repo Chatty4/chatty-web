@@ -18,10 +18,12 @@ import { ApiError } from "@/lib/api"
 
 import { MessagesContext } from "./context"
 import {
+  addReactionApi,
   deleteMessageApi,
   editMessageApi,
   getChannelEvents,
   getMessages,
+  removeReactionApi,
   sendMessageApi,
 } from "./fetchers/message-fetchers"
 import {
@@ -136,7 +138,14 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
     doDispatch({ type: "LOAD_MORE_START", channelId })
     try {
       const res = await getMessages(channelId, beforeSeq)
-      doDispatch({ type: "PREPEND", channelId, messages: res.messages, hasMore: res.has_more, beforeSeq })
+      doDispatch({
+        type: "PREPEND",
+        channelId,
+        messages: res.messages,
+        hasMore: res.has_more,
+        beforeSeq,
+        lastSeq: res.last_seq,
+      })
     } catch {
       doDispatch({ type: "LOAD_MORE_FAIL", channelId })
     }
@@ -215,8 +224,22 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
     doDispatch({ type: "MESSAGE_DELETED", channelId, messageId, deletedAt: new Date().toISOString() })
   }, [doDispatch])
 
+  const setReaction = useCallback(
+    async (channelId: string, messageId: string, emoji: string, on: boolean) => {
+      try {
+        await (on ? addReactionApi(messageId, emoji) : removeReactionApi(messageId, emoji))
+      } catch (err) {
+        if (err instanceof ApiError && err.code === "message_deleted") {
+          doDispatch({ type: "MESSAGE_DELETED", channelId, messageId, deletedAt: new Date().toISOString() })
+        }
+        throw err
+      }
+    },
+    [doDispatch],
+  )
+
   return (
-    <MessagesContext.Provider value={{ getChannel, loadChannel, loadMoreHistory, send, retry, edit, remove }}>
+    <MessagesContext.Provider value={{ getChannel, loadChannel, loadMoreHistory, send, retry, edit, remove, setReaction }}>
       {children}
     </MessagesContext.Provider>
   )

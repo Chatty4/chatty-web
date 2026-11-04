@@ -11,8 +11,15 @@ export type MessagesAction =
   | { type: "LOAD_START"; channelId: string }
   | { type: "LOAD_DONE"; channelId: string; messages: ApiMessage[]; lastSeq: number; hasMore: boolean }
   | { type: "LOAD_MORE_START"; channelId: string }
-  // beforeSeq is the cursor the page was requested with (see PREPEND).
-  | { type: "PREPEND"; channelId: string; messages: ApiMessage[]; hasMore: boolean; beforeSeq: number }
+  // beforeSeq is the cursor the page was requested with; lastSeq is its answer's last_seq.
+  | {
+      type: "PREPEND"
+      channelId: string
+      messages: ApiMessage[]
+      hasMore: boolean
+      beforeSeq: number
+      lastSeq: number
+    }
   | { type: "LOAD_MORE_FAIL"; channelId: string }
   | { type: "RELOAD"; channelId: string; messages: ApiMessage[]; lastSeq: number; hasMore: boolean }
   | { type: "APPLY_EVENT"; channelId: string; event: ChannelEvent; currentUserId: string }
@@ -110,7 +117,9 @@ export function messagesReducer(state: MessagesState, action: MessagesAction): M
       }
 
       const known = new Set(ch.messages.map((m) => m.id))
-      const older = newestFirstToAsc(action.messages).filter((m) => !known.has(m.id))
+      const older = newestFirstToAsc(action.messages)
+        .filter((m) => !known.has(m.id))
+        .map((m) => ({ ...m, asOfSeq: action.lastSeq }))
       return {
         ...state,
         [action.channelId]: {
