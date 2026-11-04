@@ -15,6 +15,7 @@ import {
 import { useAuth } from "@/features/auth"
 import { useWs } from "@/features/ws"
 import { ApiError } from "@/lib/api"
+import { uuid } from "@/lib/uuid"
 
 import { MessagesContext } from "./context"
 import {
@@ -158,7 +159,7 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
 
   const send = useCallback(async (channelId: string, body: string) => {
     const userId = userIdRef.current ?? ""
-    const clientMsgId = crypto.randomUUID()
+    const clientMsgId = uuid()
     doDispatch({
       type: "OPTIMISTIC_ADD",
       channelId,
