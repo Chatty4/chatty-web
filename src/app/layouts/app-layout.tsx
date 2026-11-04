@@ -10,7 +10,13 @@ import { TeamsProvider } from "@/features/teams"
 import { WsProvider } from "@/features/ws"
 
 /** Routes inside the app set `handle: { title }` for the header. */
-export type RouteHandle = { title?: string; subtitle?: string; fullBleed?: boolean }
+export type RouteHandle = {
+  title?: string
+  subtitle?: string
+  fullBleed?: boolean
+  /** A wider page column, for layouts with two panels. */
+  wide?: boolean
+}
 
 /** The three columns: team rail, sidebar and the main area. */
 export function AppLayout() {
@@ -52,7 +58,7 @@ export function AppLayout() {
                 </div>
               ) : (
                 <div className="min-h-0 flex-1 overflow-y-auto bg-surface-subtle p-5 md:p-7">
-                  <div className="mx-auto max-w-[780px]">
+                  <div className={handle.wide ? "mx-auto max-w-[980px]" : "mx-auto max-w-[780px]"}>
                     <Outlet />
                   </div>
                 </div>

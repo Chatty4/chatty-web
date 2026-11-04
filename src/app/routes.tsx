@@ -69,7 +69,7 @@ export const router = createBrowserRouter([
               {
                 path: "channels/browse",
                 Component: BrowseChannelsPage,
-                handle: { title: "Browse channels" } satisfies RouteHandle,
+                handle: { title: "Browse channels", wide: true } satisfies RouteHandle,
               },
               {
                 path: "dms/new",
