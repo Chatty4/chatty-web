@@ -1,13 +1,16 @@
-import { Link } from "react-router"
+import { Link, Navigate } from "react-router"
 
 import { Button, buttonVariants } from "@/components/ui/button"
 import { useAuth } from "@/features/auth"
-import { useTeams } from "@/features/teams"
+import { pickHomeTeam, readLastTeam, useTeams } from "@/features/teams"
 
-/** Root route: shown when the user has no teams or hasn't selected one yet. */
+/** Root route: opens the last used team, so only someone with no teams stays here. */
 export function HomePage() {
   const { user } = useAuth()
   const { teams, loading, failed, reload } = useTeams()
+  const homeTeam = pickHomeTeam(teams, readLastTeam())
+
+  if (homeTeam) return <Navigate to={`/teams/${homeTeam.id}`} replace />
 
   if (failed) {
     return (

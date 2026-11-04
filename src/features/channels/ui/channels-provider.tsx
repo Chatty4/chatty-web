@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
-import { useMatches } from "react-router"
 
 import { useAuth } from "@/features/auth"
+import { useActiveTeamId } from "@/features/teams/hooks/use-active-team-id"
 import { useWs } from "@/features/ws"
 
 import { getSidebarChannelsRequest, getTeamMemberPreviewsRequest } from "../fetchers/channel-fetchers"
@@ -19,14 +19,6 @@ type ChannelsState =
       memberNames: Record<string, string>
     }
   | { status: "error"; forTeamId: string }
-
-function getActiveTeamId(matches: ReturnType<typeof useMatches>): string {
-  for (let i = matches.length - 1; i >= 0; i--) {
-    const id = (matches[i].params as { teamId?: string }).teamId
-    if (id) return id
-  }
-  return ""
-}
 
 async function fetchChannels(teamId: string, myUserId: string): Promise<ChannelsState> {
   try {
@@ -56,8 +48,7 @@ async function fetchChannels(teamId: string, myUserId: string): Promise<Channels
 
 /** Fetches the channel/DM sidebar list for the active team and provides it to all children. */
 export function ChannelsProvider({ children }: { children: ReactNode }) {
-  const matches = useMatches()
-  const teamId = getActiveTeamId(matches)
+  const teamId = useActiveTeamId()
   const { user } = useAuth()
   const { subscribe } = useWs()
   const myUserId = user?.id ?? ""
