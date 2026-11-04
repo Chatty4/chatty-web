@@ -1,0 +1,224 @@
+import { describe, expect, it } from "vitest"
+
+import { messagesReducer, type MessagesAction, type MessagesState } from "./channel-reducer"
+import {
+  CHANNEL,
+  ME,
+  apiMessage,
+  created,
+  localMessage,
+  pendingMessage,
+} from "./test-fixtures"
+
+function loaded(lastSeq: number, messages = [localMessage(lastSeq)], hasMore = false): MessagesState {
+  return { [CHANNEL]: { messages, lastSeq, hasMore, loading: false } }
+}
+
+const reduce = (state: MessagesState, ...actions: MessagesAction[]) =>
+  actions.reduce(messagesReducer, state)
+const channel = (state: MessagesState) => state[CHANNEL]!
+const ids = (state: MessagesState) => channel(state).messages.map((m) => m.id)
+
+describe("loading", () => {
+  it("LOAD_START creates a loading channel once", () => {
+    const state = reduce({}, { type: "LOAD_START", channelId: CHANNEL })
+    expect(channel(state)).toMatchObject({ messages: [], lastSeq: 0, loading: true })
+    expect(reduce(state, { type: "LOAD_START", channelId: CHANNEL })).toBe(state)
+  })
+
+  it("LOAD_DONE stores newest-first history oldest-first and sets the cursor", () => {
+    const state = reduce(
+      {},
+      {
+        type: "LOAD_DONE",
+        channelId: CHANNEL,
+        messages: [apiMessage(2), apiMessage(1)],
+        lastSeq: 5,
+        hasMore: true,
+      },
+    )
+    expect(ids(state)).toEqual(["msg-1", "msg-2"])
+    expect(channel(state)).toMatchObject({ lastSeq: 5, hasMore: true, loading: false })
+  })
+
+  it("LOAD_DONE keeps a message the user sent while the channel was loading", () => {
+    const state = reduce(
+      {},
+      { type: "LOAD_START", channelId: CHANNEL },
+      { type: "OPTIMISTIC_ADD", channelId: CHANNEL, message: pendingMessage("c1") },
+      { type: "LOAD_DONE", channelId: CHANNEL, messages: [apiMessage(1)], lastSeq: 1, hasMore: false },
+    )
+    expect(ids(state)).toEqual(["msg-1", "c1"])
+  })
+
+  it("PREPEND puts older history first and leaves the cursor alone", () => {
+    const state = reduce(loaded(5, [localMessage(5)], true), {
+      type: "PREPEND",
+      channelId: CHANNEL,
+      messages: [apiMessage(4), apiMessage(3)],
+      hasMore: false,
+    })
+    expect(ids(state)).toEqual(["msg-3", "msg-4", "msg-5"])
+    expect(channel(state)).toMatchObject({ lastSeq: 5, hasMore: false })
+  })
+})
+
+describe("RELOAD (gap too large)", () => {
+  const reload = (hasMore: boolean): MessagesAction => ({
+    type: "RELOAD",
+    channelId: CHANNEL,
+    messages: [apiMessage(900)],
+    lastSeq: 912,
+    hasMore,
+  })
+
+  it("throws away old messages and takes last_seq from the answer", () => {
+    const state = reduce(loaded(3), reload(false))
+    expect(ids(state)).toEqual(["msg-900"])
+    expect(channel(state).lastSeq).toBe(912)
+  })
+
+  it("keeps older history reachable", () => {
+    expect(channel(reduce(loaded(3), reload(true))).hasMore).toBe(true)
+  })
+
+  it("does not lose messages the user has not managed to send", () => {
+    const failed = { ...pendingMessage("c2"), status: "failed" as const }
+    const state = reduce(loaded(3, [localMessage(3), pendingMessage("c1"), failed]), reload(false))
+    expect(ids(state)).toEqual(["msg-900", "c1", "c2"])
+  })
+})
+
+describe("events", () => {
+  const apply = (seq: number): MessagesAction => ({
+    type: "APPLY_EVENT",
+    channelId: CHANNEL,
+    event: created(seq),
+    currentUserId: ME,
+  })
+
+  it("APPLY_EVENT applies the next event and moves the cursor", () => {
+    const state = reduce(loaded(3), apply(4))
+    expect(ids(state)).toEqual(["msg-3", "msg-4"])
+    expect(channel(state).lastSeq).toBe(4)
+  })
+
+  it("APPLY_EVENT ignores a duplicate", () => {
+    const state = loaded(3)
+    expect(reduce(state, apply(3))).toBe(state)
+  })
+
+  it("an event about a message that isn't loaded still moves the cursor", () => {
+    const state = reduce(loaded(3), {
+      type: "APPLY_EVENT",
+      channelId: CHANNEL,
+      event: {
+        type: "pin.added",
+        channel_id: CHANNEL,
+        seq: 4,
+        created_at: "2026-10-05T14:00:00Z",
+        payload: { message_id: "far-up-in-history" },
+      },
+      currentUserId: ME,
+    })
+    expect(channel(state).lastSeq).toBe(4)
+    expect(ids(state)).toEqual(["msg-3"])
+  })
+
+  it("APPLY_EVENTS skips what was already applied and takes the server's last_seq", () => {
+    const state = reduce(loaded(3), {
+      type: "APPLY_EVENTS",
+      channelId: CHANNEL,
+      events: [created(3), created(4), created(5)],
+      lastSeq: 7,
+      currentUserId: ME,
+    })
+    expect(ids(state)).toEqual(["msg-3", "msg-4", "msg-5"])
+    expect(channel(state).lastSeq).toBe(7)
+  })
+
+  it("ignores events for a channel that isn't loaded", () => {
+    expect(reduce({}, apply(1))).toEqual({})
+  })
+})
+
+describe("optimistic send", () => {
+  const add: MessagesAction = {
+    type: "OPTIMISTIC_ADD",
+    channelId: CHANNEL,
+    message: pendingMessage("c1"),
+  }
+  const confirm = (seq: number): MessagesAction => ({
+    type: "OPTIMISTIC_CONFIRM",
+    channelId: CHANNEL,
+    clientMsgId: "c1",
+    confirmed: apiMessage(seq, { author_id: ME }),
+  })
+
+  it("replaces the pending copy with the confirmed message", () => {
+    const state = reduce(loaded(3), add, confirm(4))
+    expect(ids(state)).toEqual(["msg-3", "msg-4"])
+    expect(channel(state).messages[1]!.status).toBe("sent")
+  })
+
+  it("does not move the cursor past events that were not applied", () => {
+    const state = reduce(loaded(3), add, confirm(9))
+    expect(channel(state).lastSeq).toBe(3)
+  })
+
+  it("drops the pending copy when the event already added the message", () => {
+    const state = reduce(
+      loaded(3),
+      add,
+      { type: "APPLY_EVENT", channelId: CHANNEL, event: created(4), currentUserId: ME },
+      confirm(4),
+    )
+    expect(ids(state)).toEqual(["msg-3", "msg-4"])
+  })
+
+  it("marks a failed send and lets it retry", () => {
+    const failed = reduce(loaded(3), add, {
+      type: "OPTIMISTIC_FAIL",
+      channelId: CHANNEL,
+      clientMsgId: "c1",
+    })
+    expect(channel(failed).messages[1]!.status).toBe("failed")
+
+    const retrying = reduce(failed, {
+      type: "OPTIMISTIC_RETRY",
+      channelId: CHANNEL,
+      clientMsgId: "c1",
+    })
+    expect(channel(retrying).messages[1]!.status).toBe("pending")
+  })
+})
+
+describe("my own edit and delete", () => {
+  it("MESSAGE_EDITED and MESSAGE_DELETED leave the cursor alone", () => {
+    const state = reduce(
+      loaded(3),
+      {
+        type: "MESSAGE_EDITED",
+        channelId: CHANNEL,
+        edit: {
+          message_id: "msg-3",
+          body: "fixed",
+          mentions: [],
+          edited_at: "2026-10-05T14:05:00Z",
+        },
+      },
+      {
+        type: "MESSAGE_DELETED",
+        channelId: CHANNEL,
+        messageId: "msg-3",
+        deletedAt: "2026-10-05T14:06:00Z",
+      },
+    )
+    expect(channel(state).lastSeq).toBe(3)
+    expect(channel(state).messages[0]!.deleted_at).toBe("2026-10-05T14:06:00Z")
+  })
+})
+
+it("DROP_CHANNEL removes the channel", () => {
+  expect(reduce(loaded(3), { type: "DROP_CHANNEL", channelId: CHANNEL })).toEqual({})
+})

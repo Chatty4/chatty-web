@@ -1,7 +1,8 @@
 import path from "node:path"
 import tailwindcss from "@tailwindcss/vite"
 import react from "@vitejs/plugin-react"
-import { defineConfig, loadEnv } from "vite"
+import { loadEnv } from "vite"
+import { defineConfig } from "vitest/config"
 
 export default defineConfig(({ mode }) => {
   // Only used by the dev server, never sent to the browser (no VITE_ prefix).
@@ -15,6 +16,10 @@ export default defineConfig(({ mode }) => {
       alias: {
         "@": path.resolve(import.meta.dirname, "./src"),
       },
+    },
+    test: {
+      environment: "node",
+      include: ["src/**/*.test.ts"],
     },
     server: {
       port: 5173,
