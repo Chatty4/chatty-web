@@ -42,6 +42,26 @@ export function decodeMentions(body: string, names: Record<string, string>): str
   return body.replace(TOKEN, (token, id: string) => (names[id] ? `@${names[id]}` : token))
 }
 
+/** Longest text after the @ still looked up: display names stop at 60 characters. */
+const MAX_QUERY_LENGTH = 60
+
+/**
+ * The mention being typed at the caret: where its @ is and the text after it, which may
+ * hold spaces ("Ana P"). Null when the caret isn't in a mention.
+ */
+export function findMentionQuery(
+  text: string,
+  caret: number,
+): { start: number; query: string } | null {
+  const before = text.slice(0, caret)
+  const start = before.lastIndexOf("@")
+  if (start === -1) return null
+  if (start > 0 && /[\p{L}\p{N}_.+-]/u.test(before[start - 1]!)) return null
+  const query = before.slice(start + 1)
+  if (query.length > MAX_QUERY_LENGTH || query.includes("\n")) return null
+  return { start, query }
+}
+
 /**
  * Turns `@Display Name` into `<@id>` for every candidate written in the text.
  * Longest names match first so "@Ana Maria" is not read as "@Ana". An @ inside a word

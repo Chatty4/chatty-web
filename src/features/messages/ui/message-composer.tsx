@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { EmojiPickerButton } from "@/components/ui/emoji-picker"
 
 import { MAX_MESSAGE_LENGTH as MAX_LENGTH } from "../constants"
-import { encodeMentions, type MentionCandidate } from "../utils/mentions"
+import { encodeMentions, findMentionQuery, type MentionCandidate } from "../utils/mentions"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -32,6 +32,7 @@ export function MessageComposer({
 }: MessageComposerProps) {
   const [value, setStoredValue] = useState(initialDraft)
   const [activeIndex, setActiveIndex] = useState(0)
+  const [caret, setCaret] = useState(initialDraft.length)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const setValue = (next: string) => {
@@ -39,15 +40,12 @@ export function MessageComposer({
     onDraftChange?.(next)
   }
 
-  // Detect @mention being typed at the cursor end.
-  const mentionMatch = value.match(/@([\w]*)$/)
-  const suggestions = useMemo<MentionCandidate[]>(() => {
-    if (!mentionMatch) return []
-    const query = mentionMatch[1].toLowerCase()
-    return members
-      .filter((m) => m.display_name.toLowerCase().includes(query))
-      .slice(0, 5)
-  }, [mentionMatch, members])
+  const mention = findMentionQuery(value, caret)
+  const query = mention?.query.toLowerCase()
+  const suggestions =
+    query === undefined
+      ? []
+      : members.filter((m) => m.display_name.toLowerCase().includes(query)).slice(0, 5)
 
   // Clamp so activeIndex never points past the end of the current list.
   const clampedIndex = suggestions.length > 0 ? Math.min(activeIndex, suggestions.length - 1) : 0
@@ -63,6 +61,14 @@ export function MessageComposer({
     requestAnimationFrame(() => textareaRef.current?.focus())
   }
 
+  const moveCaret = (position: number) => {
+    setCaret(position)
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus()
+      textareaRef.current?.setSelectionRange(position, position)
+    })
+  }
+
   const insertAtCursor = (text: string) => {
     const el = textareaRef.current
     const start = el?.selectionStart ?? value.length
@@ -70,17 +76,15 @@ export function MessageComposer({
     const next = value.slice(0, start) + text + value.slice(end)
     if (next.length > MAX_LENGTH) return
     setValue(next)
-    const caret = start + text.length
-    requestAnimationFrame(() => {
-      el?.focus()
-      el?.setSelectionRange(caret, caret)
-    })
+    moveCaret(start + text.length)
   }
 
   const applyMention = (name: string) => {
-    setValue(value.replace(/@[\w]*$/, () => `@${name} `))
+    if (!mention) return
+    const inserted = `@${name} `
+    setValue(value.slice(0, mention.start) + inserted + value.slice(caret))
     setActiveIndex(0)
-    textareaRef.current?.focus()
+    moveCaret(mention.start + inserted.length)
   }
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -167,13 +171,11 @@ export function MessageComposer({
           aria-label="Write a message"
           placeholder={archived ? "This channel has been archived." : "Write a message…"}
           onChange={(e) => {
-            const next = e.target.value
-            // Reset suggestion index when the @query changes (new/different mention).
-            const nextQuery = next.match(/@([\w]*)$/)?.[1]
-            const prevQuery = value.match(/@([\w]*)$/)?.[1]
-            if (nextQuery !== prevQuery) setActiveIndex(0)
-            setValue(next)
+            setValue(e.target.value)
+            setCaret(e.target.selectionStart)
+            setActiveIndex(0)
           }}
+          onSelect={(e) => setCaret(e.currentTarget.selectionStart)}
           onKeyDown={handleKeyDown}
         />
 
@@ -199,7 +201,7 @@ export function MessageComposer({
               size="icon-sm"
               aria-label="Mention someone"
               disabled={archived}
-              onClick={() => setValue(`${value}@`)}
+              onClick={() => insertAtCursor("@")}
             >
               <AtSign />
             </Button>

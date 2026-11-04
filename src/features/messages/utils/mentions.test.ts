@@ -1,9 +1,26 @@
 import { describe, expect, it } from "vitest"
 
-import { encodeMentions } from "./mentions"
+import { encodeMentions, findMentionQuery } from "./mentions"
 
 const ANA = { id: "11111111-1111-1111-1111-111111111111", display_name: "Ana" }
 const ANA_MARIA = { id: "22222222-2222-2222-2222-222222222222", display_name: "Ana Maria" }
+
+describe("findMentionQuery", () => {
+  it("finds a name with diacritics and spaces", () => {
+    expect(findMentionQuery("hi @Ștefan", 10)).toEqual({ start: 3, query: "Ștefan" })
+    expect(findMentionQuery("@Ana P", 6)).toEqual({ start: 0, query: "Ana P" })
+  })
+
+  it("works at the caret, not at the end of the text", () => {
+    expect(findMentionQuery("hi @An there", 6)).toEqual({ start: 3, query: "An" })
+  })
+
+  it("is null without an @, inside an email, or on another line", () => {
+    expect(findMentionQuery("hello", 5)).toBeNull()
+    expect(findMentionQuery("me@ana", 6)).toBeNull()
+    expect(findMentionQuery("@Ana\nhi", 7)).toBeNull()
+  })
+})
 
 describe("encodeMentions", () => {
   it("encodes a mention, whatever the case", () => {
