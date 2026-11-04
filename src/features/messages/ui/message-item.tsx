@@ -117,12 +117,15 @@ export const MessageItem = memo(function MessageItem({
   // Close the editor if the message gets deleted (e.g. from another tab) while open.
   const showEditor = editing && !isDeleted
 
-  const candidates = Object.entries(names).map(([id, display_name]) => ({ id, display_name }))
-  // Keeps the people already mentioned when two share a name.
-  const existingMentions = extractMentionIds(message.body).flatMap((id) =>
-    names[id] ? [{ id, display_name: names[id] }] : [],
-  )
-  const encode = (text: string) => encodeMentions(text, candidates, existingMentions)
+  // Only called while editing, so rows that are just being shown don't build these lists.
+  const encode = (text: string) => {
+    const candidates = Object.entries(names).map(([id, display_name]) => ({ id, display_name }))
+    // Keeps the people already mentioned when two share a name.
+    const existingMentions = extractMentionIds(message.body).flatMap((id) =>
+      names[id] ? [{ id, display_name: names[id] }] : [],
+    )
+    return encodeMentions(text, candidates, existingMentions)
+  }
 
   // Errors that end the edit close the editor with a toast; the rest reject so the
   // editor stays open and shows them inline.
@@ -299,7 +302,7 @@ export const MessageItem = memo(function MessageItem({
         tabIndex={0}
         data-message-id={message.id}
       >
-        <ConfirmDialog {...confirmProps} />
+        {confirmProps.open && <ConfirmDialog {...confirmProps} />}
         {(!grouped || isPinned) && (
           <div className="mb-1 flex items-baseline gap-2 px-1">
             {isPinned && <PinnedMark />}
@@ -348,7 +351,7 @@ export const MessageItem = memo(function MessageItem({
       tabIndex={0}
       data-message-id={message.id}
     >
-      <ConfirmDialog {...confirmProps} />
+      {confirmProps.open && <ConfirmDialog {...confirmProps} />}
       {/* Avatar column */}
       <div className="w-8 shrink-0">{!grouped && <Avatar name={authorName} />}</div>
 
