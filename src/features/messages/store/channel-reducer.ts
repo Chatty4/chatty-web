@@ -11,7 +11,7 @@ export type MessagesAction =
   | { type: "LOAD_START"; channelId: string }
   | { type: "LOAD_DONE"; channelId: string; messages: ApiMessage[]; lastSeq: number; hasMore: boolean }
   | { type: "PREPEND"; channelId: string; messages: ApiMessage[]; hasMore: boolean }
-  | { type: "RELOAD"; channelId: string; messages: ApiMessage[]; lastSeq: number }
+  | { type: "RELOAD"; channelId: string; messages: ApiMessage[]; lastSeq: number; hasMore: boolean }
   | { type: "APPLY_EVENT"; channelId: string; event: ChannelEvent; currentUserId: string }
   | { type: "APPLY_EVENTS"; channelId: string; events: ChannelEvent[]; lastSeq: number; currentUserId: string }
   | { type: "OPTIMISTIC_ADD"; channelId: string; message: LocalMessage }
@@ -29,12 +29,15 @@ function newestFirstToAsc(messages: ApiMessage[]): LocalMessage[] {
   return [...messages].reverse().map((m) => ({ ...m, status: "sent" as const }))
 }
 
+/** Replaces a channel with fresh history, keeping what the user hasn't managed to send. */
 function makeChannelState(
+  previous: ChannelState | undefined,
   messages: ApiMessage[],
   lastSeq: number,
   hasMore: boolean,
 ): ChannelState {
-  return { messages: newestFirstToAsc(messages), lastSeq, hasMore, loading: false }
+  const unsent = previous?.messages.filter((m) => m.status !== "sent") ?? []
+  return { messages: [...newestFirstToAsc(messages), ...unsent], lastSeq, hasMore, loading: false }
 }
 
 export function messagesReducer(state: MessagesState, action: MessagesAction): MessagesState {
@@ -49,7 +52,12 @@ export function messagesReducer(state: MessagesState, action: MessagesAction): M
     case "LOAD_DONE":
       return {
         ...state,
-        [action.channelId]: makeChannelState(action.messages, action.lastSeq, action.hasMore),
+        [action.channelId]: makeChannelState(
+          state[action.channelId],
+          action.messages,
+          action.lastSeq,
+          action.hasMore,
+        ),
       }
 
     case "PREPEND": {
@@ -69,7 +77,12 @@ export function messagesReducer(state: MessagesState, action: MessagesAction): M
     case "RELOAD":
       return {
         ...state,
-        [action.channelId]: makeChannelState(action.messages, action.lastSeq, false),
+        [action.channelId]: makeChannelState(
+          state[action.channelId],
+          action.messages,
+          action.lastSeq,
+          action.hasMore,
+        ),
       }
 
     case "APPLY_EVENT": {
@@ -119,6 +132,9 @@ export function messagesReducer(state: MessagesState, action: MessagesAction): M
       const ch = state[action.channelId]
       if (!ch) return state
       const confirmed: LocalMessage = { ...action.confirmed, status: "sent" }
+      // lastSeq stays put: only applied events move it. Jumping to this seq would turn
+      // any event before it that hasn't arrived yet into a "duplicate" and lose it.
+      //
       // Events carry no client_msg_id, so a message.created that beat the POST
       // response is already in the list: keep it and drop the optimistic copy.
       const alreadyApplied = ch.messages.some(
@@ -131,7 +147,6 @@ export function messagesReducer(state: MessagesState, action: MessagesAction): M
           messages: alreadyApplied
             ? ch.messages.filter((m) => m.client_msg_id !== action.clientMsgId)
             : ch.messages.map((m) => (m.client_msg_id === action.clientMsgId ? confirmed : m)),
-          lastSeq: Math.max(ch.lastSeq, action.confirmed.seq),
         },
       }
     }

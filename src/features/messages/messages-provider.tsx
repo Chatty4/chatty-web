@@ -26,6 +26,7 @@ import {
   sendMessageApi,
 } from "./fetchers/message-fetchers"
 import { messagesReducer, type MessagesAction, type MessagesState } from "./store/channel-reducer"
+import { selectCursors } from "./store/sequence"
 import type { ApiMessage, ChannelState } from "./types"
 
 // ── Gap-fill helper ───────────────────────────────────────────────────────────
@@ -67,11 +68,7 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
 
   const doDispatch = useCallback((action: MessagesAction) => {
     stateRef.current = messagesReducer(stateRef.current, action)
-    const cursors: Record<string, number> = {}
-    for (const [id, ch] of Object.entries(stateRef.current)) {
-      if (ch.lastSeq > 0) cursors[id] = ch.lastSeq
-    }
-    setCursorsRef.current(cursors)
+    setCursorsRef.current(selectCursors(stateRef.current))
     bump()
   }, [bump])
 
@@ -113,7 +110,7 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
             // gap_too_large: discard and reload from history
             try {
               const res = await getMessages(event.channel_id)
-              doDispatch({ type: "RELOAD", channelId: event.channel_id, messages: res.messages, lastSeq: res.last_seq })
+              doDispatch({ type: "RELOAD", channelId: event.channel_id, messages: res.messages, lastSeq: res.last_seq, hasMore: res.has_more })
             } catch { /* leave stale */ }
           }
         } finally {
@@ -139,7 +136,7 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
           if (result.gap_too_large) {
             try {
               const res = await getMessages(channelId)
-              doDispatch({ type: "RELOAD", channelId, messages: res.messages, lastSeq: res.last_seq })
+              doDispatch({ type: "RELOAD", channelId, messages: res.messages, lastSeq: res.last_seq, hasMore: res.has_more })
             } catch { /* leave stale */ }
             continue
           }
