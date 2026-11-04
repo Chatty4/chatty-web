@@ -7,6 +7,10 @@ export type MessagePart = { type: "text"; value: string } | { type: "mention"; u
 
 const TOKEN = /<@([0-9a-fA-F-]{36})>/g
 
+/** Fenced or inline code, matched first so a name inside it is skipped. */
+const CODE_SPAN = "```[\\s\\S]*?```|`[^`\\n]*`"
+const NOT_IN_WORD = "(?<![\\p{L}\\p{N}_.+-])"
+
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 }
@@ -40,7 +44,8 @@ export function decodeMentions(body: string, names: Record<string, string>): str
 
 /**
  * Turns `@Display Name` into `<@id>` for every candidate written in the text.
- * Longest names match first so "@Ana Maria" is not read as "@Ana".
+ * Longest names match first so "@Ana Maria" is not read as "@Ana". An @ inside a word
+ * (an email address) and anything in a code span stay as typed.
  */
 export function encodeMentions(text: string, candidates: MentionCandidate[]): string {
   const byName = new Map<string, string>()
@@ -51,9 +56,9 @@ export function encodeMentions(text: string, candidates: MentionCandidate[]): st
   if (byName.size === 0) return text
 
   const names = [...byName.keys()].sort((a, b) => b.length - a.length).map(escapeRegExp)
-  const pattern = new RegExp(`@(${names.join("|")})(?![\\w])`, "gi")
-  return text.replace(pattern, (match, name: string) => {
-    const id = byName.get(name.toLowerCase())
+  const pattern = new RegExp(`${CODE_SPAN}|${NOT_IN_WORD}@(${names.join("|")})(?![\\p{L}\\p{N}_])`, "giu")
+  return text.replace(pattern, (match, name: string | undefined) => {
+    const id = name && byName.get(name.toLowerCase())
     return id ? `<@${id}>` : match
   })
 }
