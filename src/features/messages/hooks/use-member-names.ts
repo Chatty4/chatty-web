@@ -21,13 +21,18 @@ export function useMemberNames(
 
     for (const id of missing) fetchedIds.current.add(id)
 
-    void getTeamMemberPreviewsRequest(teamId, missing).then(({ members }) => {
-      setNames((prev) => {
-        const next = { ...prev }
-        for (const m of members) next[m.user_id] = m.display_name
-        return next
+    getTeamMemberPreviewsRequest(teamId, missing)
+      .then(({ members }) => {
+        setNames((prev) => {
+          const next = { ...prev }
+          for (const m of members) next[m.user_id] = m.display_name
+          return next
+        })
       })
-    })
+      .catch(() => {
+        // Not fetched after all: the next list change asks for these again.
+        for (const id of missing) fetchedIds.current.delete(id)
+      })
   }, [teamId, userIds])
 
   return names
