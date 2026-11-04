@@ -20,6 +20,7 @@ import { extractMentionIds } from "../utils/mentions"
 import {
   canDelete,
   canEdit,
+  canPin,
   canReact,
   type Actor,
   type ChannelAccess,
@@ -56,8 +57,17 @@ export function MessageList({
   intro,
 }: MessageListProps) {
   const { user } = useAuth()
-  const { getChannel, loadChannel, loadMoreHistory, send, retry, edit, remove, setReaction } =
-    useMessages()
+  const {
+    getChannel,
+    loadChannel,
+    loadMoreHistory,
+    send,
+    retry,
+    edit,
+    remove,
+    setReaction,
+    setPinned,
+  } = useMessages()
 
   // Load this channel on mount / when channelId changes.
   useEffect(() => {
@@ -251,6 +261,8 @@ export function MessageList({
               canDelete={!!actor && canDelete(message, actor, access)}
               canReact={canReact(message, access)}
               onSetReaction={(messageId, emoji, on) => setReaction(channelId, messageId, emoji, on)}
+              canPin={canPin(message, access)}
+              onSetPinned={(messageId, on) => setPinned(channelId, messageId, on)}
               onEdit={(messageId, body) => edit(channelId, messageId, body)}
               onDelete={(messageId) => remove(channelId, messageId)}
               onRetry={retry}

@@ -2,8 +2,9 @@
 // Handles loading, pagination, event application, gap-fill and optimistic send.
 
 import type { ChannelEvent } from "@/lib/ws/types"
-import type { ApiMessage, ChannelState, LocalMessage } from "../types"
-import { applyDelete, applyEdit, applyEvent, type MessageEdit } from "./apply-event"
+import type { ApiMessage, ChannelState, LocalMessage, Pin } from "../types"
+import { applyDelete, applyEdit, applyEvent, setPinned, type MessageEdit } from "./apply-event"
+import { addPin, applyEventToPins, editPin, removePin, type PinInfo } from "./pins"
 
 export type MessagesState = Record<string, ChannelState>
 
@@ -33,6 +34,11 @@ export type MessagesAction =
   // the matching WS event applies the same values later (see applyEdit / applyDelete).
   | { type: "MESSAGE_EDITED"; channelId: string; edit: MessageEdit }
   | { type: "MESSAGE_DELETED"; channelId: string; messageId: string; deletedAt: string }
+  | { type: "MESSAGE_PINNED"; channelId: string; info: PinInfo }
+  | { type: "MESSAGE_UNPINNED"; channelId: string; messageId: string }
+  | { type: "PINS_LOAD_START"; channelId: string }
+  | { type: "PINS_LOADED"; channelId: string; pins: Pin[] }
+  | { type: "PINS_LOAD_FAIL"; channelId: string; error: string }
 
 // API returns newest-first; store keeps oldest-first for easy append.
 function newestFirstToAsc(messages: ApiMessage[]): LocalMessage[] {
@@ -54,6 +60,8 @@ function makeChannelState(
     loading: false,
     loadingMore: false,
     loadMoreFailed: false,
+    // Events may have been skipped to get here, so the list can't be trusted any more.
+    pins: previous?.pins && { ...previous.pins, stale: true },
   }
 }
 
@@ -147,11 +155,13 @@ export function messagesReducer(state: MessagesState, action: MessagesAction): M
       const ch = state[action.channelId]
       if (!ch) return state
       if (action.event.seq <= ch.lastSeq) return state // dedup
+      const messages = applyEvent(ch.messages, action.event, action.currentUserId)
       return {
         ...state,
         [action.channelId]: {
           ...ch,
-          messages: applyEvent(ch.messages, action.event, action.currentUserId),
+          messages,
+          pins: applyEventToPins(ch.pins, action.event, messages),
           lastSeq: action.event.seq,
         },
       }
@@ -161,10 +171,12 @@ export function messagesReducer(state: MessagesState, action: MessagesAction): M
       const ch = state[action.channelId]
       if (!ch) return state
       let msgs = ch.messages
+      let pins = ch.pins
       let lastSeq = ch.lastSeq
       for (const event of action.events) {
         if (event.seq <= lastSeq) continue
         msgs = applyEvent(msgs, event, action.currentUserId)
+        pins = applyEventToPins(pins, event, msgs)
         lastSeq = event.seq
       }
       return {
@@ -172,6 +184,7 @@ export function messagesReducer(state: MessagesState, action: MessagesAction): M
         [action.channelId]: {
           ...ch,
           messages: msgs,
+          pins,
           lastSeq: Math.max(lastSeq, action.lastSeq),
         },
       }
@@ -242,7 +255,11 @@ export function messagesReducer(state: MessagesState, action: MessagesAction): M
       if (!ch) return state
       return {
         ...state,
-        [action.channelId]: { ...ch, messages: applyEdit(ch.messages, action.edit) },
+        [action.channelId]: {
+          ...ch,
+          messages: applyEdit(ch.messages, action.edit),
+          pins: editPin(ch.pins, action.edit),
+        },
       }
     }
 
@@ -254,6 +271,71 @@ export function messagesReducer(state: MessagesState, action: MessagesAction): M
         [action.channelId]: {
           ...ch,
           messages: applyDelete(ch.messages, action.messageId, action.deletedAt),
+          pins: removePin(ch.pins, action.messageId),
+        },
+      }
+    }
+
+    case "MESSAGE_PINNED": {
+      const ch = state[action.channelId]
+      if (!ch) return state
+      const messages = setPinned(ch.messages, action.info.message_id, true)
+      return {
+        ...state,
+        [action.channelId]: { ...ch, messages, pins: addPin(ch.pins, action.info, messages) },
+      }
+    }
+
+    case "MESSAGE_UNPINNED": {
+      const ch = state[action.channelId]
+      if (!ch) return state
+      return {
+        ...state,
+        [action.channelId]: {
+          ...ch,
+          messages: setPinned(ch.messages, action.messageId, false),
+          pins: removePin(ch.pins, action.messageId),
+        },
+      }
+    }
+
+    case "PINS_LOAD_START": {
+      const ch = state[action.channelId]
+      if (!ch) return state
+      return {
+        ...state,
+        [action.channelId]: {
+          ...ch,
+          pins: { status: "loading", items: ch.pins?.items ?? [], stale: false },
+        },
+      }
+    }
+
+    case "PINS_LOADED": {
+      const ch = state[action.channelId]
+      if (!ch) return state
+      return {
+        ...state,
+        [action.channelId]: {
+          ...ch,
+          pins: { status: "loaded", items: action.pins, stale: ch.pins?.stale ?? false },
+        },
+      }
+    }
+
+    case "PINS_LOAD_FAIL": {
+      const ch = state[action.channelId]
+      if (!ch) return state
+      const items = ch.pins?.items ?? []
+      return {
+        ...state,
+        [action.channelId]: {
+          ...ch,
+          // A failed refresh keeps what's on screen; only an empty panel shows the error.
+          pins:
+            items.length > 0
+              ? { status: "loaded", items, stale: false }
+              : { status: "error", items, stale: false, error: action.error },
         },
       }
     }

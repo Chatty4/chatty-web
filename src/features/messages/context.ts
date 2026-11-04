@@ -17,6 +17,10 @@ export type MessagesContextValue = {
    * when the matching event arrives. Rejects with ApiError.
    */
   setReaction: (channelId: string, messageId: string, emoji: string, on: boolean) => Promise<void>
+  /** Pins or unpins a message. Rejects with ApiError. */
+  setPinned: (channelId: string, messageId: string, on: boolean) => Promise<void>
+  /** Fetches the channel's pins into ChannelState.pins. Ignored while one is running. */
+  loadPins: (channelId: string) => Promise<void>
 }
 
 export const MessagesContext = createContext<MessagesContextValue | null>(null)

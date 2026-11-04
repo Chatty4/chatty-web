@@ -33,6 +33,11 @@ export function canReact(message: LocalMessage, channel: ChannelAccess | null): 
   return !!channel && !channel.archived && isActionable(message)
 }
 
+/** Anyone who can write can pin any message, and unpin any pin (D-05). */
+export function canPin(message: LocalMessage, channel: ChannelAccess | null): boolean {
+  return !!channel && !channel.archived && isActionable(message)
+}
+
 /** Only the author can edit, and only while they can write in the channel. */
 export function canEdit(message: LocalMessage, me: Actor, channel: ChannelAccess | null): boolean {
   if (!channel || channel.archived || !isActionable(message)) return false

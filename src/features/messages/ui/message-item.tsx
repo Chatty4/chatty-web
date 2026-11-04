@@ -1,5 +1,13 @@
 import { useState } from "react"
-import { MoreHorizontal, Pencil, RotateCcw, SmilePlus, Trash2 } from "lucide-react"
+import {
+  MoreHorizontal,
+  Pencil,
+  Pin,
+  PinOff,
+  RotateCcw,
+  SmilePlus,
+  Trash2,
+} from "lucide-react"
 
 import { Avatar } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -9,6 +17,7 @@ import { useConfirm } from "@/hooks/use-confirm"
 import { toast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
 
+import { usePinToggle } from "../hooks/use-pin-toggle"
 import { useReactionToggle } from "../hooks/use-reaction-toggle"
 import type { LocalMessage } from "../types"
 import { describeMessageError, messageErrorCode } from "../utils/errors"
@@ -16,7 +25,11 @@ import { MARKDOWN_BLOCK_CLASS } from "../utils/markdown"
 import { decodeMentions, encodeMentions } from "../utils/mentions"
 import { MessageEditor } from "./message-editor"
 import { MessageMarkdown } from "./message-markdown"
+import { PinnedMark } from "./pinned-mark"
 import { ReactionChips } from "./reaction-chips"
+
+/** jumpToMessage sets data-flash on the row for a moment. */
+const ROW_FLASH_CLASS = "rounded-md transition-colors duration-200 data-[flash]:bg-accent/60"
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -46,6 +59,10 @@ export type MessageItemProps = {
   canReact: boolean
   /** Adds or removes my reaction. Rejects with ApiError on failure. */
   onSetReaction: (messageId: string, emoji: string, on: boolean) => Promise<void>
+  /** From canPin: a sent message in a channel I can write in. */
+  canPin: boolean
+  /** Pins or unpins. Rejects with ApiError on failure. */
+  onSetPinned: (messageId: string, on: boolean) => Promise<void>
   /** Rejects with ApiError on failure. */
   onEdit:(messageId: string, body: string) => Promise<void>
   /** Rejects with ApiError on failure. */
@@ -67,6 +84,8 @@ export function MessageItem({
   canDelete,
   canReact,
   onSetReaction,
+  canPin,
+  onSetPinned,
   onEdit,
   onDelete,
   onRetry,
@@ -80,9 +99,14 @@ export function MessageItem({
     setReaction: (emoji, on) => onSetReaction(message.id, emoji, on),
     onChannelArchived,
   })
+  const { busyId: pinBusyId, toggle: togglePin } = usePinToggle({
+    setPinned: onSetPinned,
+    onChannelArchived,
+  })
 
   const isDeleted = message.deleted_at !== null
   const isEdited = message.edited_at !== null && !isDeleted
+  const isPinned = message.pinned && !isDeleted
   // Close the editor if the message gets deleted (e.g. from another tab) while open.
   const showEditor = editing && !isDeleted
 
@@ -204,6 +228,17 @@ export function MessageItem({
           <Trash2 />
         </Button>
       )}
+      {canPin && (
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label={isPinned ? "Unpin message" : "Pin message"}
+          disabled={!!pinBusyId}
+          onClick={() => void togglePin(message.id, !isPinned)}
+        >
+          {isPinned ? <PinOff /> : <Pin />}
+        </Button>
+      )}
       <Button
         variant="ghost"
         size="icon-sm"
@@ -230,12 +265,18 @@ export function MessageItem({
       <article
         className={cn(
           "group/msg relative flex flex-col items-end px-4 py-0.5",
+          ROW_FLASH_CLASS,
           grouped ? "mt-0" : "mt-3",
         )}
         data-message-id={message.id}
       >
         <ConfirmDialog {...confirmProps} />
-        {!grouped && <div className="mb-1 px-1">{time}</div>}
+        {(!grouped || isPinned) && (
+          <div className="mb-1 flex items-baseline gap-2 px-1">
+            {isPinned && <PinnedMark />}
+            {!grouped && time}
+          </div>
+        )}
 
         {showEditor ? (
           <div className="w-full max-w-[75%]">{editor}</div>
@@ -271,6 +312,7 @@ export function MessageItem({
     <article
       className={cn(
         "group/msg relative flex gap-2.5 px-4 py-0.5",
+        ROW_FLASH_CLASS,
         grouped ? "mt-0" : "mt-3",
       )}
       data-message-id={message.id}
@@ -285,6 +327,12 @@ export function MessageItem({
           <div className="mb-0.5 flex items-baseline gap-2">
             <strong className="text-sm font-semibold leading-snug">{authorName}</strong>
             {time}
+            {isPinned && <PinnedMark />}
+          </div>
+        )}
+        {grouped && isPinned && (
+          <div className="mb-0.5">
+            <PinnedMark />
           </div>
         )}
 

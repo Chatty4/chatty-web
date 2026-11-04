@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest"
 
 import { ME, OTHER, localMessage, pendingMessage } from "../store/test-fixtures"
-import { canDelete, canEdit, canReact, type Actor, type ChannelAccess } from "./permissions"
+import {
+  canDelete,
+  canEdit,
+  canPin,
+  canReact,
+  type Actor,
+  type ChannelAccess,
+} from "./permissions"
 
 const member: Actor = { userId: ME, teamRole: "member" }
 const admin: Actor = { userId: ME, teamRole: "admin" }
@@ -29,6 +36,21 @@ describe("canReact", () => {
     expect(canReact(deleted, open)).toBe(false)
     expect(canReact(pendingMessage("c1"), open)).toBe(false)
     expect(canReact({ ...pendingMessage("c1"), status: "failed" }, open)).toBe(false)
+  })
+})
+
+describe("canPin", () => {
+  it("allows anyone who can write, on anyone's message, in DMs too", () => {
+    expect(canPin(mine, open)).toBe(true)
+    expect(canPin(theirs, open)).toBe(true)
+    expect(canPin(theirs, dm)).toBe(true)
+  })
+
+  it("is off in archived channels, for non-members and on messages not on the server", () => {
+    expect(canPin(theirs, archived)).toBe(false)
+    expect(canPin(theirs, null)).toBe(false)
+    expect(canPin(deleted, open)).toBe(false)
+    expect(canPin(pendingMessage("c1"), open)).toBe(false)
   })
 })
 

@@ -29,6 +29,20 @@ export function describeReactionError(error: unknown): string {
   return describeMessageError(error)
 }
 
+/** User-facing text for the pin endpoints (api-chat.md). */
+export function describePinError(error: unknown): string {
+  switch (messageErrorCode(error)) {
+    case "pin_limit_reached":
+      return "This channel already has 100 pins"
+    case "cannot_read_channel":
+      return "You can't read this channel."
+    case "channel_not_found":
+      return "This channel no longer exists."
+    default:
+      return describeMessageError(error)
+  }
+}
+
 /** The API error code, or undefined for network and unknown errors. */
 export function messageErrorCode(error: unknown): string | undefined {
   return error instanceof ApiError ? error.code : undefined

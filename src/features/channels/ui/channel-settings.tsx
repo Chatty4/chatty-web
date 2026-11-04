@@ -1,6 +1,5 @@
 import { type FormEvent, useEffect, useState } from "react"
 import { useNavigate } from "react-router"
-import { X } from "lucide-react"
 
 import { Alert } from "@/components/ui/alert"
 import { Avatar } from "@/components/ui/avatar"
@@ -11,6 +10,7 @@ import { FormField } from "@/components/ui/form-field"
 import { Input } from "@/components/ui/input"
 import { Select } from "@/components/ui/select"
 import { DataList, DataRow, RowMain, SectionTitle, SettingsTabs } from "@/components/ui/settings"
+import { SidePanel } from "@/components/ui/side-panel"
 import { useAuth } from "@/features/auth"
 import { getTeamMembersRequest } from "@/features/teams/fetchers/team-fetchers"
 import { useConfirm } from "@/hooks/use-confirm"
@@ -471,22 +471,12 @@ export function ChannelDetailsPanel({
   const tabs = channel?.kind === "dm" ? TABS.filter((t) => t !== "archive") : TABS
 
   return (
-    <aside
-      aria-label="Channel details"
-      className="flex w-[360px] shrink-0 flex-col border-l bg-surface max-md:fixed max-md:top-16 max-md:right-0 max-md:bottom-0 max-md:z-30 max-md:w-[min(380px,92vw)] max-md:shadow-2xl"
+    <SidePanel
+      title="Channel details"
+      subtitle={channel?.name && `#${channel.name}`}
+      closeLabel="Close details"
+      onClose={onClose}
     >
-      <div className="flex min-h-[66px] shrink-0 items-center justify-between border-b py-2.5 pr-3 pl-[18px]">
-        <div className="flex min-w-0 flex-col">
-          <strong className="font-semibold">Channel details</strong>
-          {channel?.name && (
-            <span className="truncate text-xs text-muted-foreground">#{channel.name}</span>
-          )}
-        </div>
-        <Button variant="ghost" size="icon" aria-label="Close details" onClick={onClose}>
-          <X className="size-[17px]" />
-        </Button>
-      </div>
-
       {state.status === "loading" && (
         <p className="p-[18px] text-muted-foreground">Loading…</p>
       )}
@@ -550,6 +540,6 @@ export function ChannelDetailsPanel({
           </div>
         </>
       )}
-    </aside>
+    </SidePanel>
   )
 }
