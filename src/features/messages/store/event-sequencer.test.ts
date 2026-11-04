@@ -49,6 +49,7 @@ function setup({
     dispatch,
     getEvents,
     reload,
+    wait: () => Promise.resolve(),
   })
   return {
     sequencer,
@@ -145,10 +146,27 @@ describe("gaps", () => {
     expect(seqs()).toEqual([900])
   })
 
-  it("gives up on a failed fetch, and the next event tries again", async () => {
+  it("retries a failed fetch without waiting for another event", async () => {
     const getEvents = vi
       .fn<(channelId: string, afterSeq: number) => Promise<GetEventsResponse>>()
-      .mockRejectedValueOnce(new ApiError(0, "network_error", "offline"))
+      .mockRejectedValueOnce(new ApiError(503, "http_503", "down"))
+      .mockResolvedValueOnce({ events: [created(4), created(5)], last_seq: 5, has_more: false })
+    const { sequencer, seqs } = setup({ getEvents })
+
+    sequencer.receive(created(6))
+    await settle()
+
+    expect(getEvents).toHaveBeenCalledTimes(2)
+    expect(seqs()).toEqual([3, 4, 5, 6])
+  })
+
+  it("gives up after the retries, and the next event tries again", async () => {
+    const offline = new ApiError(0, "network_error", "offline")
+    const getEvents = vi
+      .fn<(channelId: string, afterSeq: number) => Promise<GetEventsResponse>>()
+      .mockRejectedValueOnce(offline)
+      .mockRejectedValueOnce(offline)
+      .mockRejectedValueOnce(offline)
       .mockResolvedValueOnce({
         events: [created(4), created(5), created(6)],
         last_seq: 6,
@@ -158,7 +176,7 @@ describe("gaps", () => {
 
     sequencer.receive(created(6))
     await settle()
-    expect(getEvents).toHaveBeenCalledTimes(1)
+    expect(getEvents).toHaveBeenCalledTimes(3)
     expect(seqs()).toEqual([3])
 
     sequencer.receive(created(7))
