@@ -1,5 +1,6 @@
 import { coreApi } from "@/lib/api"
 import { chunk } from "@/lib/chunk"
+import { fetchAllPages } from "@/lib/fetch-all-pages"
 
 import type {
   BrowsableChannel,
@@ -81,12 +82,16 @@ export function updateMyChannelSettingsRequest(
   return coreApi.put(`/channels/${channelId}/me`, settings)
 }
 
-export function getChannelMembersRequest(
-  channelId: string,
-  cursor?: string,
-): Promise<{ members: ChannelMember[]; next_cursor: string | null }> {
-  const qs = cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""
-  return coreApi.get(`/channels/${channelId}/members${qs}`)
+/** Every member of the channel, however many pages that takes. */
+export function getAllChannelMembersRequest(channelId: string): Promise<ChannelMember[]> {
+  return fetchAllPages(async (cursor) => {
+    const params = new URLSearchParams({ limit: "200" })
+    if (cursor) params.set("cursor", cursor)
+    const page = await coreApi.get<{ members: ChannelMember[]; next_cursor: string | null }>(
+      `/channels/${channelId}/members?${params}`,
+    )
+    return { items: page.members, next_cursor: page.next_cursor }
+  })
 }
 
 export function addChannelMembersRequest(
