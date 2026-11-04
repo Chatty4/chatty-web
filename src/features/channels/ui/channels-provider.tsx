@@ -2,10 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useMatches } from "react-router"
 
 import { useAuth } from "@/features/auth"
+import { useWs } from "@/features/ws"
 
 import { getSidebarChannelsRequest, getTeamMemberPreviewsRequest } from "../fetchers/channel-fetchers"
 import { ChannelsContext } from "../hooks/channels-context"
 import type { SidebarChannel } from "../types"
+import { applyChannelUpdate } from "../utils/apply-channel-update"
 
 type ChannelsState =
   | { status: "loading" }
@@ -57,6 +59,7 @@ export function ChannelsProvider({ children }: { children: ReactNode }) {
   const matches = useMatches()
   const teamId = getActiveTeamId(matches)
   const { user } = useAuth()
+  const { subscribe } = useWs()
   const myUserId = user?.id ?? ""
 
   const [state, setState] = useState<ChannelsState>({ status: "loading" })
@@ -80,6 +83,20 @@ export function ChannelsProvider({ children }: { children: ReactNode }) {
   const reload = useCallback(() => {
     if (teamId) load(teamId, myUserId)
   }, [teamId, myUserId, load])
+
+  // Renames and archives by other people: the sidebar and composer follow without a reload.
+  useEffect(
+    () =>
+      subscribe((message) => {
+        if (message.type !== "channel.updated") return
+        setState((current) =>
+          current.status === "loaded"
+            ? { ...current, channels: applyChannelUpdate(current.channels, message) }
+            : current,
+        )
+      }),
+    [subscribe],
+  )
 
   const value = useMemo(() => {
     const loaded = state.status === "loaded" && state.forTeamId === teamId
