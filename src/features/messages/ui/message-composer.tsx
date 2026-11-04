@@ -84,7 +84,7 @@ export function MessageComposer({
   }
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (suggestions.length > 0) {
+    if (suggestions.length > 0 && !e.nativeEvent.isComposing) {
       if (e.key === "ArrowDown") {
         e.preventDefault()
         setActiveIndex((i) => (i + 1) % suggestions.length)
@@ -108,7 +108,8 @@ export function MessageComposer({
         return
       }
     }
-    if (e.key === "Enter" && !e.shiftKey) {
+    // Ignore Enter while an IME composition is in progress (e.g. Japanese input).
+    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault()
       send()
     }
