@@ -2,7 +2,8 @@ import { Hash, Lock, Menu, Pin, Search, Settings } from "lucide-react"
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router"
 
 import { Button } from "@/components/ui/button"
-import { useChannels } from "@/features/channels"
+import { useAuth } from "@/features/auth"
+import { dmDisplayName, useChannels } from "@/features/channels"
 import { usePins } from "@/features/messages"
 import { cn } from "@/lib/utils"
 
@@ -19,7 +20,8 @@ export function AppHeader({ title, subtitle, onOpenMenu }: AppHeaderProps) {
   const { teamId, channelId } = useParams()
   const { pathname } = useLocation()
   const navigate = useNavigate()
-  const { channels } = useChannels()
+  const { channels, dms, memberNames } = useChannels()
+  const { user } = useAuth()
 
   const [searchParams, setSearchParams] = useSearchParams()
   const detailsOpen = searchParams.has("details")
@@ -40,14 +42,13 @@ export function AppHeader({ title, subtitle, onOpenMenu }: AppHeaderProps) {
       { replace: true },
     )
 
-  const channel = channelId ? channels.find((c) => c.id === channelId) : null
-  const displayTitle = channel?.name ?? title
+  const channel = channelId ? [...channels, ...dms].find((c) => c.id === channelId) : null
+  const isDm = channel?.kind === "dm"
+  const displayTitle = isDm
+    ? dmDisplayName(channel.dm_member_ids ?? [], user?.id ?? "", memberNames)
+    : (channel?.name ?? title)
   const displaySubtitle = channel?.topic ?? subtitle
-  const TitleIcon = channel
-    ? channel.kind === "private"
-      ? Lock
-      : Hash
-    : null
+  const TitleIcon = channel && !isDm ? (channel.kind === "private" ? Lock : Hash) : null
 
   return (
     <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b px-[18px]">
