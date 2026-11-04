@@ -9,7 +9,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 
 import { useAuth } from "@/features/auth"
 import { isServerUnavailable } from "@/lib/api"
-import { freshAccessToken } from "@/lib/session"
+import { freshAccessToken, getAccessToken, refreshSession } from "@/lib/session"
 import { backoffDelay, reconnectDelay, retryWithBackoff } from "@/lib/ws/backoff"
 import { WsClient } from "@/lib/ws/client"
 import { createSyncGate } from "@/lib/ws/sync-gate"
@@ -51,6 +51,7 @@ export function WsProvider({ children }: { children: ReactNode }) {
     let attempt = 0
     let connectedOnce = false
     let openedAt = 0
+    let tokenRejected = false
 
     const gate = createSyncGate<InboundWsMessage>((msg) => {
       msgHandlers.current.forEach((h) => h(msg))
@@ -90,7 +91,9 @@ export function WsProvider({ children }: { children: ReactNode }) {
 
       let token: string
       try {
-        token = await freshAccessToken()
+        // After 4001 the server said this token is over, whatever the local expiry says.
+        token = tokenRejected ? await refreshSession(getAccessToken()) : await freshAccessToken()
+        tokenRejected = false
       } catch (error) {
         if (!alive) return
         // Offline or server down: keep trying. Otherwise the session has ended.
@@ -132,6 +135,7 @@ export function WsProvider({ children }: { children: ReactNode }) {
           // and then closes straight away must not be hammered.
           if (openedAt && Date.now() - openedAt >= STABLE_MS) attempt = 0
           openedAt = 0
+          tokenRejected = code === 4001
           setStatus("reconnecting")
           scheduleReconnect(reconnectDelay(code, attempt++))
         },
