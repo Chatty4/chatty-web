@@ -88,7 +88,8 @@ export function createEventSequencer(deps: EventSequencerDeps): EventSequencer {
     const userId = deps.getUserId()
     if (!userId) return
     const channel = deps.getChannel(event.channel_id)
-    if (!channel) return // never opened: it loads from history
+    // Never opened, or its history failed: it loads from history, not from events.
+    if (!channel || channel.loadFailed) return
 
     if (channel.loading || filling.has(event.channel_id)) {
       hold(event)

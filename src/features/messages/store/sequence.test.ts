@@ -16,6 +16,11 @@ describe("classifyEvent", () => {
 })
 
 describe("selectCursors", () => {
+  it("leaves out a channel whose history failed to load", () => {
+    const failed = { ...channel(0), loadFailed: true }
+    expect(selectCursors({ [CHANNEL]: failed })).toEqual({})
+  })
+
   const channel = (lastSeq: number, loading = false) => ({
     messages: [localMessage(1)],
     lastSeq,

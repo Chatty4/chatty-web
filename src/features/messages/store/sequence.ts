@@ -17,7 +17,7 @@ export function classifyEvent(seq: number, lastSeq: number): EventDisposition {
 export function selectCursors(state: MessagesState): SyncCursors {
   const cursors: SyncCursors = {}
   for (const [channelId, channel] of Object.entries(state)) {
-    if (!channel.loading) cursors[channelId] = channel.lastSeq
+    if (!channel.loading && !channel.loadFailed) cursors[channelId] = channel.lastSeq
   }
   return cursors
 }

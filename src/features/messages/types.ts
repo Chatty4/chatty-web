@@ -80,6 +80,8 @@ export type ChannelState = {
   hasMore: boolean
   /** True while the initial page is being fetched. */
   loading: boolean
+  /** The initial page failed: the list shows an error, and nothing here can be synced. */
+  loadFailed?: boolean
   /** True while an older page is being fetched; blocks further fetches. */
   loadingMore: boolean
   /** The last older page failed. Stops automatic fetches until the user retries. */

@@ -58,6 +58,27 @@ describe("loading", () => {
     expect(ids(state)).toEqual(["msg-1", "c1"])
   })
 
+  it("LOAD_FAIL keeps the channel so the list can show the error", () => {
+    const state = reduce(
+      {},
+      { type: "LOAD_START", channelId: CHANNEL },
+      { type: "LOAD_FAIL", channelId: CHANNEL },
+    )
+    expect(channel(state)).toMatchObject({ loading: false, loadFailed: true })
+  })
+
+  it("LOAD_START retries a failed channel and keeps what was sent meanwhile", () => {
+    const state = reduce(
+      {},
+      { type: "LOAD_START", channelId: CHANNEL },
+      { type: "LOAD_FAIL", channelId: CHANNEL },
+      { type: "OPTIMISTIC_ADD", channelId: CHANNEL, message: pendingMessage("c1") },
+      { type: "LOAD_START", channelId: CHANNEL },
+    )
+    expect(channel(state)).toMatchObject({ loading: true })
+    expect(channel(state).loadFailed).toBeUndefined()
+    expect(ids(state)).toEqual(["c1"])
+  })
 })
 
 describe("older history", () => {

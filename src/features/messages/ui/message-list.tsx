@@ -69,15 +69,18 @@ export function MessageList({
     setPinned,
   } = useMessages()
 
-  // Load this channel on mount / when channelId changes.
+  const channelState = getChannel(channelId)
+  const channelMissing = !channelState
+
+  // Load this channel on mount, when channelId changes, and after /sync dropped it.
   useEffect(() => {
     loadChannel(channelId)
-  }, [channelId, loadChannel])
+  }, [channelId, channelMissing, loadChannel])
 
-  const channelState = getChannel(channelId)
   const messages = useMemo(() => channelState?.messages ?? [], [channelState])
   const hasMore = channelState?.hasMore ?? false
   const loading = channelState?.loading ?? true
+  const loadFailed = channelState?.loadFailed ?? false
   const loadingMore = channelState?.loadingMore ?? false
   const loadMoreFailed = channelState?.loadMoreFailed ?? false
 
@@ -218,9 +221,21 @@ export function MessageList({
         {loading && <MessageListSkeleton />}
 
         {/* The welcome block only once the very start of the history is loaded */}
-        {!loading && !hasMore && intro}
+        {!loading && !loadFailed && !hasMore && intro}
 
-        {!loading && (
+        {loadFailed && (
+          <div className="flex min-h-[150px] flex-col items-center justify-center gap-2 text-center">
+            <strong className="font-semibold">Couldn't load this channel.</strong>
+            <span role="alert" className="text-muted-foreground">
+              Check your connection and try again.
+            </span>
+            <Button variant="secondary" size="sm" onClick={() => loadChannel(channelId)}>
+              Try again
+            </Button>
+          </div>
+        )}
+
+        {!loading && !loadFailed && (
           <HistoryTop
             hasMore={hasMore}
             loadingMore={loadingMore}
@@ -232,7 +247,7 @@ export function MessageList({
         )}
 
         {/* Empty state */}
-        {!loading && messages.length === 0 && (
+        {!loading && !loadFailed && messages.length === 0 && (
           <>
             <DayDivider label="Today" />
             <div className="flex min-h-[150px] flex-col items-center justify-center text-center text-muted-foreground">

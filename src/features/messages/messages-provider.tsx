@@ -119,14 +119,15 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
 
   const loadChannel = useCallback(
     (channelId: string) => {
-      if (stateRef.current[channelId]) return
+      const existing = stateRef.current[channelId]
+      if (existing && !existing.loadFailed) return
       doDispatch({ type: "LOAD_START", channelId })
       getMessages(channelId)
         .then((res) => {
           doDispatch({ type: "LOAD_DONE", channelId, messages: res.messages, lastSeq: res.last_seq, hasMore: res.has_more })
         })
         .catch(() => {
-          doDispatch({ type: "DROP_CHANNEL", channelId })
+          doDispatch({ type: "LOAD_FAIL", channelId })
         })
         .finally(() => sequencerRef.current?.release(channelId))
     },

@@ -12,7 +12,10 @@ export function usePins(channelId: string | undefined): PinsState | undefined {
   const channel = channelId ? getChannel(channelId) : undefined
   const pins = channel?.pins
   const needsLoad =
-    !!channel && !channel.loading && (!pins || (pins.stale && pins.status !== "loading"))
+    !!channel &&
+    !channel.loading &&
+    !channel.loadFailed &&
+    (!pins || (pins.stale && pins.status !== "loading"))
 
   useEffect(() => {
     if (needsLoad && channelId) void loadPins(channelId)

@@ -10,6 +10,7 @@ export type MessagesState = Record<string, ChannelState>
 
 export type MessagesAction =
   | { type: "LOAD_START"; channelId: string }
+  | { type: "LOAD_FAIL"; channelId: string }
   | { type: "LOAD_DONE"; channelId: string; messages: ApiMessage[]; lastSeq: number; hasMore: boolean }
   | { type: "LOAD_MORE_START"; channelId: string }
   // beforeSeq is the cursor the page was requested with; lastSeq is its answer's last_seq.
@@ -72,12 +73,14 @@ export function oldestLoadedSeq(messages: LocalMessage[]): number | undefined {
 
 export function messagesReducer(state: MessagesState, action: MessagesAction): MessagesState {
   switch (action.type) {
-    case "LOAD_START":
-      if (state[action.channelId]) return state
+    case "LOAD_START": {
+      const previous = state[action.channelId]
+      if (previous && !previous.loadFailed) return state
       return {
         ...state,
         [action.channelId]: {
-          messages: [],
+          // A retry keeps what the user sent while the channel couldn't load.
+          messages: previous?.messages ?? [],
           lastSeq: 0,
           hasMore: false,
           loading: true,
@@ -85,6 +88,13 @@ export function messagesReducer(state: MessagesState, action: MessagesAction): M
           loadMoreFailed: false,
         },
       }
+    }
+
+    case "LOAD_FAIL": {
+      const ch = state[action.channelId]
+      if (!ch) return state
+      return { ...state, [action.channelId]: { ...ch, loading: false, loadFailed: true } }
+    }
 
     case "LOAD_DONE":
       return {
