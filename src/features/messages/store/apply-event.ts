@@ -39,6 +39,15 @@ export function applyDelete(
   )
 }
 
+/** Sets the pin mark. Safe to apply twice; a deleted message can't be pinned. */
+export function setPinned(
+  messages: LocalMessage[],
+  messageId: string,
+  pinned: boolean,
+): LocalMessage[] {
+  return messages.map((m) => (m.id === messageId && m.deleted_at === null ? { ...m, pinned } : m))
+}
+
 /**
  * Reaction events move a count, so unlike edits they aren't safe to apply twice.
  * Skip deleted messages, and events the message's copy already includes.
@@ -125,12 +134,12 @@ export function applyEvent(
 
     case "pin.added": {
       const { message_id } = event.payload as PinPayload
-      return messages.map((m) => (m.id === message_id ? { ...m, pinned: true } : m))
+      return setPinned(messages, message_id, true)
     }
 
     case "pin.removed": {
       const { message_id } = event.payload as PinPayload
-      return messages.map((m) => (m.id === message_id ? { ...m, pinned: false } : m))
+      return setPinned(messages, message_id, false)
     }
 
     default:

@@ -51,6 +51,24 @@ export type LocalMessage = ApiMessage & {
   asOfSeq?: number
 }
 
+// ── Pins ──────────────────────────────────────────────────────────────────────
+
+/** One entry of GET /channels/{id}/pins. */
+export type Pin = {
+  pinned_by: string
+  pinned_at: string
+  message: ApiMessage
+}
+
+export type PinsState = {
+  status: "loading" | "loaded" | "error"
+  /** Newest pin first. Kept during a refresh so the panel doesn't flash. */
+  items: Pin[]
+  /** Something changed that can't be applied here: fetch the list again. */
+  stale: boolean
+  error?: string
+}
+
 // ── Channel state ─────────────────────────────────────────────────────────────
 
 export type ChannelState = {
@@ -66,6 +84,8 @@ export type ChannelState = {
   loadingMore: boolean
   /** The last older page failed. Stops automatic fetches until the user retries. */
   loadMoreFailed: boolean
+  /** The channel's pins, once something asked for them. */
+  pins?: PinsState
 }
 
 // ── API response shapes ───────────────────────────────────────────────────────
@@ -84,3 +104,14 @@ export type GetEventsResponse = {
 }
 
 export type SendMessageResponse = ApiMessage
+
+export type GetPinsResponse = {
+  pins: Pin[]
+}
+
+export type PinMessageResponse = {
+  channel_id: string
+  message_id: string
+  pinned_by: string
+  pinned_at: string
+}
