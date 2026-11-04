@@ -9,7 +9,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 
 import { useAuth } from "@/features/auth"
 import { isServerUnavailable } from "@/lib/api"
-import { freshAccessToken, getAccessToken, refreshSession } from "@/lib/session"
+import { freshAccessToken, getAccessExpiry, getAccessToken, refreshSession } from "@/lib/session"
 import { backoffDelay, reconnectDelay, retryWithBackoff } from "@/lib/ws/backoff"
 import { WsClient } from "@/lib/ws/client"
 import { createSyncGate } from "@/lib/ws/sync-gate"
@@ -24,15 +24,6 @@ const PROACTIVE_MS = 60_000
 
 /** How long a connection must stay open before the backoff starts over. */
 const STABLE_MS = 30_000
-
-function parseTokenExp(token: string): number | null {
-  try {
-    const payload = JSON.parse(atob(token.split(".")[1]!)) as Record<string, unknown>
-    return typeof payload.exp === "number" ? payload.exp * 1000 : null
-  } catch {
-    return null
-  }
-}
 
 export function WsProvider({ children }: { children: ReactNode }) {
   const { logout } = useAuth()
@@ -146,9 +137,11 @@ export function WsProvider({ children }: { children: ReactNode }) {
       // Proactively reconnect before the token expires so the server never
       // closes with 4001. The new connect() calls freshAccessToken() which
       // will pick up the already-refreshed token from session.ts.
-      const exp = parseTokenExp(token)
-      if (exp !== null) {
-        const delay = Math.max(0, exp - PROACTIVE_MS - Date.now())
+      // session.ts measures the expiry on this device's clock: comparing the token's exp
+      // with a wrong clock here would reconnect in a loop.
+      const expiresAt = getAccessExpiry()
+      if (expiresAt !== null) {
+        const delay = Math.max(0, expiresAt - PROACTIVE_MS - Date.now())
         proactiveTimer = setTimeout(() => {
           client.close()
           clientRef.current = null
