@@ -21,6 +21,8 @@ describe("selectCursors", () => {
     lastSeq,
     hasMore: false,
     loading,
+    loadingMore: false,
+    loadMoreFailed: false,
   })
 
   it("includes every loaded channel, even an empty one at seq 0", () => {

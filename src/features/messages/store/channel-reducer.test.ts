@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest"
 
-import { messagesReducer, type MessagesAction, type MessagesState } from "./channel-reducer"
+import {
+  messagesReducer,
+  oldestLoadedSeq,
+  type MessagesAction,
+  type MessagesState,
+} from "./channel-reducer"
 import {
   CHANNEL,
   ME,
@@ -11,7 +16,9 @@ import {
 } from "./test-fixtures"
 
 function loaded(lastSeq: number, messages = [localMessage(lastSeq)], hasMore = false): MessagesState {
-  return { [CHANNEL]: { messages, lastSeq, hasMore, loading: false } }
+  return {
+    [CHANNEL]: { messages, lastSeq, hasMore, loading: false, loadingMore: false, loadMoreFailed: false },
+  }
 }
 
 const reduce = (state: MessagesState, ...actions: MessagesAction[]) =>
@@ -51,15 +58,89 @@ describe("loading", () => {
     expect(ids(state)).toEqual(["msg-1", "c1"])
   })
 
-  it("PREPEND puts older history first and leaves the cursor alone", () => {
-    const state = reduce(loaded(5, [localMessage(5)], true), {
-      type: "PREPEND",
-      channelId: CHANNEL,
-      messages: [apiMessage(4), apiMessage(3)],
-      hasMore: false,
-    })
+})
+
+describe("older history", () => {
+  const start: MessagesAction = { type: "LOAD_MORE_START", channelId: CHANNEL }
+  const prepend = (
+    messages: ReturnType<typeof apiMessage>[],
+    hasMore: boolean,
+    beforeSeq = 5,
+  ): MessagesAction => ({ type: "PREPEND", channelId: CHANNEL, messages, hasMore, beforeSeq })
+
+  it("marks the fetch while it runs", () => {
+    expect(channel(reduce(loaded(5, [localMessage(5)], true), start)).loadingMore).toBe(true)
+  })
+
+  it("puts older history first and leaves the cursor alone", () => {
+    const state = reduce(
+      loaded(5, [localMessage(5)], true),
+      start,
+      prepend([apiMessage(4), apiMessage(3)], false),
+    )
     expect(ids(state)).toEqual(["msg-3", "msg-4", "msg-5"])
-    expect(channel(state)).toMatchObject({ lastSeq: 5, hasMore: false })
+    expect(channel(state)).toMatchObject({ lastSeq: 5, hasMore: false, loadingMore: false })
+  })
+
+  it("keeps hasMore when the server has more", () => {
+    const state = reduce(loaded(5, [localMessage(5)], true), start, prepend([apiMessage(4)], true))
+    expect(channel(state).hasMore).toBe(true)
+  })
+
+  it("skips a message that is already in the list", () => {
+    const state = reduce(
+      loaded(5, [localMessage(5)], true),
+      start,
+      prepend([apiMessage(5), apiMessage(4)], false),
+    )
+    expect(ids(state)).toEqual(["msg-4", "msg-5"])
+  })
+
+  it("stops asking after an empty page, even if the server says there is more", () => {
+    const state = reduce(loaded(5, [localMessage(5)], true), start, prepend([], true))
+    expect(channel(state).hasMore).toBe(false)
+  })
+
+  it("ignores a page that arrives after a reload replaced the list", () => {
+    const state = reduce(
+      loaded(5, [localMessage(5)], true),
+      start,
+      {
+        type: "RELOAD",
+        channelId: CHANNEL,
+        messages: [apiMessage(900)],
+        lastSeq: 912,
+        hasMore: true,
+      },
+      prepend([apiMessage(4)], true),
+    )
+    expect(ids(state)).toEqual(["msg-900"])
+    expect(channel(state).loadingMore).toBe(false)
+  })
+
+  it("keeps live messages that arrived during the fetch", () => {
+    const state = reduce(
+      loaded(5, [localMessage(5)], true),
+      start,
+      { type: "APPLY_EVENT", channelId: CHANNEL, event: created(6), currentUserId: ME },
+      prepend([apiMessage(4)], false),
+    )
+    expect(ids(state)).toEqual(["msg-4", "msg-5", "msg-6"])
+    expect(channel(state).lastSeq).toBe(6)
+  })
+
+  it("records a failure and clears it on the next try", () => {
+    const failed = reduce(loaded(5, [localMessage(5)], true), start, {
+      type: "LOAD_MORE_FAIL",
+      channelId: CHANNEL,
+    })
+    expect(channel(failed)).toMatchObject({ loadingMore: false, loadMoreFailed: true, hasMore: true })
+    expect(channel(reduce(failed, start))).toMatchObject({ loadingMore: true, loadMoreFailed: false })
+  })
+
+  it("asks for the page before the smallest server seq, ignoring pending messages", () => {
+    expect(oldestLoadedSeq([localMessage(7), localMessage(8), pendingMessage("c1")])).toBe(7)
+    expect(oldestLoadedSeq([pendingMessage("c1")])).toBeUndefined()
   })
 })
 

@@ -10,7 +10,10 @@ export type MessagesState = Record<string, ChannelState>
 export type MessagesAction =
   | { type: "LOAD_START"; channelId: string }
   | { type: "LOAD_DONE"; channelId: string; messages: ApiMessage[]; lastSeq: number; hasMore: boolean }
-  | { type: "PREPEND"; channelId: string; messages: ApiMessage[]; hasMore: boolean }
+  | { type: "LOAD_MORE_START"; channelId: string }
+  // beforeSeq is the cursor the page was requested with (see PREPEND).
+  | { type: "PREPEND"; channelId: string; messages: ApiMessage[]; hasMore: boolean; beforeSeq: number }
+  | { type: "LOAD_MORE_FAIL"; channelId: string }
   | { type: "RELOAD"; channelId: string; messages: ApiMessage[]; lastSeq: number; hasMore: boolean }
   | { type: "APPLY_EVENT"; channelId: string; event: ChannelEvent; currentUserId: string }
   | { type: "APPLY_EVENTS"; channelId: string; events: ChannelEvent[]; lastSeq: number; currentUserId: string }
@@ -37,7 +40,19 @@ function makeChannelState(
   hasMore: boolean,
 ): ChannelState {
   const unsent = previous?.messages.filter((m) => m.status !== "sent") ?? []
-  return { messages: [...newestFirstToAsc(messages), ...unsent], lastSeq, hasMore, loading: false }
+  return {
+    messages: [...newestFirstToAsc(messages), ...unsent],
+    lastSeq,
+    hasMore,
+    loading: false,
+    loadingMore: false,
+    loadMoreFailed: false,
+  }
+}
+
+/** The seq to request the next older page with, or undefined with nothing from the server yet. */
+export function oldestLoadedSeq(messages: LocalMessage[]): number | undefined {
+  return messages.find((m) => m.seq > 0)?.seq
 }
 
 export function messagesReducer(state: MessagesState, action: MessagesAction): MessagesState {
@@ -46,7 +61,14 @@ export function messagesReducer(state: MessagesState, action: MessagesAction): M
       if (state[action.channelId]) return state
       return {
         ...state,
-        [action.channelId]: { messages: [], lastSeq: 0, hasMore: false, loading: true },
+        [action.channelId]: {
+          messages: [],
+          lastSeq: 0,
+          hasMore: false,
+          loading: true,
+          loadingMore: false,
+          loadMoreFailed: false,
+        },
       }
 
     case "LOAD_DONE":
@@ -60,16 +82,43 @@ export function messagesReducer(state: MessagesState, action: MessagesAction): M
         ),
       }
 
-    case "PREPEND": {
+    case "LOAD_MORE_START": {
       const ch = state[action.channelId]
       if (!ch) return state
       return {
         ...state,
+        [action.channelId]: { ...ch, loadingMore: true, loadMoreFailed: false },
+      }
+    }
+
+    case "LOAD_MORE_FAIL": {
+      const ch = state[action.channelId]
+      if (!ch) return state
+      return {
+        ...state,
+        [action.channelId]: { ...ch, loadingMore: false, loadMoreFailed: true },
+      }
+    }
+
+    case "PREPEND": {
+      const ch = state[action.channelId]
+      if (!ch) return state
+      // A reload replaced the list while this page was in flight: it no longer joins up
+      // with what's on screen, and keeping it would leave a hole in the history.
+      if (oldestLoadedSeq(ch.messages) !== action.beforeSeq) {
+        return { ...state, [action.channelId]: { ...ch, loadingMore: false } }
+      }
+
+      const known = new Set(ch.messages.map((m) => m.id))
+      const older = newestFirstToAsc(action.messages).filter((m) => !known.has(m.id))
+      return {
+        ...state,
         [action.channelId]: {
           ...ch,
-          messages: [...newestFirstToAsc(action.messages), ...ch.messages],
-          hasMore: action.hasMore,
-          loading: false,
+          messages: [...older, ...ch.messages],
+          // An empty page can't move the cursor, so asking again would loop forever.
+          hasMore: action.hasMore && older.length > 0,
+          loadingMore: false,
         },
       }
     }
