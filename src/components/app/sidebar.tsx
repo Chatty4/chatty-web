@@ -122,7 +122,6 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         >
           <Search className="size-[15px] shrink-0" />
           <span className="flex-1 text-left">Search &amp; browse</span>
-          <kbd className="font-sans text-[11px] text-faint-foreground">⌘K</kbd>
         </button>
 
         {/* Nav */}
@@ -209,12 +208,8 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                 aria-current={isActive ? "page" : undefined}
               >
                 {/* Mini avatar */}
-                <span className="relative flex-none">
-                  <span className="grid size-[22px] place-items-center rounded-full bg-surface-hover text-[9px] font-semibold text-muted-foreground">
-                    {abbr}
-                  </span>
-                  {/* Presence dot */}
-                  <span className="absolute -right-0.5 bottom-0 size-[7px] rounded-full border border-background bg-online" />
+                <span className="grid size-[22px] flex-none place-items-center rounded-full bg-surface-hover text-[9px] font-semibold text-muted-foreground">
+                  {abbr}
                 </span>
                 <span className="min-w-0 flex-1 truncate">{label}</span>
               </Link>
