@@ -8,7 +8,8 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 
 import { useAuth } from "@/features/auth"
-import { isServerUnavailable } from "@/lib/api"
+import { ApiError, isServerUnavailable } from "@/lib/api"
+import { isSessionRejected } from "@/lib/api-error"
 import { freshAccessToken, getAccessExpiry, getAccessToken, refreshSession } from "@/lib/session"
 import { backoffDelay, reconnectDelay, retryWithBackoff } from "@/lib/ws/backoff"
 import { WsClient } from "@/lib/ws/client"
@@ -87,12 +88,13 @@ export function WsProvider({ children }: { children: ReactNode }) {
         tokenRejected = false
       } catch (error) {
         if (!alive) return
-        // Offline or server down: keep trying. Otherwise the session has ended.
-        if (isServerUnavailable(error)) {
-          setStatus("reconnecting")
-          scheduleReconnect(backoffDelay(attempt++))
-        } else {
+        // Only a rejected session stops here. Offline, down or rate limited: keep trying.
+        if (isSessionRejected(error)) {
           setStatus("disconnected")
+        } else {
+          const retryAfterMs = error instanceof ApiError ? (error.retryAfter ?? 0) * 1000 : 0
+          setStatus("reconnecting")
+          scheduleReconnect(Math.max(backoffDelay(attempt++), retryAfterMs))
         }
         return
       }
