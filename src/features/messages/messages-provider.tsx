@@ -15,7 +15,6 @@ import {
 import { useAuth } from "@/features/auth"
 import { useWs } from "@/features/ws"
 import { ApiError } from "@/lib/api"
-import type { ChannelEvent } from "@/lib/ws/types"
 
 import { MessagesContext } from "./context"
 import {
@@ -26,29 +25,9 @@ import {
   sendMessageApi,
 } from "./fetchers/message-fetchers"
 import { messagesReducer, type MessagesAction, type MessagesState } from "./store/channel-reducer"
-import { selectCursors } from "./store/sequence"
+import { createEventSequencer, type EventSequencer } from "./store/event-sequencer"
+import { planSync, selectCursors } from "./store/sequence"
 import type { ApiMessage, ChannelState } from "./types"
-
-// ── Gap-fill helper ───────────────────────────────────────────────────────────
-
-type GapFillOk = { ok: true; events: ChannelEvent[]; lastSeq: number }
-type GapFillFail = { ok: false }
-
-async function fillGap(channelId: string, afterSeq: number): Promise<GapFillOk | GapFillFail> {
-  const allEvents: ChannelEvent[] = []
-  let current = afterSeq
-  for (;;) {
-    try {
-      const res = await getChannelEvents(channelId, current)
-      allEvents.push(...res.events)
-      if (!res.has_more) return { ok: true, events: allEvents, lastSeq: res.last_seq }
-      current = res.last_seq
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 409) return { ok: false }
-      throw err
-    }
-  }
-}
 
 // ── Provider ──────────────────────────────────────────────────────────────────
 
@@ -76,75 +55,49 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
   const userIdRef = useRef(user?.id)
   useEffect(() => { userIdRef.current = user?.id }, [user?.id])
 
-  // Track in-progress gap fills per channel to avoid concurrent fetches.
-  const gapFilling = useRef(new Set<string>())
+  const reloadChannel = useCallback(async (channelId: string) => {
+    try {
+      const res = await getMessages(channelId)
+      doDispatch({
+        type: "RELOAD",
+        channelId,
+        messages: res.messages,
+        lastSeq: res.last_seq,
+        hasMore: res.has_more,
+      })
+    } catch {
+      // Stale until the next sync or gap: the cursor didn't move, so nothing is lost.
+    }
+  }, [doDispatch])
 
   // ── WS event subscription ────────────────────────────────────────────────────
+  const sequencerRef = useRef<EventSequencer | null>(null)
+
   useEffect(() => {
-    return subscribe((msg) => {
-      if (msg.type !== "event") return
-      const { event } = msg
-      const userId = userIdRef.current
-      if (!userId) return
-      const ch: ChannelState | undefined = stateRef.current[event.channel_id]
-      if (!ch) return // channel not loaded — ignore
-
-      if (event.seq <= ch.lastSeq) return // dedup
-
-      if (event.seq === ch.lastSeq + 1) {
-        doDispatch({ type: "APPLY_EVENT", channelId: event.channel_id, event, currentUserId: userId })
-        return
-      }
-
-      // Gap: fetch missing events then apply.
-      if (gapFilling.current.has(event.channel_id)) return
-      gapFilling.current.add(event.channel_id)
-      void (async () => {
-        try {
-          const result = await fillGap(event.channel_id, ch.lastSeq)
-          if (result.ok) {
-            doDispatch({ type: "APPLY_EVENTS", channelId: event.channel_id, events: result.events, lastSeq: result.lastSeq, currentUserId: userId })
-            // Dedup handles if this event was already in the batch.
-            doDispatch({ type: "APPLY_EVENT", channelId: event.channel_id, event, currentUserId: userId })
-          } else {
-            // gap_too_large: discard and reload from history
-            try {
-              const res = await getMessages(event.channel_id)
-              doDispatch({ type: "RELOAD", channelId: event.channel_id, messages: res.messages, lastSeq: res.last_seq, hasMore: res.has_more })
-            } catch { /* leave stale */ }
-          }
-        } finally {
-          gapFilling.current.delete(event.channel_id)
-        }
-      })()
+    const sequencer = createEventSequencer({
+      getChannel: (channelId) => stateRef.current[channelId],
+      getUserId: () => userIdRef.current,
+      dispatch: doDispatch,
+      getEvents: getChannelEvents,
+      reload: reloadChannel,
     })
-  }, [subscribe, doDispatch])
+    sequencerRef.current = sequencer
+    return subscribe((msg) => {
+      if (msg.type === "event") sequencer.receive(msg.event)
+    })
+  }, [subscribe, doDispatch, reloadChannel])
 
   // ── Sync response handler ────────────────────────────────────────────────────
+  // Resolves once reloads are done, so held-back events are released after them.
   useEffect(() => {
-    return onSync((syncRes) => {
+    return onSync(async (response) => {
       const userId = userIdRef.current
       if (!userId) return
-      void (async () => {
-        for (const [channelId, result] of Object.entries(syncRes.channels)) {
-          if ("error" in result) {
-            if (result.error === "cannot_read_channel") {
-              doDispatch({ type: "DROP_CHANNEL", channelId })
-            }
-            continue
-          }
-          if (result.gap_too_large) {
-            try {
-              const res = await getMessages(channelId)
-              doDispatch({ type: "RELOAD", channelId, messages: res.messages, lastSeq: res.last_seq, hasMore: res.has_more })
-            } catch { /* leave stale */ }
-            continue
-          }
-          doDispatch({ type: "APPLY_EVENTS", channelId, events: result.events, lastSeq: result.last_seq, currentUserId: userId })
-        }
-      })()
+      const { actions, reload } = planSync(response, userId)
+      actions.forEach(doDispatch)
+      await Promise.all(reload.map(reloadChannel))
     })
-  }, [onSync, doDispatch])
+  }, [onSync, doDispatch, reloadChannel])
 
   // ── Public API ────────────────────────────────────────────────────────────────
 
@@ -164,6 +117,7 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
         .catch(() => {
           doDispatch({ type: "DROP_CHANNEL", channelId })
         })
+        .finally(() => sequencerRef.current?.release(channelId))
     },
     [doDispatch],
   )
