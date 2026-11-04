@@ -33,6 +33,8 @@ export function MessageComposer({
   const [value, setStoredValue] = useState(initialDraft)
   const [activeIndex, setActiveIndex] = useState(0)
   const [caret, setCaret] = useState(initialDraft.length)
+  // The @ whose suggestions were closed with Esc: they stay closed for that mention.
+  const [dismissedAt, setDismissedAt] = useState<number | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const setValue = (next: string) => {
@@ -40,7 +42,8 @@ export function MessageComposer({
     onDraftChange?.(next)
   }
 
-  const mention = findMentionQuery(value, caret)
+  const found = findMentionQuery(value, caret)
+  const mention = found && found.start !== dismissedAt ? found : null
   const query = mention?.query.toLowerCase()
   const suggestions =
     query === undefined
@@ -106,9 +109,8 @@ export function MessageComposer({
         return
       }
       if (e.key === "Escape") {
-        // Dismiss suggestions without closing by inserting a zero-width space
-        // — simplest way to break the @-pattern match without changing visible text.
-        setValue(value + "​")
+        e.preventDefault()
+        setDismissedAt(mention?.start ?? null)
         return
       }
     }
@@ -174,6 +176,10 @@ export function MessageComposer({
             setValue(e.target.value)
             setCaret(e.target.selectionStart)
             setActiveIndex(0)
+            // Typing a new @, or removing this one, brings suggestions back.
+            if (findMentionQuery(e.target.value, e.target.selectionStart)?.start !== dismissedAt) {
+              setDismissedAt(null)
+            }
           }}
           onSelect={(e) => setCaret(e.currentTarget.selectionStart)}
           onKeyDown={handleKeyDown}
