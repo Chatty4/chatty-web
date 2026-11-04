@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { useAuth } from "@/features/auth"
 import { dmDisplayName, useChannels } from "@/features/channels"
 import { usePins } from "@/features/messages"
+import { useActiveTeamId } from "@/features/teams"
 import { cn } from "@/lib/utils"
 
 import { ThemeToggle } from "./theme-toggle"
@@ -18,6 +19,7 @@ type AppHeaderProps = {
 /** The bar above the main area: title, topic, member count, search, settings, theme. */
 export function AppHeader({ title, subtitle, onOpenMenu }: AppHeaderProps) {
   const { teamId, channelId } = useParams()
+  const activeTeamId = useActiveTeamId()
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const { channels, dms, memberNames } = useChannels()
@@ -107,7 +109,8 @@ export function AppHeader({ title, subtitle, onOpenMenu }: AppHeaderProps) {
           variant="ghost"
           size="icon"
           aria-label="Search"
-          onClick={() => teamId && navigate(`/teams/${teamId}/channels/browse`)}
+          disabled={!activeTeamId}
+          onClick={() => navigate(`/teams/${activeTeamId}/channels/browse`)}
         >
           <Search className="size-[18px]" />
         </Button>

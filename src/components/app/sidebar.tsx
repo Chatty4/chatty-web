@@ -1,12 +1,12 @@
 import { Menu } from "@base-ui/react/menu"
 import { ChevronDown, Hash, Headphones, Lock, MessageSquare, Plus, Search, Settings, X } from "lucide-react"
-import { Link, useMatches, useNavigate, useParams } from "react-router"
+import { Link, useMatches, useNavigate } from "react-router"
 
 import { Button } from "@/components/ui/button"
 import { initials } from "@/components/ui/avatar"
 import { dmDisplayName, useChannels } from "@/features/channels"
 import { useAuth } from "@/features/auth"
-import { useTeams } from "@/features/teams"
+import { useActiveTeamId, useTeams } from "@/features/teams"
 import { cn } from "@/lib/utils"
 
 import { UserMenu } from "./user-menu"
@@ -30,11 +30,11 @@ type SidebarProps = {
 
 /** The workspace column: team name header, search, channels, DMs, and user menu. */
 export function Sidebar({ open, onClose }: SidebarProps) {
-  const { teamId = "" } = useParams()
+  const teamId = useActiveTeamId()
   const activeChannelId = useActiveChannelId()
   const { channels, dms, memberNames, failed, reload } = useChannels()
   const { user } = useAuth()
-  const { teams } = useTeams()
+  const { teams, loading: teamsLoading, failed: teamsFailed } = useTeams()
   const navigate = useNavigate()
   const myUserId = user?.id ?? ""
 
@@ -70,7 +70,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                   {activeTeam.name[0]?.toUpperCase()}
                 </span>
               )}
-              <span className="truncate">{activeTeam?.name ?? "Select team"}</span>
+              <span className="truncate">{activeTeam?.name ?? "No team"}</span>
               <ChevronDown className="ml-auto size-[15px] shrink-0 text-muted-foreground" aria-hidden="true" />
             </Menu.Trigger>
             <Menu.Portal>
@@ -114,6 +114,17 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           </Button>
         </div>
 
+        {/* Everything below belongs to a team, so its links only exist with one. */}
+        {!teamId ? (
+          <div className="flex-1 px-5 pt-2">
+            {!teamsLoading && !teamsFailed && (
+              <p className="text-[13px] text-faint-foreground">
+                Channels and direct messages show up here once you're in a team.
+              </p>
+            )}
+          </div>
+        ) : (
+        <>
         {/* Search & browse bar */}
         <button
           type="button"
@@ -232,6 +243,8 @@ export function Sidebar({ open, onClose }: SidebarProps) {
             )
           )}
         </nav>
+        </>
+        )}
 
         {/* Footer — user menu + action icons */}
         <div className="flex min-h-[66px] shrink-0 items-center gap-0.5 border-t px-2 py-2.5">
@@ -244,15 +257,17 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           >
             <Headphones className="size-[17px]" />
           </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="New message"
-            className="shrink-0"
-            onClick={() => go(`/teams/${teamId}/dms/new`)}
-          >
-            <MessageSquare className="size-[17px]" />
-          </Button>
+          {teamId && (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="New message"
+              className="shrink-0"
+              onClick={() => go(`/teams/${teamId}/dms/new`)}
+            >
+              <MessageSquare className="size-[17px]" />
+            </Button>
+          )}
         </div>
       </aside>
     </>
