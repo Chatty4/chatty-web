@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { ArrowDown } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -183,10 +183,14 @@ export function MessageList({
     // The user can keep scrolling during the fetch: hold on to what they see now.
     if (loadingMore) captureAnchor()
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
-    setScrollState({
-      atBottom: distanceFromBottom < 40,
-      farFromBottom: distanceFromBottom > el.clientHeight,
-      newCount: distanceFromBottom < 40 ? 0 : scrollState.newCount,
+    const nextAtBottom = distanceFromBottom < 40
+    const nextFar = distanceFromBottom > el.clientHeight
+    // Keep the same object when nothing changed, or every scroll event re-renders the list.
+    setScrollState((s) => {
+      const nextCount = nextAtBottom ? 0 : s.newCount
+      return s.atBottom === nextAtBottom && s.farFromBottom === nextFar && s.newCount === nextCount
+        ? s
+        : { atBottom: nextAtBottom, farFromBottom: nextFar, newCount: nextCount }
     })
   }
 
@@ -201,6 +205,24 @@ export function MessageList({
     if (dayKey(prev.created_at) !== dayKey(msg.created_at)) return false
     return prev.author_id === msg.author_id
   }
+
+  // Stable, so MessageItem's memo holds when something else in the list changes.
+  const onSetReaction = useCallback(
+    (messageId: string, emoji: string, on: boolean) => setReaction(channelId, messageId, emoji, on),
+    [channelId, setReaction],
+  )
+  const onSetPinned = useCallback(
+    (messageId: string, on: boolean) => setPinned(channelId, messageId, on),
+    [channelId, setPinned],
+  )
+  const onEdit = useCallback(
+    (messageId: string, body: string) => edit(channelId, messageId, body),
+    [channelId, edit],
+  )
+  const onDelete = useCallback(
+    (messageId: string) => remove(channelId, messageId),
+    [channelId, remove],
+  )
 
   const archived = channel?.archived ?? false
 
@@ -278,11 +300,11 @@ export function MessageList({
               canEdit={!!actor && canEdit(message, actor, access)}
               canDelete={!!actor && canDelete(message, actor, access)}
               canReact={canReact(message, access)}
-              onSetReaction={(messageId, emoji, on) => setReaction(channelId, messageId, emoji, on)}
+              onSetReaction={onSetReaction}
               canPin={canPin(message, access)}
-              onSetPinned={(messageId, on) => setPinned(channelId, messageId, on)}
-              onEdit={(messageId, body) => edit(channelId, messageId, body)}
-              onDelete={(messageId) => remove(channelId, messageId)}
+              onSetPinned={onSetPinned}
+              onEdit={onEdit}
+              onDelete={onDelete}
               onRetry={retry}
               onDiscard={discard}
               onChannelArchived={onChannelArchived}

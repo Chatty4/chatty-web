@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { memo, useState } from "react"
 import {
   MoreHorizontal,
   Pencil,
@@ -80,7 +80,7 @@ export type MessageItemProps = {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function MessageItem({
+export const MessageItem = memo(function MessageItem({
   message,
   authorName,
   names,
@@ -393,4 +393,4 @@ export function MessageItem({
       </div>
     </article>
   )
-}
+})
