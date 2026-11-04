@@ -58,10 +58,13 @@ export function applyEvent(
       const { message } = event.payload as MessageCreatedPayload
       const confirmed: LocalMessage = { ...message, status: "sent" }
 
-      // Replace an optimistic copy if one exists (same id or same client_msg_id)
-      const idx = messages.findIndex(
-        (m) => m.id === message.id || (message.client_msg_id && m.client_msg_id === message.client_msg_id),
-      )
+      // Already here from the POST answer or a replay: a created event has nothing newer,
+      // and applying it would undo a later edit or delete.
+      if (messages.some((m) => m.id === message.id)) return messages
+
+      const idx = message.client_msg_id
+        ? messages.findIndex((m) => m.client_msg_id === message.client_msg_id)
+        : -1
       if (idx !== -1) {
         const out = [...messages]
         out[idx] = confirmed
