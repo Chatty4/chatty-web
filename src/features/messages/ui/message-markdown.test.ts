@@ -32,6 +32,12 @@ describe("formatting", () => {
     expect(render("> quoted")).toMatch(/<blockquote[^>]*>/)
   })
 
+  it("renders # headings", () => {
+    expect(render("# One")).toMatch(/<h1[^>]*>One<\/h1>/)
+    expect(render("## Jira\nCHAT-202")).toMatch(/<h2[^>]*>Jira<\/h2>/)
+    expect(render("###### Six")).toMatch(/<h6[^>]*>Six<\/h6>/)
+  })
+
   it("keeps a single line break", () => {
     expect(render("first\nsecond")).toContain("<br/>")
   })
@@ -39,7 +45,8 @@ describe("formatting", () => {
 
 describe("left as typed", () => {
   it.each([
-    ["# not a heading", "# not a heading"],
+    ["#general is the channel", "#general is the channel"],
+    ["#1 priority", "#1 priority"],
     ["title\n---", "---"],
     ["---", "---"],
     ["![cat](https://x.test/cat.png)", "!"],

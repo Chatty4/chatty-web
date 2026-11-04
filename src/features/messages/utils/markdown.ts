@@ -4,9 +4,8 @@ import { defaultUrlTransform } from "react-markdown"
 
 import { splitMentions } from "./mentions"
 
-/** Parser features switched off: "# hi" stays "# hi" rather than becoming a page heading. */
+/** Parser features switched off: what they match stays as the text the user typed. */
 const DISABLED_CONSTRUCTS = [
-  "headingAtx",
   "setextUnderline",
   "thematicBreak",
   "codeIndented",
@@ -25,6 +24,12 @@ const DISABLED_CONSTRUCTS = [
 export const ALLOWED_ELEMENTS = [
   "p",
   "br",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
   "strong",
   "em",
   "del",

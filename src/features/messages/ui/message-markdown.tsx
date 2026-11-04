@@ -17,9 +17,18 @@ type MessageMarkdownProps = {
   names: Record<string, string>
 }
 
+// Sized for a chat bubble, not a page: a heading only stands out a little from the text.
+const HEADING_SMALL = "text-sm font-semibold"
+
 function buildComponents({ own, names }: Omit<MessageMarkdownProps, "body">): Components {
   return {
-    span: ({ node }) => {
+    h1: ({ children }) => <h1 className="text-base font-semibold">{children}</h1>,
+    h2: ({ children }) => <h2 className="text-[15px] font-semibold">{children}</h2>,
+    h3: ({ children }) => <h3 className={HEADING_SMALL}>{children}</h3>,
+    h4: ({ children }) => <h4 className={HEADING_SMALL}>{children}</h4>,
+    h5: ({ children }) => <h5 className={HEADING_SMALL}>{children}</h5>,
+    h6: ({ children }) => <h6 className={HEADING_SMALL}>{children}</h6>,
+    span:({ node }) => {
       const userId = String(node?.properties.dataMentionId ?? "")
       return (
         <span
