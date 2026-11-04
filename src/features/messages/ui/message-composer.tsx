@@ -5,7 +5,12 @@ import { Button } from "@/components/ui/button"
 import { EmojiPickerButton } from "@/components/ui/emoji-picker"
 
 import { MAX_MESSAGE_LENGTH as MAX_LENGTH } from "../constants"
-import { encodeMentions, type MentionCandidate } from "../utils/mentions"
+import {
+  encodeMentions,
+  extractMentionIds,
+  findMentionQuery,
+  type MentionCandidate,
+} from "../utils/mentions"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -14,39 +19,68 @@ export type MessageComposerProps = {
   members: MentionCandidate[]
   /** When true the textarea is disabled and shows an archived notice. */
   archived?: boolean
+  /** The text to start with, such as what was left here before switching channel. */
+  initialDraft?: string
+  onDraftChange?: (text: string) => void
   /** Called when the user submits a message. */
   onSend: (body: string) => Promise<void>
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function MessageComposer({ members, archived = false, onSend }: MessageComposerProps) {
-  const [value, setValue] = useState("")
+export function MessageComposer({
+  members,
+  archived = false,
+  initialDraft = "",
+  onDraftChange,
+  onSend,
+}: MessageComposerProps) {
+  const [value, setStoredValue] = useState(initialDraft)
   const [activeIndex, setActiveIndex] = useState(0)
+  const [caret, setCaret] = useState(initialDraft.length)
+  // The @ whose suggestions were closed with Esc: they stay closed for that mention.
+  const [dismissedAt, setDismissedAt] = useState<number | null>(null)
+  // Who was chosen from the list: the text alone can't tell two people with one name apart.
+  const [picks, setPicks] = useState<MentionCandidate[]>([])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  // Detect @mention being typed at the cursor end.
-  const mentionMatch = value.match(/@([\w]*)$/)
-  const suggestions = useMemo<MentionCandidate[]>(() => {
-    if (!mentionMatch) return []
-    const query = mentionMatch[1].toLowerCase()
-    return members
-      .filter((m) => m.display_name.toLowerCase().includes(query))
-      .slice(0, 5)
-  }, [mentionMatch, members])
+  const setValue = (next: string) => {
+    setStoredValue(next)
+    onDraftChange?.(next)
+  }
+
+  const found = findMentionQuery(value, caret)
+  const mention = found && found.start !== dismissedAt ? found : null
+  const query = mention?.query.toLowerCase()
+  const suggestions =
+    query === undefined
+      ? []
+      : members.filter((m) => m.display_name.toLowerCase().includes(query)).slice(0, 5)
 
   // Clamp so activeIndex never points past the end of the current list.
   const clampedIndex = suggestions.length > 0 ? Math.min(activeIndex, suggestions.length - 1) : 0
 
-  const encoded = useMemo(() => encodeMentions(value.trim(), members), [value, members])
+  const encoded = useMemo(
+    () => encodeMentions(value.trim(), members, picks),
+    [value, members, picks],
+  )
   const tooLong = encoded.length > MAX_LENGTH
 
   const send = () => {
     const body = encoded
     if (!body || archived || tooLong) return
     setValue("")
+    setPicks([])
     void onSend(body)
     requestAnimationFrame(() => textareaRef.current?.focus())
+  }
+
+  const moveCaret = (position: number) => {
+    setCaret(position)
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus()
+      textareaRef.current?.setSelectionRange(position, position)
+    })
   }
 
   const insertAtCursor = (text: string) => {
@@ -56,21 +90,23 @@ export function MessageComposer({ members, archived = false, onSend }: MessageCo
     const next = value.slice(0, start) + text + value.slice(end)
     if (next.length > MAX_LENGTH) return
     setValue(next)
-    const caret = start + text.length
-    requestAnimationFrame(() => {
-      el?.focus()
-      el?.setSelectionRange(caret, caret)
-    })
+    moveCaret(start + text.length)
   }
 
-  const applyMention = (name: string) => {
-    setValue((prev) => prev.replace(/@[\w]*$/, `@${name} `))
+  const applyMention = (candidate: MentionCandidate) => {
+    if (!mention) return
+    const inserted = `@${candidate.display_name} `
+    // In text order, so each @name finds its own pick.
+    const earlier = encodeMentions(value.slice(0, mention.start), members, picks)
+    const position = extractMentionIds(earlier).length
+    setPicks([...picks.slice(0, position), candidate, ...picks.slice(position)])
+    setValue(value.slice(0, mention.start) + inserted + value.slice(caret))
     setActiveIndex(0)
-    textareaRef.current?.focus()
+    moveCaret(mention.start + inserted.length)
   }
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (suggestions.length > 0) {
+    if (suggestions.length > 0 && !e.nativeEvent.isComposing) {
       if (e.key === "ArrowDown") {
         e.preventDefault()
         setActiveIndex((i) => (i + 1) % suggestions.length)
@@ -84,17 +120,17 @@ export function MessageComposer({ members, archived = false, onSend }: MessageCo
       if (e.key === "Tab" || (e.key === "Enter" && suggestions.length > 0)) {
         e.preventDefault()
         const candidate = suggestions[clampedIndex]
-        if (candidate) applyMention(candidate.display_name)
+        if (candidate) applyMention(candidate)
         return
       }
       if (e.key === "Escape") {
-        // Dismiss suggestions without closing by inserting a zero-width space
-        // — simplest way to break the @-pattern match without changing visible text.
-        setValue((prev) => prev + "​")
+        e.preventDefault()
+        setDismissedAt(mention?.start ?? null)
         return
       }
     }
-    if (e.key === "Enter" && !e.shiftKey) {
+    // Ignore Enter while an IME composition is in progress (e.g. Japanese input).
+    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault()
       send()
     }
@@ -125,7 +161,7 @@ export function MessageComposer({ members, archived = false, onSend }: MessageCo
               onMouseEnter={() => setActiveIndex(i)}
               onMouseDown={(e) => {
                 e.preventDefault() // keep textarea focus
-                applyMention(m.display_name)
+                applyMention(m)
               }}
             >
               <span
@@ -152,13 +188,15 @@ export function MessageComposer({ members, archived = false, onSend }: MessageCo
           aria-label="Write a message"
           placeholder={archived ? "This channel has been archived." : "Write a message…"}
           onChange={(e) => {
-            const next = e.target.value
-            // Reset suggestion index when the @query changes (new/different mention).
-            const nextQuery = next.match(/@([\w]*)$/)?.[1]
-            const prevQuery = value.match(/@([\w]*)$/)?.[1]
-            if (nextQuery !== prevQuery) setActiveIndex(0)
-            setValue(next)
+            setValue(e.target.value)
+            setCaret(e.target.selectionStart)
+            setActiveIndex(0)
+            // Typing a new @, or removing this one, brings suggestions back.
+            if (findMentionQuery(e.target.value, e.target.selectionStart)?.start !== dismissedAt) {
+              setDismissedAt(null)
+            }
           }}
+          onSelect={(e) => setCaret(e.currentTarget.selectionStart)}
           onKeyDown={handleKeyDown}
         />
 
@@ -184,7 +222,7 @@ export function MessageComposer({ members, archived = false, onSend }: MessageCo
               size="icon-sm"
               aria-label="Mention someone"
               disabled={archived}
-              onClick={() => setValue((v) => `${v}@`)}
+              onClick={() => insertAtCursor("@")}
             >
               <AtSign />
             </Button>

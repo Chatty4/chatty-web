@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import {
   addChannelMembersRequest,
   archiveChannelRequest,
-  getChannelMembersRequest,
+  getAllChannelMembersRequest,
   getChannelRequest,
   getTeamMemberPreviewsRequest,
   leaveChannelRequest,
@@ -26,13 +26,13 @@ export type ChannelSettingsState =
 
 async function fetchChannelSettings(channelId: string): Promise<ChannelSettingsState> {
   try {
-    const [channel, membersPage] = await Promise.all([
+    const [channel, members] = await Promise.all([
       getChannelRequest(channelId),
-      getChannelMembersRequest(channelId),
+      getAllChannelMembersRequest(channelId),
     ])
 
     // Batch-resolve display names for channel members
-    const userIds = membersPage.members.map((m) => m.user_id)
+    const userIds = members.map((m) => m.user_id)
     const memberNames: Record<string, string> = {}
     if (userIds.length > 0 && channel.team_id) {
       const { members: previews } = await getTeamMemberPreviewsRequest(channel.team_id, userIds)
@@ -43,7 +43,7 @@ async function fetchChannelSettings(channelId: string): Promise<ChannelSettingsS
       status: "loaded",
       forChannelId: channelId,
       channel,
-      members: membersPage.members,
+      members,
       memberNames,
     }
   } catch {
@@ -115,8 +115,8 @@ export function useChannelSettings(channelId: string) {
     async (userIds: string[], teamId: string) => {
       await addChannelMembersRequest(channelId, userIds)
       // Reload members to get accurate list after adding
-      const [membersPage, previews] = await Promise.all([
-        getChannelMembersRequest(channelId),
+      const [members, previews] = await Promise.all([
+        getAllChannelMembersRequest(channelId),
         getTeamMemberPreviewsRequest(teamId, userIds),
       ])
       const newNames: Record<string, string> = {}
@@ -125,7 +125,7 @@ export function useChannelSettings(channelId: string) {
         if (prev.status !== "loaded") return prev
         return {
           ...prev,
-          members: membersPage.members,
+          members,
           memberNames: { ...prev.memberNames, ...newNames },
         }
       })

@@ -4,7 +4,8 @@ const MAX_MS = 30_000
 /**
  * Close codes that can reconnect right away: the token expired (4001) or a heartbeat
  * was missed (4002), so the server is healthy. Anything else, including 1006 for a
- * dropped network, backs off (chatty-infra/docs/events.md#ws-close).
+ * dropped network, backs off (chatty-infra/docs/events.md#ws-close). Only the first
+ * try is immediate: the same code again means reconnecting didn't help.
  */
 const IMMEDIATE_CODES = new Set([4001, 4002])
 
@@ -20,7 +21,7 @@ export function backoffDelay(attempt: number): number {
 
 /** Delay in ms before reconnecting after a socket closed with `code`. */
 export function reconnectDelay(code: number, attempt: number): number {
-  return IMMEDIATE_CODES.has(code) ? 0 : backoffDelay(attempt)
+  return IMMEDIATE_CODES.has(code) && attempt === 0 ? 0 : backoffDelay(attempt)
 }
 
 type RetryOptions = {

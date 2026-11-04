@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
-import { useMatches } from "react-router"
 
 import { useAuth } from "@/features/auth"
+import { useActiveTeamId } from "@/features/teams/hooks/use-active-team-id"
+import { useWs } from "@/features/ws"
 
 import { getSidebarChannelsRequest, getTeamMemberPreviewsRequest } from "../fetchers/channel-fetchers"
 import { ChannelsContext } from "../hooks/channels-context"
 import type { SidebarChannel } from "../types"
+import { applyChannelUpdate } from "../utils/apply-channel-update"
 
 type ChannelsState =
   | { status: "loading" }
@@ -17,14 +19,6 @@ type ChannelsState =
       memberNames: Record<string, string>
     }
   | { status: "error"; forTeamId: string }
-
-function getActiveTeamId(matches: ReturnType<typeof useMatches>): string {
-  for (let i = matches.length - 1; i >= 0; i--) {
-    const id = (matches[i].params as { teamId?: string }).teamId
-    if (id) return id
-  }
-  return ""
-}
 
 async function fetchChannels(teamId: string, myUserId: string): Promise<ChannelsState> {
   try {
@@ -54,9 +48,9 @@ async function fetchChannels(teamId: string, myUserId: string): Promise<Channels
 
 /** Fetches the channel/DM sidebar list for the active team and provides it to all children. */
 export function ChannelsProvider({ children }: { children: ReactNode }) {
-  const matches = useMatches()
-  const teamId = getActiveTeamId(matches)
+  const teamId = useActiveTeamId()
   const { user } = useAuth()
+  const { subscribe } = useWs()
   const myUserId = user?.id ?? ""
 
   const [state, setState] = useState<ChannelsState>({ status: "loading" })
@@ -81,13 +75,29 @@ export function ChannelsProvider({ children }: { children: ReactNode }) {
     if (teamId) load(teamId, myUserId)
   }, [teamId, myUserId, load])
 
+  // Renames and archives by other people: the sidebar and composer follow without a reload.
+  useEffect(
+    () =>
+      subscribe((message) => {
+        if (message.type !== "channel.updated") return
+        setState((current) =>
+          current.status === "loaded"
+            ? { ...current, channels: applyChannelUpdate(current.channels, message) }
+            : current,
+        )
+      }),
+    [subscribe],
+  )
+
   const value = useMemo(() => {
     const loaded = state.status === "loaded" && state.forTeamId === teamId
+    const failed = state.status === "error" && state.forTeamId === teamId
     return {
       channels: loaded ? state.channels : [],
       dms: loaded ? state.dms : [],
       memberNames: loaded ? state.memberNames : {},
-      loading: !!teamId && !loaded,
+      loading: !!teamId && !loaded && !failed,
+      failed,
       reload,
     }
   }, [state, teamId, reload])

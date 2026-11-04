@@ -6,6 +6,8 @@ export type TeamsContextValue = {
   /** The current user's teams, loaded from GET /teams. */
   teams: TeamListItem[]
   loading: boolean
+  /** The list couldn't be fetched: not the same as having no teams. */
+  failed: boolean
   /** Re-fetch GET /teams. Call after any mutation that adds, removes or renames a team. */
   reload: () => void
 }

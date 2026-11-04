@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { ArrowDown } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -63,21 +63,27 @@ export function MessageList({
     loadMoreHistory,
     send,
     retry,
+    discard,
     edit,
     remove,
     setReaction,
     setPinned,
+    getDraft,
+    setDraft,
   } = useMessages()
 
-  // Load this channel on mount / when channelId changes.
+  const channelState = getChannel(channelId)
+  const channelMissing = !channelState
+
+  // Load this channel on mount, when channelId changes, and after /sync dropped it.
   useEffect(() => {
     loadChannel(channelId)
-  }, [channelId, loadChannel])
+  }, [channelId, channelMissing, loadChannel])
 
-  const channelState = getChannel(channelId)
   const messages = useMemo(() => channelState?.messages ?? [], [channelState])
   const hasMore = channelState?.hasMore ?? false
   const loading = channelState?.loading ?? true
+  const loadFailed = channelState?.loadFailed ?? false
   const loadingMore = channelState?.loadingMore ?? false
   const loadMoreFailed = channelState?.loadMoreFailed ?? false
 
@@ -177,10 +183,14 @@ export function MessageList({
     // The user can keep scrolling during the fetch: hold on to what they see now.
     if (loadingMore) captureAnchor()
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
-    setScrollState({
-      atBottom: distanceFromBottom < 40,
-      farFromBottom: distanceFromBottom > el.clientHeight,
-      newCount: distanceFromBottom < 40 ? 0 : scrollState.newCount,
+    const nextAtBottom = distanceFromBottom < 40
+    const nextFar = distanceFromBottom > el.clientHeight
+    // Keep the same object when nothing changed, or every scroll event re-renders the list.
+    setScrollState((s) => {
+      const nextCount = nextAtBottom ? 0 : s.newCount
+      return s.atBottom === nextAtBottom && s.farFromBottom === nextFar && s.newCount === nextCount
+        ? s
+        : { atBottom: nextAtBottom, farFromBottom: nextFar, newCount: nextCount }
     })
   }
 
@@ -195,6 +205,24 @@ export function MessageList({
     if (dayKey(prev.created_at) !== dayKey(msg.created_at)) return false
     return prev.author_id === msg.author_id
   }
+
+  // Stable, so MessageItem's memo holds when something else in the list changes.
+  const onSetReaction = useCallback(
+    (messageId: string, emoji: string, on: boolean) => setReaction(channelId, messageId, emoji, on),
+    [channelId, setReaction],
+  )
+  const onSetPinned = useCallback(
+    (messageId: string, on: boolean) => setPinned(channelId, messageId, on),
+    [channelId, setPinned],
+  )
+  const onEdit = useCallback(
+    (messageId: string, body: string) => edit(channelId, messageId, body),
+    [channelId, edit],
+  )
+  const onDelete = useCallback(
+    (messageId: string) => remove(channelId, messageId),
+    [channelId, remove],
+  )
 
   const archived = channel?.archived ?? false
 
@@ -218,9 +246,21 @@ export function MessageList({
         {loading && <MessageListSkeleton />}
 
         {/* The welcome block only once the very start of the history is loaded */}
-        {!loading && !hasMore && intro}
+        {!loading && !loadFailed && !hasMore && intro}
 
-        {!loading && (
+        {loadFailed && (
+          <div className="flex min-h-[150px] flex-col items-center justify-center gap-2 text-center">
+            <strong className="font-semibold">Couldn't load this channel.</strong>
+            <span role="alert" className="text-muted-foreground">
+              Check your connection and try again.
+            </span>
+            <Button variant="secondary" size="sm" onClick={() => loadChannel(channelId)}>
+              Try again
+            </Button>
+          </div>
+        )}
+
+        {!loading && !loadFailed && (
           <HistoryTop
             hasMore={hasMore}
             loadingMore={loadingMore}
@@ -232,7 +272,7 @@ export function MessageList({
         )}
 
         {/* Empty state */}
-        {!loading && messages.length === 0 && (
+        {!loading && !loadFailed && messages.length === 0 && (
           <>
             <DayDivider label="Today" />
             <div className="flex min-h-[150px] flex-col items-center justify-center text-center text-muted-foreground">
@@ -260,12 +300,13 @@ export function MessageList({
               canEdit={!!actor && canEdit(message, actor, access)}
               canDelete={!!actor && canDelete(message, actor, access)}
               canReact={canReact(message, access)}
-              onSetReaction={(messageId, emoji, on) => setReaction(channelId, messageId, emoji, on)}
+              onSetReaction={onSetReaction}
               canPin={canPin(message, access)}
-              onSetPinned={(messageId, on) => setPinned(channelId, messageId, on)}
-              onEdit={(messageId, body) => edit(channelId, messageId, body)}
-              onDelete={(messageId) => remove(channelId, messageId)}
+              onSetPinned={onSetPinned}
+              onEdit={onEdit}
+              onDelete={onDelete}
               onRetry={retry}
+              onDiscard={discard}
               onChannelArchived={onChannelArchived}
             />
             </Fragment>
@@ -295,10 +336,16 @@ export function MessageList({
       </div>
 
       {/* Composer */}
+      {/* Keyed so a draft can never be sent to the channel opened after it. */}
       <MessageComposer
+        key={channelId}
         members={mentionCandidates}
         archived={archived}
-        onSend={(body) => send(channelId, body)}
+        initialDraft={getDraft(channelId)}
+        onDraftChange={(text) => setDraft(channelId, text)}
+        onSend={async (body) => {
+          if ((await send(channelId, body)) === "channel_archived") onChannelArchived()
+        }}
       />
     </div>
   )

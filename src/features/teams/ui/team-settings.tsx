@@ -183,7 +183,8 @@ function MembersTab({
                 >
                   <option value="admin">Admin</option>
                   <option value="member">Member</option>
-                  <option value="owner">Owner</option>
+                  {/* Only an owner can make someone owner (api-core.md). */}
+                  {(myRole === "owner" || isOwner) && <option value="owner">Owner</option>}
                 </Select>
               </div>
               {!isOwner && (

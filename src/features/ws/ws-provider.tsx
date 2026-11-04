@@ -8,8 +8,9 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 
 import { useAuth } from "@/features/auth"
-import { isServerUnavailable } from "@/lib/api"
-import { freshAccessToken } from "@/lib/session"
+import { ApiError, isServerUnavailable } from "@/lib/api"
+import { isSessionRejected } from "@/lib/api-error"
+import { freshAccessToken, getAccessExpiry, getAccessToken, refreshSession } from "@/lib/session"
 import { backoffDelay, reconnectDelay, retryWithBackoff } from "@/lib/ws/backoff"
 import { WsClient } from "@/lib/ws/client"
 import { createSyncGate } from "@/lib/ws/sync-gate"
@@ -24,15 +25,6 @@ const PROACTIVE_MS = 60_000
 
 /** How long a connection must stay open before the backoff starts over. */
 const STABLE_MS = 30_000
-
-function parseTokenExp(token: string): number | null {
-  try {
-    const payload = JSON.parse(atob(token.split(".")[1]!)) as Record<string, unknown>
-    return typeof payload.exp === "number" ? payload.exp * 1000 : null
-  } catch {
-    return null
-  }
-}
 
 export function WsProvider({ children }: { children: ReactNode }) {
   const { logout } = useAuth()
@@ -51,6 +43,7 @@ export function WsProvider({ children }: { children: ReactNode }) {
     let attempt = 0
     let connectedOnce = false
     let openedAt = 0
+    let tokenRejected = false
 
     const gate = createSyncGate<InboundWsMessage>((msg) => {
       msgHandlers.current.forEach((h) => h(msg))
@@ -90,15 +83,18 @@ export function WsProvider({ children }: { children: ReactNode }) {
 
       let token: string
       try {
-        token = await freshAccessToken()
+        // After 4001 the server said this token is over, whatever the local expiry says.
+        token = tokenRejected ? await refreshSession(getAccessToken()) : await freshAccessToken()
+        tokenRejected = false
       } catch (error) {
         if (!alive) return
-        // Offline or server down: keep trying. Otherwise the session has ended.
-        if (isServerUnavailable(error)) {
-          setStatus("reconnecting")
-          scheduleReconnect(backoffDelay(attempt++))
-        } else {
+        // Only a rejected session stops here. Offline, down or rate limited: keep trying.
+        if (isSessionRejected(error)) {
           setStatus("disconnected")
+        } else {
+          const retryAfterMs = error instanceof ApiError ? (error.retryAfter ?? 0) * 1000 : 0
+          setStatus("reconnecting")
+          scheduleReconnect(Math.max(backoffDelay(attempt++), retryAfterMs))
         }
         return
       }
@@ -132,6 +128,7 @@ export function WsProvider({ children }: { children: ReactNode }) {
           // and then closes straight away must not be hammered.
           if (openedAt && Date.now() - openedAt >= STABLE_MS) attempt = 0
           openedAt = 0
+          tokenRejected = code === 4001
           setStatus("reconnecting")
           scheduleReconnect(reconnectDelay(code, attempt++))
         },
@@ -142,9 +139,11 @@ export function WsProvider({ children }: { children: ReactNode }) {
       // Proactively reconnect before the token expires so the server never
       // closes with 4001. The new connect() calls freshAccessToken() which
       // will pick up the already-refreshed token from session.ts.
-      const exp = parseTokenExp(token)
-      if (exp !== null) {
-        const delay = Math.max(0, exp - PROACTIVE_MS - Date.now())
+      // session.ts measures the expiry on this device's clock: comparing the token's exp
+      // with a wrong clock here would reconnect in a loop.
+      const expiresAt = getAccessExpiry()
+      if (expiresAt !== null) {
+        const delay = Math.max(0, expiresAt - PROACTIVE_MS - Date.now())
         proactiveTimer = setTimeout(() => {
           client.close()
           clientRef.current = null

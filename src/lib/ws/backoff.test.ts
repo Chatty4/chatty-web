@@ -14,7 +14,13 @@ describe("backoffDelay", () => {
 
 describe("reconnectDelay", () => {
   it.each([4001, 4002])("reconnects right away after %i", (code) => {
-    expect(reconnectDelay(code, 5)).toBe(0)
+    expect(reconnectDelay(code, 0)).toBe(0)
+  })
+
+  it.each([4001, 4002])("backs off when %i keeps coming back", (code) => {
+    vi.spyOn(Math, "random").mockReturnValue(0.5)
+    expect(reconnectDelay(code, 2)).toBe(2_000)
+    vi.restoreAllMocks()
   })
 
   it.each([1001, 1006, 1009, 1011, 1012, 4008])("backs off after %i", (code) => {

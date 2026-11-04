@@ -1,4 +1,6 @@
 import { coreApi } from "@/lib/api"
+import { chunk } from "@/lib/chunk"
+import { fetchAllPages } from "@/lib/fetch-all-pages"
 
 import type {
   BrowsableChannel,
@@ -80,12 +82,16 @@ export function updateMyChannelSettingsRequest(
   return coreApi.put(`/channels/${channelId}/me`, settings)
 }
 
-export function getChannelMembersRequest(
-  channelId: string,
-  cursor?: string,
-): Promise<{ members: ChannelMember[]; next_cursor: string | null }> {
-  const qs = cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""
-  return coreApi.get(`/channels/${channelId}/members${qs}`)
+/** Every member of the channel, however many pages that takes. */
+export function getAllChannelMembersRequest(channelId: string): Promise<ChannelMember[]> {
+  return fetchAllPages(async (cursor) => {
+    const params = new URLSearchParams({ limit: "200" })
+    if (cursor) params.set("cursor", cursor)
+    const page = await coreApi.get<{ members: ChannelMember[]; next_cursor: string | null }>(
+      `/channels/${channelId}/members?${params}`,
+    )
+    return { items: page.members, next_cursor: page.next_cursor }
+  })
 }
 
 export function addChannelMembersRequest(
@@ -102,10 +108,20 @@ export function removeChannelMemberRequest(
   return coreApi.delete(`/channels/${channelId}/members/${userId}`)
 }
 
-/** Batch-fetch display names by user ID. Used to resolve DM participant names. */
-export function getTeamMemberPreviewsRequest(
+/** The API takes at most this many user_ids per call (api-core.md, GET /teams/{id}/members). */
+const MAX_USER_IDS = 100
+
+/** Fetch display names by user ID, in as many calls as the API limit needs. */
+export async function getTeamMemberPreviewsRequest(
   teamId: string,
   userIds: string[],
-): Promise<{ members: MemberPreview[]; next_cursor: null }> {
-  return coreApi.get(`/teams/${teamId}/members?user_ids=${userIds.join(",")}`)
+): Promise<{ members: MemberPreview[] }> {
+  const pages = await Promise.all(
+    chunk(userIds, MAX_USER_IDS).map((ids) =>
+      coreApi.get<{ members: MemberPreview[] }>(
+        `/teams/${teamId}/members?user_ids=${ids.join(",")}`,
+      ),
+    ),
+  )
+  return { members: pages.flatMap((page) => page.members) }
 }

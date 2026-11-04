@@ -1,5 +1,7 @@
 export { TeamsProvider } from "./ui/teams-provider"
 export { useTeams } from "./hooks/teams-context"
+export { useActiveTeamId } from "./hooks/use-active-team-id"
+export { pickHomeTeam, readLastTeam } from "./utils/last-team"
 export { useTeamSettings } from "./hooks/use-team-settings"
 export { CreateTeamForm } from "./ui/create-team-form"
 export { TeamSettings } from "./ui/team-settings"

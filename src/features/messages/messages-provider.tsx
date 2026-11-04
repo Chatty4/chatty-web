@@ -15,6 +15,7 @@ import {
 import { useAuth } from "@/features/auth"
 import { useWs } from "@/features/ws"
 import { ApiError } from "@/lib/api"
+import { uuid } from "@/lib/uuid"
 
 import { MessagesContext } from "./context"
 import {
@@ -38,7 +39,7 @@ import {
 import { createEventSequencer, type EventSequencer } from "./store/event-sequencer"
 import { planSync, selectCursors } from "./store/sequence"
 import type { ApiMessage, ChannelState } from "./types"
-import { describePinError } from "./utils/errors"
+import { describePinError, describeSendFailure, messageErrorCode } from "./utils/errors"
 
 // ── Provider ──────────────────────────────────────────────────────────────────
 
@@ -119,14 +120,15 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
 
   const loadChannel = useCallback(
     (channelId: string) => {
-      if (stateRef.current[channelId]) return
+      const existing = stateRef.current[channelId]
+      if (existing && !existing.loadFailed) return
       doDispatch({ type: "LOAD_START", channelId })
       getMessages(channelId)
         .then((res) => {
           doDispatch({ type: "LOAD_DONE", channelId, messages: res.messages, lastSeq: res.last_seq, hasMore: res.has_more })
         })
         .catch(() => {
-          doDispatch({ type: "DROP_CHANNEL", channelId })
+          doDispatch({ type: "LOAD_FAIL", channelId })
         })
         .finally(() => sequencerRef.current?.release(channelId))
     },
@@ -157,7 +159,7 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
 
   const send = useCallback(async (channelId: string, body: string) => {
     const userId = userIdRef.current ?? ""
-    const clientMsgId = crypto.randomUUID()
+    const clientMsgId = uuid()
     doDispatch({
       type: "OPTIMISTIC_ADD",
       channelId,
@@ -182,8 +184,9 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
     try {
       const confirmed: ApiMessage = await sendMessageApi(channelId, body, clientMsgId)
       doDispatch({ type: "OPTIMISTIC_CONFIRM", channelId, clientMsgId, confirmed })
-    } catch {
-      doDispatch({ type: "OPTIMISTIC_FAIL", channelId, clientMsgId })
+    } catch (err) {
+      doDispatch({ type: "OPTIMISTIC_FAIL", channelId, clientMsgId, failure: describeSendFailure(err) })
+      return messageErrorCode(err)
     }
   }, [doDispatch])
 
@@ -195,9 +198,14 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
     try {
       const confirmed = await sendMessageApi(channelId, msg.body, clientMsgId)
       doDispatch({ type: "OPTIMISTIC_CONFIRM", channelId, clientMsgId, confirmed })
-    } catch {
-      doDispatch({ type: "OPTIMISTIC_FAIL", channelId, clientMsgId })
+    } catch (err) {
+      doDispatch({ type: "OPTIMISTIC_FAIL", channelId, clientMsgId, failure: describeSendFailure(err) })
+      return messageErrorCode(err)
     }
+  }, [doDispatch])
+
+  const discard = useCallback((channelId: string, clientMsgId: string) => {
+    doDispatch({ type: "OPTIMISTIC_DISCARD", channelId, clientMsgId })
   }, [doDispatch])
 
   // Edit and delete apply the REST answer right away, so the change shows even if the
@@ -278,8 +286,16 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
     [doDispatch],
   )
 
+  // Refs, not state: only the composer of the open channel reads these, when it mounts.
+  const draftsRef = useRef(new Map<string, string>())
+  const getDraft = useCallback((channelId: string) => draftsRef.current.get(channelId) ?? "", [])
+  const setDraft = useCallback((channelId: string, text: string) => {
+    if (text) draftsRef.current.set(channelId, text)
+    else draftsRef.current.delete(channelId)
+  }, [])
+
   return (
-    <MessagesContext.Provider value={{ getChannel, loadChannel, loadMoreHistory, send, retry, edit, remove, setReaction, setPinned, loadPins }}>
+    <MessagesContext.Provider value={{ getChannel, loadChannel, loadMoreHistory, send, retry, discard, edit, remove, setReaction, setPinned, loadPins, getDraft, setDraft }}>
       {children}
     </MessagesContext.Provider>
   )

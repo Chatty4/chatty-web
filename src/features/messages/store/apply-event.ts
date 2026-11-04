@@ -13,6 +13,11 @@ type PinPayload = { message_id: string }
 
 export type MessageEdit = { message_id: string; body: string; mentions: string[]; edited_at: string }
 
+/** True when an edit is older than the one a copy of the message already shows. */
+export function isOlderEdit(shownEditedAt: string | null, edit: MessageEdit): boolean {
+  return !!shownEditedAt && Date.parse(shownEditedAt) > Date.parse(edit.edited_at)
+}
+
 /**
  * Applies an edit from a message.edited event or a PUT response. Both can arrive for
  * the same edit in either order, so this is idempotent: deleted messages and edits
@@ -21,7 +26,7 @@ export type MessageEdit = { message_id: string; body: string; mentions: string[]
 export function applyEdit(messages: LocalMessage[], edit: MessageEdit): LocalMessage[] {
   return messages.map((m) => {
     if (m.id !== edit.message_id || m.deleted_at !== null) return m
-    if (m.edited_at && Date.parse(m.edited_at) > Date.parse(edit.edited_at)) return m
+    if (isOlderEdit(m.edited_at, edit)) return m
     return { ...m, body: edit.body, mentions: edit.mentions, edited_at: edit.edited_at }
   })
 }

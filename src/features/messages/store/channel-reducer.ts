@@ -2,7 +2,7 @@
 // Handles loading, pagination, event application, gap-fill and optimistic send.
 
 import type { ChannelEvent } from "@/lib/ws/types"
-import type { ApiMessage, ChannelState, LocalMessage, Pin } from "../types"
+import type { ApiMessage, ChannelState, LocalMessage, Pin, SendFailure } from "../types"
 import { applyDelete, applyEdit, applyEvent, setPinned, type MessageEdit } from "./apply-event"
 import { addPin, applyEventToPins, editPin, removePin, type PinInfo } from "./pins"
 
@@ -10,6 +10,7 @@ export type MessagesState = Record<string, ChannelState>
 
 export type MessagesAction =
   | { type: "LOAD_START"; channelId: string }
+  | { type: "LOAD_FAIL"; channelId: string }
   | { type: "LOAD_DONE"; channelId: string; messages: ApiMessage[]; lastSeq: number; hasMore: boolean }
   | { type: "LOAD_MORE_START"; channelId: string }
   // beforeSeq is the cursor the page was requested with; lastSeq is its answer's last_seq.
@@ -27,7 +28,8 @@ export type MessagesAction =
   | { type: "APPLY_EVENTS"; channelId: string; events: ChannelEvent[]; lastSeq: number; currentUserId: string }
   | { type: "OPTIMISTIC_ADD"; channelId: string; message: LocalMessage }
   | { type: "OPTIMISTIC_CONFIRM"; channelId: string; clientMsgId: string; confirmed: ApiMessage }
-  | { type: "OPTIMISTIC_FAIL"; channelId: string; clientMsgId: string }
+  | { type: "OPTIMISTIC_FAIL"; channelId: string; clientMsgId: string; failure: SendFailure }
+  | { type: "OPTIMISTIC_DISCARD"; channelId: string; clientMsgId: string }
   | { type: "OPTIMISTIC_RETRY"; channelId: string; clientMsgId: string }
   | { type: "DROP_CHANNEL"; channelId: string }
   // REST answers to my own edit/delete. They carry no seq, so lastSeq is untouched;
@@ -72,12 +74,14 @@ export function oldestLoadedSeq(messages: LocalMessage[]): number | undefined {
 
 export function messagesReducer(state: MessagesState, action: MessagesAction): MessagesState {
   switch (action.type) {
-    case "LOAD_START":
-      if (state[action.channelId]) return state
+    case "LOAD_START": {
+      const previous = state[action.channelId]
+      if (previous && !previous.loadFailed) return state
       return {
         ...state,
         [action.channelId]: {
-          messages: [],
+          // A retry keeps what the user sent while the channel couldn't load.
+          messages: previous?.messages ?? [],
           lastSeq: 0,
           hasMore: false,
           loading: true,
@@ -85,6 +89,13 @@ export function messagesReducer(state: MessagesState, action: MessagesAction): M
           loadMoreFailed: false,
         },
       }
+    }
+
+    case "LOAD_FAIL": {
+      const ch = state[action.channelId]
+      if (!ch) return state
+      return { ...state, [action.channelId]: { ...ch, loading: false, loadFailed: true } }
+    }
 
     case "LOAD_DONE":
       return {
@@ -230,7 +241,23 @@ export function messagesReducer(state: MessagesState, action: MessagesAction): M
         [action.channelId]: {
           ...ch,
           messages: ch.messages.map((m) =>
-            m.client_msg_id === action.clientMsgId ? { ...m, status: "failed" as const } : m,
+            m.client_msg_id === action.clientMsgId
+              ? { ...m, status: "failed" as const, failure: action.failure }
+              : m,
+          ),
+        },
+      }
+    }
+
+    case "OPTIMISTIC_DISCARD": {
+      const ch = state[action.channelId]
+      if (!ch) return state
+      return {
+        ...state,
+        [action.channelId]: {
+          ...ch,
+          messages: ch.messages.filter(
+            (m) => !(m.client_msg_id === action.clientMsgId && m.status === "failed"),
           ),
         },
       }
@@ -244,7 +271,9 @@ export function messagesReducer(state: MessagesState, action: MessagesAction): M
         [action.channelId]: {
           ...ch,
           messages: ch.messages.map((m) =>
-            m.client_msg_id === action.clientMsgId ? { ...m, status: "pending" as const } : m,
+            m.client_msg_id === action.clientMsgId
+              ? { ...m, status: "pending" as const, failure: undefined }
+              : m,
           ),
         },
       }

@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { memo, useState } from "react"
 import {
   MoreHorizontal,
   Pencil,
@@ -22,7 +22,7 @@ import { useReactionToggle } from "../hooks/use-reaction-toggle"
 import type { LocalMessage } from "../types"
 import { describeMessageError, messageErrorCode } from "../utils/errors"
 import { MARKDOWN_BLOCK_CLASS } from "../utils/markdown"
-import { decodeMentions, encodeMentions } from "../utils/mentions"
+import { decodeMentions, encodeMentions, extractMentionIds } from "../utils/mentions"
 import { MessageEditor } from "./message-editor"
 import { MessageMarkdown } from "./message-markdown"
 import { PinnedMark } from "./pinned-mark"
@@ -30,6 +30,9 @@ import { ReactionChips } from "./reaction-chips"
 
 /** jumpToMessage sets data-flash on the row for a moment. */
 const ROW_FLASH_CLASS = "rounded-md transition-colors duration-200 data-[flash]:bg-accent/60"
+
+/** Rows take focus so the toolbar also opens from the keyboard and with a tap. */
+const ROW_FOCUS_CLASS = "outline-none focus-visible:ring-2 focus-visible:ring-ring"
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -67,14 +70,17 @@ export type MessageItemProps = {
   onEdit:(messageId: string, body: string) => Promise<void>
   /** Rejects with ApiError on failure. */
   onDelete: (messageId: string) => Promise<void>
-  onRetry: (channelId: string, clientMsgId: string) => Promise<void>
+  /** Resolves with the error code when sending failed again. */
+  onRetry: (channelId: string, clientMsgId: string) => Promise<string | undefined>
+  /** Removes a message that failed to send. */
+  onDiscard: (channelId: string, clientMsgId: string) => void
   /** Called when the server says the channel is archived, so the view can go read-only. */
   onChannelArchived: () => void
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function MessageItem({
+export const MessageItem = memo(function MessageItem({
   message,
   authorName,
   names,
@@ -89,6 +95,7 @@ export function MessageItem({
   onEdit,
   onDelete,
   onRetry,
+  onDiscard,
   onChannelArchived,
 }: MessageItemProps) {
   const [editing, setEditing] = useState(false)
@@ -110,8 +117,15 @@ export function MessageItem({
   // Close the editor if the message gets deleted (e.g. from another tab) while open.
   const showEditor = editing && !isDeleted
 
-  const candidates = Object.entries(names).map(([id, display_name]) => ({ id, display_name }))
-  const encode = (text: string) => encodeMentions(text, candidates)
+  // Only called while editing, so rows that are just being shown don't build these lists.
+  const encode = (text: string) => {
+    const candidates = Object.entries(names).map(([id, display_name]) => ({ id, display_name }))
+    // Keeps the people already mentioned when two share a name.
+    const existingMentions = extractMentionIds(message.body).flatMap((id) =>
+      names[id] ? [{ id, display_name: names[id] }] : [],
+    )
+    return encodeMentions(text, candidates, existingMentions)
+  }
 
   // Errors that end the edit close the editor with a toast; the rest reject so the
   // editor stays open and shows them inline.
@@ -148,6 +162,12 @@ export function MessageItem({
     }
   }
 
+  const retrySend = async () => {
+    if (!message.client_msg_id) return
+    const code = await onRetry(message.channel_id, message.client_msg_id)
+    if (code === "channel_archived") onChannelArchived()
+  }
+
   const time = (
     <time className="text-xs text-muted-foreground" dateTime={message.created_at}>
       {formatTime(message.created_at)}
@@ -161,17 +181,27 @@ export function MessageItem({
       )}
       {message.status === "failed" && (
         <span className="text-xs text-destructive">
-          Not sent{" "}
+          {message.failure?.message ?? "Not sent"}{" "}
+          {(message.failure?.retryable ?? true) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-auto px-1 py-0 text-xs"
+              onClick={() => void retrySend()}
+            >
+              <RotateCcw className="size-3" />
+              Retry
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"
             className="h-auto px-1 py-0 text-xs"
             onClick={() =>
-              message.client_msg_id && void onRetry(message.channel_id, message.client_msg_id)
+              message.client_msg_id && onDiscard(message.channel_id, message.client_msg_id)
             }
           >
-            <RotateCcw className="size-3" />
-            Retry
+            Dismiss
           </Button>
         </span>
       )}
@@ -194,7 +224,7 @@ export function MessageItem({
     <div
       className={cn(
         "absolute z-10 -translate-y-1/2 items-center gap-0.5 rounded-md border bg-surface shadow-sm",
-        pickingReaction ? "flex" : "hidden group-hover/msg:flex",
+        pickingReaction ? "flex" : "hidden group-hover/msg:flex group-focus-within/msg:flex",
         own ? "top-1/2 right-full mr-1.5" : "top-1/2 left-full ml-1.5",
         // A wide bubble leaves no room beside it on a phone, so sit on its top edge there.
         "max-sm:inset-auto max-sm:top-0 max-sm:right-0 max-sm:mx-0",
@@ -266,11 +296,13 @@ export function MessageItem({
         className={cn(
           "group/msg relative flex flex-col items-end px-4 py-0.5",
           ROW_FLASH_CLASS,
+          ROW_FOCUS_CLASS,
           grouped ? "mt-0" : "mt-3",
         )}
+        tabIndex={0}
         data-message-id={message.id}
       >
-        <ConfirmDialog {...confirmProps} />
+        {confirmProps.open && <ConfirmDialog {...confirmProps} />}
         {(!grouped || isPinned) && (
           <div className="mb-1 flex items-baseline gap-2 px-1">
             {isPinned && <PinnedMark />}
@@ -313,11 +345,13 @@ export function MessageItem({
       className={cn(
         "group/msg relative flex gap-2.5 px-4 py-0.5",
         ROW_FLASH_CLASS,
+        ROW_FOCUS_CLASS,
         grouped ? "mt-0" : "mt-3",
       )}
+      tabIndex={0}
       data-message-id={message.id}
     >
-      <ConfirmDialog {...confirmProps} />
+      {confirmProps.open && <ConfirmDialog {...confirmProps} />}
       {/* Avatar column */}
       <div className="w-8 shrink-0">{!grouped && <Avatar name={authorName} />}</div>
 
@@ -362,4 +396,4 @@ export function MessageItem({
       </div>
     </article>
   )
-}
+})

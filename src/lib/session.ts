@@ -170,6 +170,11 @@ export function getAccessToken(): string | null {
   return access?.token ?? null
 }
 
+/** When the access token expires, on this device's clock. Null without one. */
+export function getAccessExpiry(): number | null {
+  return access?.expiresAt ?? null
+}
+
 export function getRefreshToken(): string | null {
   return readRefreshToken()
 }

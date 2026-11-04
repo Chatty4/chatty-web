@@ -58,6 +58,27 @@ describe("loading", () => {
     expect(ids(state)).toEqual(["msg-1", "c1"])
   })
 
+  it("LOAD_FAIL keeps the channel so the list can show the error", () => {
+    const state = reduce(
+      {},
+      { type: "LOAD_START", channelId: CHANNEL },
+      { type: "LOAD_FAIL", channelId: CHANNEL },
+    )
+    expect(channel(state)).toMatchObject({ loading: false, loadFailed: true })
+  })
+
+  it("LOAD_START retries a failed channel and keeps what was sent meanwhile", () => {
+    const state = reduce(
+      {},
+      { type: "LOAD_START", channelId: CHANNEL },
+      { type: "LOAD_FAIL", channelId: CHANNEL },
+      { type: "OPTIMISTIC_ADD", channelId: CHANNEL, message: pendingMessage("c1") },
+      { type: "LOAD_START", channelId: CHANNEL },
+    )
+    expect(channel(state)).toMatchObject({ loading: true })
+    expect(channel(state).loadFailed).toBeUndefined()
+    expect(ids(state)).toEqual(["c1"])
+  })
 })
 
 describe("older history", () => {
@@ -267,6 +288,7 @@ describe("optimistic send", () => {
   it("marks a failed send and lets it retry", () => {
     const failed = reduce(loaded(3), add, {
       type: "OPTIMISTIC_FAIL",
+      failure: { message: "Not sent", retryable: true },
       channelId: CHANNEL,
       clientMsgId: "c1",
     })
@@ -278,6 +300,24 @@ describe("optimistic send", () => {
       clientMsgId: "c1",
     })
     expect(channel(retrying).messages[1]!.status).toBe("pending")
+    expect(channel(retrying).messages[1]!.failure).toBeUndefined()
+  })
+
+  it("removes a failed message when it is dismissed", () => {
+    const failed = reduce(loaded(3), add, {
+      type: "OPTIMISTIC_FAIL",
+      failure: { message: "Not sent", retryable: false },
+      channelId: CHANNEL,
+      clientMsgId: "c1",
+    })
+    expect(channel(failed).messages[1]!.failure?.retryable).toBe(false)
+
+    const dismissed = reduce(failed, {
+      type: "OPTIMISTIC_DISCARD",
+      channelId: CHANNEL,
+      clientMsgId: "c1",
+    })
+    expect(ids(dismissed)).toEqual(["msg-3"])
   })
 })
 

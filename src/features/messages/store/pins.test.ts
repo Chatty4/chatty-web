@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import type { Pin, PinsState } from "../types"
 import { messagesReducer, type MessagesAction, type MessagesState } from "./channel-reducer"
+import { editPin } from "./pins"
 import {
   CHANNEL,
   ME,
@@ -12,6 +13,22 @@ import {
   event,
   localMessage,
 } from "./test-fixtures"
+
+describe("editPin", () => {
+  const edit = (body: string, editedAt: string) => ({
+    message_id: "msg-1",
+    body,
+    mentions: [],
+    edited_at: editedAt,
+  })
+
+  it("ignores an edit older than the one on the card", () => {
+    const pins: PinsState = { status: "loaded", stale: false, items: [pin(1)] }
+    const newer = editPin(pins, edit("second", "2026-10-05T15:00:00Z"))
+    const late = editPin(newer, edit("first", "2026-10-05T14:30:00Z"))
+    expect(late?.items[0]!.message.body).toBe("second")
+  })
+})
 
 const pin = (seq: number, pinnedAt = "2026-10-05T14:00:00Z"): Pin => ({
   pinned_by: OTHER,

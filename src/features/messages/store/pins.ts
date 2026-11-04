@@ -4,7 +4,7 @@
 import type { ChannelEvent } from "@/lib/ws/types"
 
 import type { LocalMessage, Pin, PinsState } from "../types"
-import type { MessageEdit } from "./apply-event"
+import { isOlderEdit, type MessageEdit } from "./apply-event"
 
 export type PinInfo = { message_id: string; pinned_by: string; pinned_at: string }
 
@@ -44,7 +44,7 @@ export function editPin(pins: PinsState | undefined, edit: MessageEdit): PinsSta
   return {
     ...pins,
     items: pins.items.map((item) =>
-      item.message.id === edit.message_id
+      item.message.id === edit.message_id && !isOlderEdit(item.message.edited_at, edit)
         ? {
             ...item,
             message: {

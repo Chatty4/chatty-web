@@ -49,7 +49,11 @@ export type LocalMessage = ApiMessage & {
    * reaction counts already include events up to here, even if they arrive later.
    */
   asOfSeq?: number
+  /** Why a failed message wasn't sent. A retry can't help unless `retryable`. */
+  failure?: SendFailure
 }
+
+export type SendFailure = { message: string; retryable: boolean }
 
 // ── Pins ──────────────────────────────────────────────────────────────────────
 
@@ -80,6 +84,8 @@ export type ChannelState = {
   hasMore: boolean
   /** True while the initial page is being fetched. */
   loading: boolean
+  /** The initial page failed: the list shows an error, and nothing here can be synced. */
+  loadFailed?: boolean
   /** True while an older page is being fetched; blocks further fetches. */
   loadingMore: boolean
   /** The last older page failed. Stops automatic fetches until the user retries. */

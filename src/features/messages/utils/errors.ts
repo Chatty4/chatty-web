@@ -1,4 +1,6 @@
-import { ApiError } from "@/lib/api"
+import { ApiError, isServerUnavailable } from "@/lib/api"
+
+import type { SendFailure } from "../types"
 
 /** User-facing text for PUT / DELETE /messages/{id} errors (api-chat.md). */
 export function describeMessageError(error: unknown): string {
@@ -41,6 +43,14 @@ export function describePinError(error: unknown): string {
     default:
       return describeMessageError(error)
   }
+}
+
+/** Why POST /channels/{id}/messages failed, and whether sending again can work. */
+export function describeSendFailure(error: unknown): SendFailure {
+  if (error instanceof ApiError && !isServerUnavailable(error) && error.status !== 429) {
+    return { message: describeMessageError(error), retryable: false }
+  }
+  return { message: "Not sent", retryable: true }
 }
 
 /** The API error code, or undefined for network and unknown errors. */

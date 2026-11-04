@@ -1,7 +1,8 @@
 // Applies live events by the rules in chatty-infra/docs/events.md#client-rules.
 // Plain code with injected I/O, so the ordering can be tested without a socket or React.
 
-import { ApiError } from "@/lib/api"
+import { ApiError, isServerUnavailable } from "@/lib/api"
+import { retryWithBackoff } from "@/lib/ws/backoff"
 import type { ChannelEvent } from "@/lib/ws/types"
 
 import type { ChannelState, GetEventsResponse } from "../types"
@@ -15,6 +16,8 @@ export type EventSequencerDeps = {
   getEvents: (channelId: string, afterSeq: number) => Promise<GetEventsResponse>
   /** Reloads the channel from history. Must not reject. */
   reload: (channelId: string) => Promise<void>
+  /** Replaces the pause between retries, for tests. */
+  wait?: (ms: number) => Promise<void>
 }
 
 export type EventSequencer = {
@@ -58,20 +61,27 @@ export function createEventSequencer(deps: EventSequencerDeps): EventSequencer {
         })
         return
       }
-      cursor = page.last_seq
+      // Not page.last_seq: that is the channel's newest seq, past what this page returned.
+      const lastInPage = page.events.at(-1)?.seq
+      if (lastInPage === undefined) throw new Error("has_more with an empty page")
+      cursor = lastInPage
     }
   }
 
   async function fillGap(channelId: string, afterSeq: number, userId: string) {
     filling.add(channelId)
     try {
-      await fetchMissing(channelId, afterSeq, userId)
+      await retryWithBackoff(() => fetchMissing(channelId, afterSeq, userId), {
+        shouldRetry: isServerUnavailable,
+        wait: deps.wait,
+      })
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) await deps.reload(channelId)
     }
     filling.delete(channelId)
 
-    // No progress means the fill failed: drop what's held, the next event starts over.
+    // No progress means the fill failed even after retries: drop what's held, the next
+    // event or /sync starts over.
     // Replaying would just fill again in a tight loop.
     const channel = deps.getChannel(channelId)
     if (!channel || channel.lastSeq === afterSeq) {
@@ -85,7 +95,8 @@ export function createEventSequencer(deps: EventSequencerDeps): EventSequencer {
     const userId = deps.getUserId()
     if (!userId) return
     const channel = deps.getChannel(event.channel_id)
-    if (!channel) return // never opened: it loads from history
+    // Never opened, or its history failed: it loads from history, not from events.
+    if (!channel || channel.loadFailed) return
 
     if (channel.loading || filling.has(event.channel_id)) {
       hold(event)

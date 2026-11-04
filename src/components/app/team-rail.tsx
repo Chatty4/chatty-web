@@ -1,17 +1,8 @@
 import { Bell, MessageCircle, Plus } from "lucide-react"
-import { Link, useMatches } from "react-router"
+import { Link } from "react-router"
 
 import { cn } from "@/lib/utils"
-import { useTeams } from "@/features/teams"
-
-function useActiveTeamId(): string | null {
-  const matches = useMatches()
-  for (let i = matches.length - 1; i >= 0; i--) {
-    const id = matches[i].params?.teamId
-    if (id) return id
-  }
-  return null
-}
+import { useActiveTeamId, useTeams } from "@/features/teams"
 
 const tileBase =
   "grid size-[34px] shrink-0 place-items-center rounded-md text-[12px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring"

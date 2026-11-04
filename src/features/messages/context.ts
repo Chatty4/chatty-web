@@ -6,8 +6,11 @@ export type MessagesContextValue = {
   getChannel: (channelId: string) => ChannelState | undefined
   loadChannel: (channelId: string) => void
   loadMoreHistory: (channelId: string) => Promise<void>
-  send: (channelId: string, body: string) => Promise<void>
-  retry: (channelId: string, clientMsgId: string) => Promise<void>
+  /** Never rejects: a failure shows on the message. Resolves with the error code, if any. */
+  send: (channelId: string, body: string) => Promise<string | undefined>
+  retry: (channelId: string, clientMsgId: string) => Promise<string | undefined>
+  /** Removes a message that failed to send. */
+  discard: (channelId: string, clientMsgId: string) => void
   /** PUT /messages/{id}; rejects with ApiError so the editor can stay open on failure. */
   edit: (channelId: string, messageId: string, body: string) => Promise<void>
   /** DELETE /messages/{id}; rejects with ApiError. */
@@ -21,6 +24,9 @@ export type MessagesContextValue = {
   setPinned: (channelId: string, messageId: string, on: boolean) => Promise<void>
   /** Fetches the channel's pins into ChannelState.pins. Ignored while one is running. */
   loadPins: (channelId: string) => Promise<void>
+  /** The unsent text of a channel's composer, kept while another channel is open. */
+  getDraft: (channelId: string) => string
+  setDraft: (channelId: string, text: string) => void
 }
 
 export const MessagesContext = createContext<MessagesContextValue | null>(null)
