@@ -8,9 +8,11 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 
 import { useAuth } from "@/features/auth"
+import { isServerUnavailable } from "@/lib/api"
 import { freshAccessToken } from "@/lib/session"
-import { backoffDelay } from "@/lib/ws/backoff"
+import { backoffDelay, reconnectDelay, retryWithBackoff } from "@/lib/ws/backoff"
 import { WsClient } from "@/lib/ws/client"
+import { createSyncGate } from "@/lib/ws/sync-gate"
 import type { InboundWsMessage, OutboundWsMessage } from "@/lib/ws/types"
 
 import { WsContext } from "./context"
@@ -20,8 +22,8 @@ import type { SyncCursors, SyncResponse, WsStatus } from "./types"
 /** How long before token `exp` to proactively reconnect with a fresh token. */
 const PROACTIVE_MS = 60_000
 
-/** Codes that deserve exponential backoff (server is restarting). */
-const BACKOFF_CODES = new Set([1001, 1011, 1012])
+/** How long a connection must stay open before the backoff starts over. */
+const STABLE_MS = 30_000
 
 function parseTokenExp(token: string): number | null {
   try {
@@ -39,39 +41,47 @@ export function WsProvider({ children }: { children: ReactNode }) {
   const clientRef = useRef<WsClient | null>(null)
   const cursorsRef = useRef<SyncCursors>({})
   const msgHandlers = useRef(new Set<(msg: InboundWsMessage) => void>())
-  const syncHandlersRef = useRef(new Set<(res: SyncResponse) => void>())
+  const syncHandlersRef = useRef(new Set<(res: SyncResponse) => void | Promise<void>>())
 
   useEffect(() => {
     let alive = true
     let reconnectTimer: ReturnType<typeof setTimeout> | undefined
     let proactiveTimer: ReturnType<typeof setTimeout> | undefined
+    let waitingToReconnect = false
     let attempt = 0
     let connectedOnce = false
-    let syncing = false
-    let holdQueue: InboundWsMessage[] = []
+    let openedAt = 0
 
-    function emit(msg: InboundWsMessage) {
-      if (syncing) {
-        holdQueue.push(msg)
-      } else {
-        msgHandlers.current.forEach((h) => h(msg))
-      }
+    const gate = createSyncGate<InboundWsMessage>((msg) => {
+      msgHandlers.current.forEach((h) => h(msg))
+    })
+
+    function doSync() {
+      return gate.run(async () => {
+        const res = await retryWithBackoff(() => syncRequest(cursorsRef.current), {
+          shouldRetry: isServerUnavailable,
+          isCancelled: () => !alive,
+        })
+        if (!alive) return
+        await Promise.all([...syncHandlersRef.current].map((h) => h(res)))
+      })
     }
 
-    async function doSync() {
-      syncing = true
-      holdQueue = []
-      try {
-        const res = await syncRequest(cursorsRef.current)
-        if (!alive) return
-        syncHandlersRef.current.forEach((h) => h(res))
-      } catch {
-        // Sync failure: still flush so live events are not stuck forever
-      } finally {
-        syncing = false
-        const queued = holdQueue.splice(0)
-        queued.forEach((msg) => msgHandlers.current.forEach((h) => h(msg)))
-      }
+    function scheduleReconnect(delay: number) {
+      waitingToReconnect = true
+      reconnectTimer = setTimeout(() => {
+        waitingToReconnect = false
+        void connect()
+      }, delay)
+    }
+
+    // The browser knows the network is back before our backoff timer does.
+    function handleOnline() {
+      if (!waitingToReconnect) return
+      clearTimeout(reconnectTimer)
+      waitingToReconnect = false
+      attempt = 0
+      void connect()
     }
 
     async function connect() {
@@ -81,25 +91,31 @@ export function WsProvider({ children }: { children: ReactNode }) {
       let token: string
       try {
         token = await freshAccessToken()
-      } catch {
-        if (alive) setStatus("disconnected")
+      } catch (error) {
+        if (!alive) return
+        // Offline or server down: keep trying. Otherwise the session has ended.
+        if (isServerUnavailable(error)) {
+          setStatus("reconnecting")
+          scheduleReconnect(backoffDelay(attempt++))
+        } else {
+          setStatus("disconnected")
+        }
         return
       }
       if (!alive) return
 
-      const isReconnect = connectedOnce
-      setStatus(isReconnect ? "reconnecting" : "connecting")
+      setStatus(connectedOnce ? "reconnecting" : "connecting")
 
       const client = new WsClient(token, {
         onOpen() {
-          const wasReconnect = connectedOnce
           connectedOnce = true
-          attempt = 0
+          openedAt = Date.now()
           setStatus("connected")
-          if (wasReconnect) void doSync()
+          // Also on the first open: a channel may have loaded before the socket connected.
+          if (Object.keys(cursorsRef.current).length > 0) void doSync()
         },
 
-        onMessage: emit,
+        onMessage: gate.receive,
 
         onClose(code) {
           clientRef.current = null
@@ -112,9 +128,12 @@ export function WsProvider({ children }: { children: ReactNode }) {
             return
           }
 
-          // All other codes reconnect. Use backoff for server-restart codes.
-          const delay = BACKOFF_CODES.has(code) ? backoffDelay(attempt++) : 0
-          reconnectTimer = setTimeout(() => void connect(), delay)
+          // Only a connection that lasted resets the backoff: a server that accepts
+          // and then closes straight away must not be hammered.
+          if (openedAt && Date.now() - openedAt >= STABLE_MS) attempt = 0
+          openedAt = 0
+          setStatus("reconnecting")
+          scheduleReconnect(reconnectDelay(code, attempt++))
         },
       })
 
@@ -135,10 +154,12 @@ export function WsProvider({ children }: { children: ReactNode }) {
       }
     }
 
+    window.addEventListener("online", handleOnline)
     void connect()
 
     return () => {
       alive = false
+      window.removeEventListener("online", handleOnline)
       clearTimeout(reconnectTimer)
       clearTimeout(proactiveTimer)
       clientRef.current?.close()
@@ -157,10 +178,10 @@ export function WsProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const setCursors = useCallback((cursors: SyncCursors) => {
-    cursorsRef.current = { ...cursorsRef.current, ...cursors }
+    cursorsRef.current = cursors
   }, [])
 
-  const onSync = useCallback((handler: (res: SyncResponse) => void) => {
+  const onSync = useCallback((handler: (res: SyncResponse) => void | Promise<void>) => {
     syncHandlersRef.current.add(handler)
     return () => { syncHandlersRef.current.delete(handler) }
   }, [])

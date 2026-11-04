@@ -13,17 +13,15 @@ export type WsContextValue = {
    */
   subscribe: (handler: (msg: InboundWsMessage) => void) => () => void
   /**
-   * Register cursors (channel_id → last_seen_seq) used in the next POST /sync.
-   * Merge with the existing map — pass an empty object to clear all cursors.
-   * Called by the sync store (CHAT-199) as channels are loaded and updated.
+   * Replace the cursors (channel_id → last_seen_seq) used in the next POST /sync.
+   * Pass every open channel: one left out is no longer synced.
    */
   setCursors: (cursors: SyncCursors) => void
   /**
-   * Subscribe to the POST /sync response after every reconnect. Returns an
-   * unsubscribe function. Called by the sync store (CHAT-199) to apply missed
-   * events and handle gap_too_large / cannot_read_channel.
+   * Subscribe to the POST /sync response after every reconnect. Live events stay
+   * held back until the returned promise settles. Returns an unsubscribe function.
    */
-  onSync: (handler: (response: SyncResponse) => void) => () => void
+  onSync: (handler: (response: SyncResponse) => void | Promise<void>) => () => void
 }
 
 export const WsContext = createContext<WsContextValue | null>(null)
