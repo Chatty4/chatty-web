@@ -7,12 +7,12 @@ React web app for Chatty, the team chat for channels, DMs and live messages.
 - The browser only talks to its own origin: in development the Vite dev server forwards the API paths, in Docker
   Nginx does. No CORS needed.
 
-Stack: Vite, React 19, TypeScript, React Router, Tailwind CSS 4, shadcn/ui (Base UI), ESLint.
+Stack: Vite, React 19, TypeScript, React Router, Tailwind CSS 4, shadcn/ui (Base UI), ESLint, Vitest.
 
 ## Requirements
 
 - Node.js 24 (npm 11)
-- The backends you want to call, from `chatty-infra` (optional: the pages work without them)
+- chatty-core and chatty-chat, from `chatty-infra`. Without them only the login page and `/status` work
 
 ## Setup
 
@@ -27,9 +27,11 @@ cp .env.example .env    # optional: the defaults point at 127.0.0.1:8000 (core) 
 npm run dev
 ```
 
-Open http://localhost:5173. You can register, log in and log out; the screens after login are placeholders
-for now. Logging in needs chatty-core running. `/status` calls each backend's `/health` through the proxy,
-to check that the wiring works.
+Open http://localhost:5173. You can register, log in, create and join teams, use channels and DMs, and send,
+edit and delete messages, with reactions and pins. Logging in needs chatty-core running, and messages need
+chatty-chat. `/status` calls each backend's `/health` through the proxy, to check that the wiring works.
+
+Not built yet: unread badges, typing, presence dots and file uploads.
 
 | Path in the browser | Forwarded to |
 |---|---|
@@ -45,7 +47,12 @@ npm run lint        # ESLint
 npm run typecheck   # TypeScript
 npm run build       # typecheck + production build into dist/
 npm run preview     # serve dist/ locally
+npm test            # Vitest, once
+npm run test:watch  # Vitest, on every change
 ```
+
+Tests sit next to the code as `*.test.ts`. They cover the logic without a browser: the message store,
+reconnect helpers, permissions and other pure functions.
 
 ## Docker
 
@@ -73,6 +80,22 @@ refresh); see `chatty-infra/docs/api-core.md`, Authorization. `src/lib/session.t
 - A rejected refresh token (`401`) or a deactivated user (`403`) ends the session everywhere. When
   chatty-core can't be reached, the session is kept and the app offers to try again.
 
+## Live updates
+
+The app shell opens one WebSocket per tab (`src/features/ws/ws-provider.tsx`), with the access token in the URL:
+
+- A heartbeat goes out every 20 s, and when the tab is shown or hidden.
+- A closed socket reconnects with backoff, and a new one opens about a minute before the token expires. Close
+  code `4003` (deactivated user) logs out.
+- After every open, `POST /sync` fetches what was missed. Live messages wait until it answers
+  (`src/lib/ws/sync-gate.ts`).
+
+The message store (`src/features/messages/`) keeps one state per loaded channel and applies events by `seq`, as
+`chatty-infra/docs/events.md` says: it drops duplicates, applies the next event and fills gaps. Writes always go
+through REST. A message shows as pending at once, then as sent or failed; a retry reuses its `client_msg_id`.
+
+More: the `chatty-docs` repo, `services/web/index.md` and `architecture/flows/from-login-to-logout.md`.
+
 ## Project layout
 
 Each feature keeps its API calls, state and components together; pages only put features together.
@@ -82,30 +105,36 @@ src/
   main.tsx              entry point: theme, AuthProvider, RouterProvider
   app/
     routes.tsx          all routes
-    layouts/            AuthLayout, AppLayout (the shell), RequireAuth, GuestOnly
+    layouts/            AuthLayout, AppLayout (the shell and its providers), RequireAuth, GuestOnly
     pages/              one thin component per screen
   components/
     ui/                 generic components (Button, Input, FormField, ...; shadcn ones too)
     app/                the app shell: team rail, sidebar, header, user menu, ...
-  features/<name>/      one folder per feature (auth for now)
+  features/<name>/      auth, channels, invites, messages, profile, teams, ws
     fetchers/           API calls
     hooks/              state and logic
+    store/              messages only: the pure state changes, tested without a browser
     ui/                 the feature's components
     utils/              pure helpers (validation, error messages, ...)
     types.ts            the feature's types (from the contracts)
     index.ts            what other code may import
-  hooks/                shared hooks (useTheme)
+  hooks/                shared hooks (useTheme, useConfirm)
   lib/
     api.ts              API client: Authorization header, refresh on 401, contract error body -> ApiError
+    api-error.ts        ApiError and how a response becomes one
+    config.ts           API base paths
     session.ts          the tokens: storage, refresh, other tabs
     theme.ts            light and dark theme
+    toast.ts            toast messages
     utils.ts            cn() helper
+    ws/                 one WebSocket connection, reconnect delays, the sync gate, message types
 nginx/                  Nginx config for the Docker image
 ```
 
-Other code imports a feature only through its `index.ts`.
+Other code should import a feature through its `index.ts`. A few imports still reach inside a feature, and
+`invites` has no `index.ts` yet.
 
 ## Contributing
 
-One Jira ticket per branch and PR (`CHAT-<n>/<short-name>`), and `npm run lint`, `npm run typecheck` and
-`npm run build` must pass before you push.
+One Jira ticket per branch and PR (`CHAT-<n>/<short-name>`), and `npm run lint`, `npm run typecheck`,
+`npm run build` and `npm test` must pass before you push.
