@@ -9,7 +9,7 @@ import { useTabVisible } from "@/hooks/use-tab-visible"
 import { cn } from "@/lib/utils"
 
 import { useMessages } from "../context"
-import { useChannelMembers } from "../hooks/use-channel-members"
+import { useTeamMembers } from "../hooks/use-team-members"
 import { useMemberNames } from "../hooks/use-member-names"
 import { useScrollAnchor } from "../hooks/use-scroll-anchor"
 import { useWhenVisible } from "../hooks/use-when-visible"
@@ -97,8 +97,8 @@ export function MessageList({
   )
   const memberNames = useMemberNames(teamId, userIds)
 
-  // ── Channel members (for @mention autocomplete) ──────────────────────────────
-  const mentionCandidates = useChannelMembers(channelId, teamId)
+  // ── Team members (for @mention autocomplete) ─────────────────────────────────
+  const mentionCandidates = useTeamMembers(teamId)
 
   const names = useMemo(() => {
     const merged: Record<string, string> = {}

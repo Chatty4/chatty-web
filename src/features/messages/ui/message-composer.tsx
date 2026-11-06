@@ -15,7 +15,7 @@ import {
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type MessageComposerProps = {
-  /** Channel members used for @mention autocomplete. */
+  /** Team members used for @mention autocomplete. */
   members: MentionCandidate[]
   /** When true the textarea is disabled and shows an archived notice. */
   archived?: boolean
