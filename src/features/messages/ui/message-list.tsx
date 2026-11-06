@@ -3,6 +3,7 @@ import { ArrowDown } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/features/auth"
+import { usePresence } from "@/features/presence"
 import { useUnread } from "@/features/unread"
 import { useTabVisible } from "@/hooks/use-tab-visible"
 import { cn } from "@/lib/utils"
@@ -182,6 +183,7 @@ export function MessageList({
   // ── Read state ───────────────────────────────────────────────────────────────
   // Read up to the newest message while I can see it. Only members have a read position.
   const { getCounts, markRead } = useUnread()
+  const { isOnline } = usePresence()
   const tabVisible = useTabVisible()
   const isMember = channel !== null
   const lastSeq = channelState?.lastSeq ?? 0
@@ -309,6 +311,7 @@ export function MessageList({
             <MessageItem
               message={message}
               authorName={names[message.author_id] ?? "Unknown member"}
+              authorOnline={isOnline(message.author_id)}
               names={names}
               grouped={isGrouped(index)}
               own={own}

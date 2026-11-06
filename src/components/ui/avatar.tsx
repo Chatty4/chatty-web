@@ -10,8 +10,17 @@ export function initials(name: string): string {
   return letters.slice(0, 2).join("").toUpperCase() || "?"
 }
 
-export function Avatar({ name, className }: { name: string; className?: string }) {
-  return (
+export function Avatar({
+  name,
+  className,
+  online = false,
+}: {
+  name: string
+  className?: string
+  /** Shows the green presence dot. The caller says "online" in text for screen readers. */
+  online?: boolean
+}) {
+  const avatar = (
     <span
       aria-hidden="true"
       className={cn(
@@ -20,6 +29,16 @@ export function Avatar({ name, className }: { name: string; className?: string }
       )}
     >
       {initials(name)}
+    </span>
+  )
+  if (!online) return avatar
+  return (
+    <span className="relative inline-flex shrink-0">
+      {avatar}
+      <span
+        aria-hidden="true"
+        className="absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full border-2 border-surface bg-online"
+      />
     </span>
   )
 }
