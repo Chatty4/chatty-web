@@ -22,7 +22,12 @@ import { useReactionToggle } from "../hooks/use-reaction-toggle"
 import type { LocalMessage } from "../types"
 import { describeMessageError, messageErrorCode } from "../utils/errors"
 import { MARKDOWN_BLOCK_CLASS } from "../utils/markdown"
-import { decodeMentions, encodeMentions, extractMentionIds } from "../utils/mentions"
+import {
+  decodeMentions,
+  encodeMentions,
+  extractMentionIds,
+  type MentionCandidate,
+} from "../utils/mentions"
 import { MessageEditor } from "./message-editor"
 import { MessageMarkdown } from "./message-markdown"
 import { PinnedMark } from "./pinned-mark"
@@ -54,6 +59,8 @@ export type MessageItemProps = {
   mentionsMe: boolean
   /** userId → display name, used to show and edit `<@id>` mentions. */
   names: Record<string, string>
+  /** Who an edit can newly mention: the channel's members, not me. */
+  mentionable: MentionCandidate[]
   /** Whether this message immediately follows one from the same author. */
   grouped: boolean
   /** True when the message was written by the current user (shown on the right). */
@@ -90,6 +97,7 @@ export const MessageItem = memo(function MessageItem({
   authorOnline,
   mentionsMe,
   names,
+  mentionable,
   grouped,
   own,
   canEdit,
@@ -125,12 +133,11 @@ export const MessageItem = memo(function MessageItem({
 
   // Only called while editing, so rows that are just being shown don't build these lists.
   const encode = (text: string) => {
-    const candidates = Object.entries(names).map(([id, display_name]) => ({ id, display_name }))
-    // Keeps the people already mentioned when two share a name.
+    // Keeps the people already mentioned (also when two share a name, or one left the channel).
     const existingMentions = extractMentionIds(message.body).flatMap((id) =>
       names[id] ? [{ id, display_name: names[id] }] : [],
     )
-    return encodeMentions(text, candidates, existingMentions)
+    return encodeMentions(text, [...mentionable, ...existingMentions], existingMentions)
   }
 
   // Errors that end the edit close the editor with a toast; the rest reject so the
