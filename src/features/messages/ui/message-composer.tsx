@@ -22,8 +22,8 @@ export type MessageComposerProps = {
   /** The text to start with, such as what was left here before switching channel. */
   initialDraft?: string
   onDraftChange?: (text: string) => void
-  /** Called on every change that leaves text in the box. */
-  onTyping?: () => void
+  /** Called on every change, with whether any text is left in the box. */
+  onTextChange?: (hasText: boolean) => void
   /** Called when the user submits a message. */
   onSend: (body: string) => Promise<void>
 }
@@ -35,7 +35,7 @@ export function MessageComposer({
   archived = false,
   initialDraft = "",
   onDraftChange,
-  onTyping,
+  onTextChange,
   onSend,
 }: MessageComposerProps) {
   const [value, setStoredValue] = useState(initialDraft)
@@ -50,7 +50,7 @@ export function MessageComposer({
   const setValue = (next: string) => {
     setStoredValue(next)
     onDraftChange?.(next)
-    if (next.trim()) onTyping?.()
+    onTextChange?.(next.trim() !== "")
   }
 
   const found = findMentionQuery(value, caret)

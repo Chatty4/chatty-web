@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest"
 
 import {
   addTyping,
-  canSendTyping,
   nextHideAt,
   removeExpired,
   removeTyping,
   TYPING_HIDE_MS,
   TYPING_SEND_EVERY_MS,
+  typingDelay,
   typingIn,
   typingLabel,
   type TypingState,
@@ -82,14 +82,19 @@ describe("nextHideAt", () => {
   })
 })
 
-describe("canSendTyping", () => {
+describe("typingDelay", () => {
   it("sends the first one straight away", () => {
-    expect(canSendTyping(undefined, 0)).toBe(true)
+    expect(typingDelay(undefined, 0)).toBe(0)
   })
 
-  it("waits until the time has passed", () => {
-    expect(canSendTyping(1000, 1000 + TYPING_SEND_EVERY_MS - 1)).toBe(false)
-    expect(canSendTyping(1000, 1000 + TYPING_SEND_EVERY_MS)).toBe(true)
+  it("is the time left until the limit has passed", () => {
+    expect(typingDelay(1000, 1000)).toBe(TYPING_SEND_EVERY_MS)
+    expect(typingDelay(1000, 1000 + TYPING_SEND_EVERY_MS - 1)).toBe(1)
+  })
+
+  it("is 0 once the limit has passed", () => {
+    expect(typingDelay(1000, 1000 + TYPING_SEND_EVERY_MS)).toBe(0)
+    expect(typingDelay(1000, 1000 + TYPING_SEND_EVERY_MS + 500)).toBe(0)
   })
 
   it("never sends faster than the server's 3 s, and keeps a typing user shown", () => {

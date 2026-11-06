@@ -54,9 +54,10 @@ export function typingIn(state: TypingState, channelId: string): string[] {
   return Object.keys(state[channelId] ?? {})
 }
 
-/** True when enough time has passed since the last `typing` sent to this channel. */
-export function canSendTyping(lastSentAt: number | undefined, now: number): boolean {
-  return lastSentAt === undefined || now - lastSentAt >= TYPING_SEND_EVERY_MS
+/** How long until the next `typing` can go to this channel (ms). 0 means now. */
+export function typingDelay(lastSentAt: number | undefined, now: number): number {
+  if (lastSentAt === undefined) return 0
+  return Math.max(0, lastSentAt + TYPING_SEND_EVERY_MS - now)
 }
 
 /** What the indicator says: the names, shown in bold, and the words after them. */

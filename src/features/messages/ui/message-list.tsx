@@ -389,7 +389,7 @@ export function MessageList({
         initialDraft={getDraft(channelId)}
         onDraftChange={(text) => setDraft(channelId, text)}
         // Only who can write here: someone just watching a public channel sends nothing.
-        onTyping={isMember && !archived ? sendTyping : undefined}
+        onTextChange={isMember && !archived ? sendTyping : undefined}
         onSend={async (body) => {
           if ((await send(channelId, body)) === "channel_archived") onChannelArchived()
         }}
