@@ -362,8 +362,6 @@ export function MessageList({
       </Button>
       </div>
 
-      {!archived && <TypingIndicator channelId={channelId} teamId={teamId} names={names} />}
-
       {/* Composer */}
       {/* Keyed so a draft can never be sent to the channel opened after it. */}
       <MessageComposer
@@ -378,6 +376,7 @@ export function MessageList({
           if ((await send(channelId, body)) === "channel_archived") onChannelArchived()
         }}
       />
+      <TypingIndicator channelId={channelId} teamId={teamId} names={names} />
     </div>
   )
 }

@@ -13,7 +13,7 @@ export type TypingIndicatorProps = {
   names: Record<string, string>
 }
 
-/** The line above the composer. Keeps its height when empty, so the list doesn't jump. */
+/** The line under the composer. Keeps its height when empty, so the composer doesn't jump. */
 export function TypingIndicator({ channelId, teamId, names }: TypingIndicatorProps) {
   const { typingIn } = useTyping()
   const userIds = useMemo(() => typingIn(channelId), [typingIn, channelId])
@@ -22,7 +22,7 @@ export function TypingIndicator({ channelId, teamId, names }: TypingIndicatorPro
   const label = typingLabel(userIds.map((id) => names[id] ?? fetchedNames[id]))
 
   return (
-    <div role="status" className="flex h-5 items-center gap-1.5 px-5 text-xs text-muted-foreground">
+    <div role="status" className="flex h-6 items-center gap-1.5 px-5 pb-1 text-xs text-muted-foreground">
       {label && (
         <>
           <TypingDots />

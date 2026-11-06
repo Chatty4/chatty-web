@@ -144,7 +144,7 @@ export function MessageComposer({
   const nearLimit = charCount > 3600
 
   return (
-    <div className="relative px-4 pb-4 pt-2">
+    <div className="relative px-4 pb-1 pt-2">
       {/* @mention suggestion list */}
       {suggestions.length > 0 && (
         <div
