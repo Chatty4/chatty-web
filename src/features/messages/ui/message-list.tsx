@@ -4,6 +4,7 @@ import { ArrowDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/features/auth"
 import { usePresence } from "@/features/presence"
+import { TypingIndicator, useSendTyping } from "@/features/typing"
 import { useUnread } from "@/features/unread"
 import { useTabVisible } from "@/hooks/use-tab-visible"
 import { cn } from "@/lib/utils"
@@ -189,6 +190,7 @@ export function MessageList({
   // Read up to the newest message while I can see it. Only members have a read position.
   const { getCounts, markRead } = useUnread()
   const { isOnline } = usePresence()
+  const sendTyping = useSendTyping(channelId)
   const tabVisible = useTabVisible()
   const isMember = channel !== null
   const lastSeq = channelState?.lastSeq ?? 0
@@ -360,6 +362,8 @@ export function MessageList({
       </Button>
       </div>
 
+      {!archived && <TypingIndicator channelId={channelId} teamId={teamId} names={names} />}
+
       {/* Composer */}
       {/* Keyed so a draft can never be sent to the channel opened after it. */}
       <MessageComposer
@@ -368,6 +372,8 @@ export function MessageList({
         archived={archived}
         initialDraft={getDraft(channelId)}
         onDraftChange={(text) => setDraft(channelId, text)}
+        // Only who can write here: someone just watching a public channel sends nothing.
+        onTyping={isMember && !archived ? sendTyping : undefined}
         onSend={async (body) => {
           if ((await send(channelId, body)) === "channel_archived") onChannelArchived()
         }}
