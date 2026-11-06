@@ -152,6 +152,16 @@ export function MessageList({
     setScrollState(resetScroll)
   }
 
+  // The typing row goes under the last message: follow it only if I was already at the bottom.
+  const atBottomRef = useRef(atBottom)
+  useEffect(() => {
+    atBottomRef.current = atBottom
+  }, [atBottom])
+  const keepTypingInView = useCallback(() => {
+    const el = listRef.current
+    if (el && atBottomRef.current) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })
+  }, [])
+
   // On channel switch: jump to bottom immediately.
   useEffect(() => {
     prevLengthRef.current = messages.length
@@ -339,6 +349,14 @@ export function MessageList({
             </Fragment>
             )
           })}
+          {!loading && !loadFailed && (
+            <TypingIndicator
+              channelId={channelId}
+              teamId={teamId}
+              names={names}
+              onShown={keepTypingInView}
+            />
+          )}
         </div>
       </div>
 
@@ -376,7 +394,6 @@ export function MessageList({
           if ((await send(channelId, body)) === "channel_archived") onChannelArchived()
         }}
       />
-      <TypingIndicator channelId={channelId} teamId={teamId} names={names} />
     </div>
   )
 }
