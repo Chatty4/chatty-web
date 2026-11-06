@@ -3,6 +3,8 @@ import { ArrowDown } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/features/auth"
+import { useUnread } from "@/features/unread"
+import { useTabVisible } from "@/hooks/use-tab-visible"
 import { cn } from "@/lib/utils"
 
 import { useMessages } from "../context"
@@ -176,6 +178,19 @@ export function MessageList({
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastKey])
+
+  // ── Read state ───────────────────────────────────────────────────────────────
+  // Read up to the newest message while I can see it. Only members have a read position.
+  const { getCounts, markRead } = useUnread()
+  const tabVisible = useTabVisible()
+  const isMember = channel !== null
+  const lastSeq = channelState?.lastSeq ?? 0
+  // Also runs when the counts arrive or grow, so a channel opened before GET /unread answered
+  // is still marked.
+  const { unread } = getCounts(channelId)
+  useEffect(() => {
+    if (isMember && atBottom && tabVisible && !loading) markRead(channelId, lastSeq)
+  }, [isMember, atBottom, tabVisible, loading, channelId, lastSeq, unread, markRead])
 
   const handleScroll = () => {
     const el = listRef.current
