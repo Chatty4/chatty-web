@@ -4,6 +4,7 @@ import { useMemberNames } from "@/features/messages/hooks/use-member-names"
 
 import { useTyping } from "../hooks/typing-context"
 import { typingLabel } from "../store/typing"
+import { TypingDots } from "./typing-dots"
 
 export type TypingIndicatorProps = {
   channelId: string
@@ -21,18 +22,21 @@ export function TypingIndicator({ channelId, teamId, names }: TypingIndicatorPro
   const label = typingLabel(userIds.map((id) => names[id] ?? fetchedNames[id]))
 
   return (
-    <p role="status" className="h-5 truncate px-4 pt-1 text-xs text-muted-foreground">
+    <div role="status" className="flex h-5 items-center gap-1.5 px-5 text-xs text-muted-foreground">
       {label && (
         <>
-          {label.names.map((name, index) => (
-            <Fragment key={name}>
-              {index > 0 && " and "}
-              <span className="font-semibold text-foreground">{name}</span>
-            </Fragment>
-          ))}{" "}
-          {label.text}
+          <TypingDots />
+          <span className="truncate">
+            {label.names.map((name, index) => (
+              <Fragment key={name}>
+                {index > 0 && " and "}
+                <span className="font-semibold text-foreground">{name}</span>
+              </Fragment>
+            ))}{" "}
+            {label.text}
+          </span>
         </>
       )}
-    </p>
+    </div>
   )
 }
