@@ -4,6 +4,7 @@ import type { ChannelEvent } from "@/lib/ws/types"
 
 import {
   countNewMessage,
+  formatCount,
   replaceCounts,
   selectCounts,
   setChannelCounts,
@@ -54,6 +55,13 @@ describe("setChannelCounts", () => {
   it("keeps the same object when nothing changed", () => {
     const state = loaded(2)
     expect(setChannelCounts(state, { channel_id: "a", unread: 2, mentions: 0 })).toBe(state)
+  })
+})
+
+describe("formatCount", () => {
+  it("shows 99+ from the cap on", () => {
+    expect(formatCount(99)).toBe("99")
+    expect(formatCount(UNREAD_CAP)).toBe("99+")
   })
 })
 
