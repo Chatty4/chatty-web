@@ -59,13 +59,16 @@ export function canSendTyping(lastSentAt: number | undefined, now: number): bool
   return lastSentAt === undefined || now - lastSentAt >= TYPING_SEND_EVERY_MS
 }
 
-/** The line above the composer. A name that hasn't loaded yet is undefined. */
-export function typingLabel(names: (string | undefined)[]): string {
-  if (names.length === 0) return ""
-  if (names.length > 2) return "Several people are typing…"
-  const [first, second] = names
-  if (names.some((name) => name === undefined)) return "Someone is typing…"
-  return names.length === 1 ? `${first} is typing…` : `${first} and ${second} are typing…`
+/** What the indicator says: the names, shown in bold, and the words after them. */
+export type TypingLabel = { names: string[]; text: string }
+
+/** Null when nobody is typing. A name that hasn't loaded yet is undefined. */
+export function typingLabel(names: (string | undefined)[]): TypingLabel | null {
+  if (names.length === 0) return null
+  if (names.length > 2) return { names: ["Several people"], text: "are typing…" }
+  const known = names.filter((name) => name !== undefined)
+  if (known.length < names.length) return { names: ["Someone"], text: "is typing…" }
+  return { names: known, text: known.length === 1 ? "is typing…" : "are typing…" }
 }
 
 function without<T>(record: Readonly<Record<string, T>>, key: string): Record<string, T> {

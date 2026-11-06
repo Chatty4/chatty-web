@@ -99,22 +99,24 @@ describe("canSendTyping", () => {
 })
 
 describe("typingLabel", () => {
-  it("is empty when nobody is typing", () => {
-    expect(typingLabel([])).toBe("")
+  it("is null when nobody is typing", () => {
+    expect(typingLabel([])).toBeNull()
   })
 
   it("names one or two people", () => {
-    expect(typingLabel(["Ana"])).toBe("Ana is typing…")
-    expect(typingLabel(["Ana", "Bob"])).toBe("Ana and Bob are typing…")
+    expect(typingLabel(["Ana"])).toEqual({ names: ["Ana"], text: "is typing…" })
+    expect(typingLabel(["Ana", "Bob"])).toEqual({ names: ["Ana", "Bob"], text: "are typing…" })
   })
 
   it("doesn't name three or more", () => {
-    expect(typingLabel(["Ana", "Bob", "Cleo"])).toBe("Several people are typing…")
-    expect(typingLabel(["Ana", undefined, "Cleo"])).toBe("Several people are typing…")
+    const several = { names: ["Several people"], text: "are typing…" }
+    expect(typingLabel(["Ana", "Bob", "Cleo"])).toEqual(several)
+    expect(typingLabel(["Ana", undefined, "Cleo"])).toEqual(several)
   })
 
   it("says someone until the names load", () => {
-    expect(typingLabel([undefined])).toBe("Someone is typing…")
-    expect(typingLabel(["Ana", undefined])).toBe("Someone is typing…")
+    const someone = { names: ["Someone"], text: "is typing…" }
+    expect(typingLabel([undefined])).toEqual(someone)
+    expect(typingLabel(["Ana", undefined])).toEqual(someone)
   })
 })
