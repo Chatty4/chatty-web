@@ -7,6 +7,7 @@ import { TeamRail } from "@/components/app/team-rail"
 import { ChannelsProvider } from "@/features/channels"
 import { MessagesProvider } from "@/features/messages"
 import { TeamsProvider } from "@/features/teams"
+import { UnreadProvider } from "@/features/unread"
 import { WsProvider } from "@/features/ws"
 
 /** Routes inside the app set `handle: { title }` for the header. */
@@ -43,6 +44,7 @@ export function AppLayout() {
       <MessagesProvider>
       <TeamsProvider>
         <ChannelsProvider>
+        <UnreadProvider>
           <div className="flex h-full bg-surface">
             <TeamRail />
             <Sidebar open={drawerOpen} onClose={closeDrawer} />
@@ -65,6 +67,7 @@ export function AppLayout() {
               )}
             </main>
           </div>
+        </UnreadProvider>
         </ChannelsProvider>
       </TeamsProvider>
       </MessagesProvider>
