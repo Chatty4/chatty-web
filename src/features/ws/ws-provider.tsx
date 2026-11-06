@@ -34,6 +34,7 @@ export function WsProvider({ children }: { children: ReactNode }) {
   const cursorsRef = useRef<SyncCursors>({})
   const msgHandlers = useRef(new Set<(msg: InboundWsMessage) => void>())
   const syncHandlersRef = useRef(new Set<(res: SyncResponse) => void | Promise<void>>())
+  const reconnectHandlersRef = useRef(new Set<() => void>())
 
   useEffect(() => {
     let alive = true
@@ -104,11 +105,19 @@ export function WsProvider({ children }: { children: ReactNode }) {
 
       const client = new WsClient(token, {
         onOpen() {
+          const reconnected = connectedOnce
           connectedOnce = true
           openedAt = Date.now()
           setStatus("connected")
           // Also on the first open: a channel may have loaded before the socket connected.
-          if (Object.keys(cursorsRef.current).length > 0) void doSync()
+          const synced =
+            Object.keys(cursorsRef.current).length > 0 ? doSync() : Promise.resolve()
+          // After the held-back messages are out, so a fresh GET /unread doesn't count them twice.
+          if (reconnected) {
+            void synced.then(() => {
+              if (alive) reconnectHandlersRef.current.forEach((h) => h())
+            })
+          }
         },
 
         onMessage: gate.receive,
@@ -185,8 +194,13 @@ export function WsProvider({ children }: { children: ReactNode }) {
     return () => { syncHandlersRef.current.delete(handler) }
   }, [])
 
+  const onReconnect = useCallback((handler: () => void) => {
+    reconnectHandlersRef.current.add(handler)
+    return () => { reconnectHandlersRef.current.delete(handler) }
+  }, [])
+
   return (
-    <WsContext.Provider value={{ status, send, subscribe, setCursors, onSync }}>
+    <WsContext.Provider value={{ status, send, subscribe, setCursors, onSync, onReconnect }}>
       {children}
     </WsContext.Provider>
   )

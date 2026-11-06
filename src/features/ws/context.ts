@@ -22,6 +22,11 @@ export type WsContextValue = {
    * held back until the returned promise settles. Returns an unsubscribe function.
    */
   onSync: (handler: (response: SyncResponse) => void | Promise<void>) => () => void
+  /**
+   * Runs after every reconnect (not the first connect), once POST /sync is applied and
+   * held-back messages are released. Returns an unsubscribe function.
+   */
+  onReconnect: (handler: () => void) => () => void
 }
 
 export const WsContext = createContext<WsContextValue | null>(null)
