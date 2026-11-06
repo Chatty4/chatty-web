@@ -6,6 +6,7 @@ import { Sidebar } from "@/components/app/sidebar"
 import { TeamRail } from "@/components/app/team-rail"
 import { ChannelsProvider } from "@/features/channels"
 import { MessagesProvider } from "@/features/messages"
+import { PresenceProvider } from "@/features/presence"
 import { TeamsProvider } from "@/features/teams"
 import { UnreadProvider } from "@/features/unread"
 import { WsProvider } from "@/features/ws"
@@ -45,6 +46,7 @@ export function AppLayout() {
       <TeamsProvider>
         <ChannelsProvider>
         <UnreadProvider>
+        <PresenceProvider>
           <div className="flex h-full bg-surface">
             <TeamRail />
             <Sidebar open={drawerOpen} onClose={closeDrawer} />
@@ -67,6 +69,7 @@ export function AppLayout() {
               )}
             </main>
           </div>
+        </PresenceProvider>
         </UnreadProvider>
         </ChannelsProvider>
       </TeamsProvider>

@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button"
 import { initials } from "@/components/ui/avatar"
 import { dmDisplayName, useChannels } from "@/features/channels"
 import { useAuth } from "@/features/auth"
+import { usePresence } from "@/features/presence"
 import { useActiveTeamId, useTeams } from "@/features/teams"
+import { UnreadBadge, useUnread } from "@/features/unread"
 import { cn } from "@/lib/utils"
 
 import { UserMenu } from "./user-menu"
@@ -35,8 +37,14 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   const { channels, dms, memberNames, failed, reload } = useChannels()
   const { user } = useAuth()
   const { teams, loading: teamsLoading, failed: teamsFailed } = useTeams()
+  const { getCounts } = useUnread()
+  const { isOnline } = usePresence()
   const navigate = useNavigate()
   const myUserId = user?.id ?? ""
+
+  // The open channel is being read, so it shows no badge.
+  const countsOf = (channelId: string, isActive: boolean) =>
+    isActive ? { unread: 0, mentions: 0 } : getCounts(channelId)
 
   const activeTeam = teams.find((t) => t.id === teamId)
 
@@ -156,6 +164,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           {channels.map((ch) => {
             const isActive = ch.id === activeChannelId
             const Icon = ch.kind === "private" ? Lock : Hash
+            const counts = countsOf(ch.id, isActive)
             return (
               <Link
                 key={ch.id}
@@ -166,6 +175,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                   isActive
                     ? "bg-accent font-medium text-accent-foreground"
                     : "text-muted-foreground hover:bg-surface-hover hover:text-foreground",
+                  counts.unread > 0 && "font-semibold text-foreground",
                   ch.archived && "opacity-50",
                 )}
                 aria-current={isActive ? "page" : undefined}
@@ -175,6 +185,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                 {ch.archived && (
                   <span className="ml-auto shrink-0 text-[10px] text-faint-foreground">archived</span>
                 )}
+                <UnreadBadge {...counts} />
               </Link>
             )
           })}
@@ -205,6 +216,9 @@ export function Sidebar({ open, onClose }: SidebarProps) {
             const isActive = dm.id === activeChannelId
             const label = dmDisplayName(dm.dm_member_ids ?? [], myUserId, memberNames)
             const abbr = initials(label).slice(0, 2)
+            const counts = countsOf(dm.id, isActive)
+            // A group DM shows the dot while anyone else in it is online.
+            const online = (dm.dm_member_ids ?? []).some((id) => id !== myUserId && isOnline(id))
             return (
               <Link
                 key={dm.id}
@@ -215,14 +229,22 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                   isActive
                     ? "bg-accent font-medium text-accent-foreground"
                     : "text-muted-foreground hover:bg-surface-hover hover:text-foreground",
+                  counts.unread > 0 && "font-semibold text-foreground",
                 )}
                 aria-current={isActive ? "page" : undefined}
               >
                 {/* Mini avatar */}
-                <span className="grid size-[22px] flex-none place-items-center rounded-full bg-surface-hover text-[9px] font-semibold text-muted-foreground">
-                  {abbr}
+                <span className="relative flex-none">
+                  <span className="grid size-[22px] place-items-center rounded-full bg-surface-hover text-[9px] font-semibold text-muted-foreground">
+                    {abbr}
+                  </span>
+                  {online && (
+                    <span className="absolute -right-0.5 bottom-0 size-[7px] rounded-full border border-background bg-online" />
+                  )}
                 </span>
                 <span className="min-w-0 flex-1 truncate">{label}</span>
+                {online && <span className="sr-only">, online</span>}
+                <UnreadBadge {...counts} />
               </Link>
             )
           })}

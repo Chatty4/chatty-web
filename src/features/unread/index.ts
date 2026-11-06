@@ -1,5 +1,6 @@
 export { UnreadProvider } from "./ui/unread-provider"
 export { useUnread } from "./hooks/unread-context"
-export { UNREAD_CAP } from "./store/unread"
+export { formatCount, UNREAD_CAP } from "./store/unread"
+export { UnreadBadge } from "./ui/unread-badge"
 export type { ChannelUnread, UnreadCounts } from "./types"
 export type { UnreadContextValue } from "./hooks/unread-context"

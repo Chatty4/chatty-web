@@ -79,6 +79,11 @@ export function countNewMessage(
   }
 }
 
+/** A badge's text: the server stops at the cap, so the cap means "99+". */
+export function formatCount(count: number): string {
+  return count >= UNREAD_CAP ? `${UNREAD_CAP - 1}+` : String(count)
+}
+
 /** The counts of one channel; a channel not loaded yet has none. */
 export function selectCounts(state: UnreadState, channelId: string): UnreadCounts {
   const entry = state[channelId]

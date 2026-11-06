@@ -48,6 +48,8 @@ function formatTime(iso: string): string {
 export type MessageItemProps = {
   message: LocalMessage
   authorName: string
+  /** The author has an open WebSocket: a green dot on the avatar. */
+  authorOnline: boolean
   /** userId → display name, used to show and edit `<@id>` mentions. */
   names: Record<string, string>
   /** Whether this message immediately follows one from the same author. */
@@ -83,6 +85,7 @@ export type MessageItemProps = {
 export const MessageItem = memo(function MessageItem({
   message,
   authorName,
+  authorOnline,
   names,
   grouped,
   own,
@@ -353,13 +356,18 @@ export const MessageItem = memo(function MessageItem({
     >
       {confirmProps.open && <ConfirmDialog {...confirmProps} />}
       {/* Avatar column */}
-      <div className="w-8 shrink-0">{!grouped && <Avatar name={authorName} />}</div>
+      <div className="w-8 shrink-0">
+        {!grouped && <Avatar name={authorName} online={authorOnline} />}
+      </div>
 
       {/* Content */}
       <div className="min-w-0 flex-1">
         {!grouped && (
           <div className="mb-0.5 flex items-baseline gap-2">
-            <strong className="text-sm font-semibold leading-snug">{authorName}</strong>
+            <strong className="text-sm font-semibold leading-snug">
+              {authorName}
+              {authorOnline && <span className="sr-only">, online</span>}
+            </strong>
             {time}
             {isPinned && <PinnedMark />}
           </div>
