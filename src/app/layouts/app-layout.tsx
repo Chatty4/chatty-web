@@ -8,6 +8,7 @@ import { ChannelsProvider } from "@/features/channels"
 import { MessagesProvider } from "@/features/messages"
 import { PresenceProvider } from "@/features/presence"
 import { TeamsProvider } from "@/features/teams"
+import { TypingProvider } from "@/features/typing"
 import { UnreadProvider } from "@/features/unread"
 import { WsProvider } from "@/features/ws"
 
@@ -47,6 +48,7 @@ export function AppLayout() {
         <ChannelsProvider>
         <UnreadProvider>
         <PresenceProvider>
+        <TypingProvider>
           <div className="flex h-full bg-surface">
             <TeamRail />
             <Sidebar open={drawerOpen} onClose={closeDrawer} />
@@ -69,6 +71,7 @@ export function AppLayout() {
               )}
             </main>
           </div>
+        </TypingProvider>
         </PresenceProvider>
         </UnreadProvider>
         </ChannelsProvider>

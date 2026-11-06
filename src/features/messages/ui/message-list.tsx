@@ -4,6 +4,7 @@ import { ArrowDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/features/auth"
 import { usePresence } from "@/features/presence"
+import { TypingIndicator, useSendTyping } from "@/features/typing"
 import { useUnread } from "@/features/unread"
 import { useTabVisible } from "@/hooks/use-tab-visible"
 import { cn } from "@/lib/utils"
@@ -151,6 +152,16 @@ export function MessageList({
     setScrollState(resetScroll)
   }
 
+  // The typing row goes under the last message: follow it only if I was already at the bottom.
+  const atBottomRef = useRef(atBottom)
+  useEffect(() => {
+    atBottomRef.current = atBottom
+  }, [atBottom])
+  const keepTypingInView = useCallback(() => {
+    const el = listRef.current
+    if (el && atBottomRef.current) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })
+  }, [])
+
   // On channel switch: jump to bottom immediately.
   useEffect(() => {
     prevLengthRef.current = messages.length
@@ -189,6 +200,7 @@ export function MessageList({
   // Read up to the newest message while I can see it. Only members have a read position.
   const { getCounts, markRead } = useUnread()
   const { isOnline } = usePresence()
+  const sendTyping = useSendTyping(channelId)
   const tabVisible = useTabVisible()
   const isMember = channel !== null
   const lastSeq = channelState?.lastSeq ?? 0
@@ -337,6 +349,14 @@ export function MessageList({
             </Fragment>
             )
           })}
+          {!loading && !loadFailed && (
+            <TypingIndicator
+              channelId={channelId}
+              teamId={teamId}
+              names={names}
+              onShown={keepTypingInView}
+            />
+          )}
         </div>
       </div>
 
@@ -368,6 +388,8 @@ export function MessageList({
         archived={archived}
         initialDraft={getDraft(channelId)}
         onDraftChange={(text) => setDraft(channelId, text)}
+        // Only who can write here: someone just watching a public channel sends nothing.
+        onTextChange={isMember && !archived ? sendTyping : undefined}
         onSend={async (body) => {
           if ((await send(channelId, body)) === "channel_archived") onChannelArchived()
         }}

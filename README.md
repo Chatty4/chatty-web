@@ -28,10 +28,10 @@ npm run dev
 ```
 
 Open http://localhost:5173. You can register, log in, create and join teams, use channels and DMs, and send,
-edit and delete messages, with reactions and pins. Logging in needs chatty-core running, and messages need
-chatty-chat. `/status` calls each backend's `/health` through the proxy, to check that the wiring works.
+edit and delete messages, with reactions, pins, unread badges, presence dots and a typing indicator. Logging
+in needs chatty-core running, and messages need chatty-chat. `/status` calls each backend's `/health` through the proxy, to check that the wiring works.
 
-Not built yet: unread badges, typing, presence dots and file uploads.
+Not built yet: file uploads.
 
 | Path in the browser | Forwarded to |
 |---|---|
