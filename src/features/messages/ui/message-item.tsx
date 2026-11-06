@@ -50,7 +50,7 @@ export type MessageItemProps = {
   authorName: string
   /** The author has an open WebSocket: a green dot on the avatar. */
   authorOnline: boolean
-  /** The message mentions me: the row is highlighted. */
+  /** The message mentions me: its bubble is highlighted. */
   mentionsMe: boolean
   /** userId → display name, used to show and edit `<@id>` mentions. */
   names: Record<string, string>
@@ -353,7 +353,6 @@ export const MessageItem = memo(function MessageItem({
         ROW_FLASH_CLASS,
         ROW_FOCUS_CLASS,
         grouped ? "mt-0" : "mt-3",
-        mentionsMe && "bg-accent/40 shadow-[inset_2px_0_0_var(--primary)]",
       )}
       aria-label={mentionsMe ? `${authorName} mentioned you` : undefined}
       tabIndex={0}
@@ -393,12 +392,15 @@ export const MessageItem = memo(function MessageItem({
           <div className="relative w-fit max-w-[75%]">
             <div
               className={cn(
-                "rounded-lg bg-surface-hover px-3 py-1.5 text-sm leading-relaxed break-words text-foreground",
+                "rounded-lg px-3 py-1.5 text-sm leading-relaxed break-words text-foreground",
+                // A mention of me gets the light-blue of my own bubbles, with a thin edge.
+                mentionsMe ? "bg-accent ring-1 ring-primary/30" : "bg-surface-hover",
                 MARKDOWN_BLOCK_CLASS,
                 !grouped && "rounded-tl-sm",
               )}
             >
-              <MessageMarkdown body={message.body} own={false} names={names} />
+              {/* `own` styles mention chips for a light-blue bubble. */}
+              <MessageMarkdown body={message.body} own={mentionsMe} names={names} />
               {isEdited && <span className="ml-1 text-xs text-muted-foreground">(edited)</span>}
               {message.status !== "sent" && <span className="ml-1">{status}</span>}
             </div>
