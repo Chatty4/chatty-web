@@ -312,6 +312,7 @@ export function MessageList({
               message={message}
               authorName={names[message.author_id] ?? "Unknown member"}
               authorOnline={isOnline(message.author_id)}
+              mentionsMe={!!user && message.mentions.includes(user.id)}
               names={names}
               grouped={isGrouped(index)}
               own={own}

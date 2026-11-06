@@ -50,6 +50,8 @@ export type MessageItemProps = {
   authorName: string
   /** The author has an open WebSocket: a green dot on the avatar. */
   authorOnline: boolean
+  /** The message mentions me: the row is highlighted. */
+  mentionsMe: boolean
   /** userId → display name, used to show and edit `<@id>` mentions. */
   names: Record<string, string>
   /** Whether this message immediately follows one from the same author. */
@@ -86,6 +88,7 @@ export const MessageItem = memo(function MessageItem({
   message,
   authorName,
   authorOnline,
+  mentionsMe,
   names,
   grouped,
   own,
@@ -350,7 +353,9 @@ export const MessageItem = memo(function MessageItem({
         ROW_FLASH_CLASS,
         ROW_FOCUS_CLASS,
         grouped ? "mt-0" : "mt-3",
+        mentionsMe && "bg-accent/40 shadow-[inset_2px_0_0_var(--primary)]",
       )}
+      aria-label={mentionsMe ? `${authorName} mentioned you` : undefined}
       tabIndex={0}
       data-message-id={message.id}
     >
