@@ -99,6 +99,11 @@ export function MessageList({
 
   // ── Channel members (for @mention autocomplete) ──────────────────────────────
   const mentionCandidates = useChannelMembers(channelId, teamId)
+  // Who the composer and the editor can mention: the channel's members, but not me.
+  const mentionable = useMemo(
+    () => mentionCandidates.filter((c) => c.id !== user?.id),
+    [mentionCandidates, user?.id],
+  )
 
   const names = useMemo(() => {
     const merged: Record<string, string> = {}
@@ -312,7 +317,9 @@ export function MessageList({
               message={message}
               authorName={names[message.author_id] ?? "Unknown member"}
               authorOnline={isOnline(message.author_id)}
+              mentionsMe={!!user && message.mentions.includes(user.id)}
               names={names}
+              mentionable={mentionable}
               grouped={isGrouped(index)}
               own={own}
               canEdit={!!actor && canEdit(message, actor, access)}
@@ -357,7 +364,7 @@ export function MessageList({
       {/* Keyed so a draft can never be sent to the channel opened after it. */}
       <MessageComposer
         key={channelId}
-        members={mentionCandidates}
+        members={mentionable}
         archived={archived}
         initialDraft={getDraft(channelId)}
         onDraftChange={(text) => setDraft(channelId, text)}

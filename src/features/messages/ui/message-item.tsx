@@ -22,7 +22,12 @@ import { useReactionToggle } from "../hooks/use-reaction-toggle"
 import type { LocalMessage } from "../types"
 import { describeMessageError, messageErrorCode } from "../utils/errors"
 import { MARKDOWN_BLOCK_CLASS } from "../utils/markdown"
-import { decodeMentions, encodeMentions, extractMentionIds } from "../utils/mentions"
+import {
+  decodeMentions,
+  encodeMentions,
+  extractMentionIds,
+  type MentionCandidate,
+} from "../utils/mentions"
 import { MessageEditor } from "./message-editor"
 import { MessageMarkdown } from "./message-markdown"
 import { PinnedMark } from "./pinned-mark"
@@ -50,8 +55,12 @@ export type MessageItemProps = {
   authorName: string
   /** The author has an open WebSocket: a green dot on the avatar. */
   authorOnline: boolean
+  /** The message mentions me: its bubble is highlighted. */
+  mentionsMe: boolean
   /** userId → display name, used to show and edit `<@id>` mentions. */
   names: Record<string, string>
+  /** Who an edit can newly mention: the channel's members, not me. */
+  mentionable: MentionCandidate[]
   /** Whether this message immediately follows one from the same author. */
   grouped: boolean
   /** True when the message was written by the current user (shown on the right). */
@@ -86,7 +95,9 @@ export const MessageItem = memo(function MessageItem({
   message,
   authorName,
   authorOnline,
+  mentionsMe,
   names,
+  mentionable,
   grouped,
   own,
   canEdit,
@@ -122,12 +133,11 @@ export const MessageItem = memo(function MessageItem({
 
   // Only called while editing, so rows that are just being shown don't build these lists.
   const encode = (text: string) => {
-    const candidates = Object.entries(names).map(([id, display_name]) => ({ id, display_name }))
-    // Keeps the people already mentioned when two share a name.
+    // Keeps the people already mentioned (also when two share a name, or one left the channel).
     const existingMentions = extractMentionIds(message.body).flatMap((id) =>
       names[id] ? [{ id, display_name: names[id] }] : [],
     )
-    return encodeMentions(text, candidates, existingMentions)
+    return encodeMentions(text, [...mentionable, ...existingMentions], existingMentions)
   }
 
   // Errors that end the edit close the editor with a toast; the rest reject so the
@@ -351,6 +361,7 @@ export const MessageItem = memo(function MessageItem({
         ROW_FOCUS_CLASS,
         grouped ? "mt-0" : "mt-3",
       )}
+      aria-label={mentionsMe ? `${authorName} mentioned you` : undefined}
       tabIndex={0}
       data-message-id={message.id}
     >
@@ -388,12 +399,15 @@ export const MessageItem = memo(function MessageItem({
           <div className="relative w-fit max-w-[75%]">
             <div
               className={cn(
-                "rounded-lg bg-surface-hover px-3 py-1.5 text-sm leading-relaxed break-words text-foreground",
+                "rounded-lg px-3 py-1.5 text-sm leading-relaxed break-words text-foreground",
+                // A mention of me gets the light-blue of my own bubbles, with a thin edge.
+                mentionsMe ? "bg-accent ring-1 ring-primary/30" : "bg-surface-hover",
                 MARKDOWN_BLOCK_CLASS,
                 !grouped && "rounded-tl-sm",
               )}
             >
-              <MessageMarkdown body={message.body} own={false} names={names} />
+              {/* `own` styles mention chips for a light-blue bubble. */}
+              <MessageMarkdown body={message.body} own={mentionsMe} names={names} />
               {isEdited && <span className="ml-1 text-xs text-muted-foreground">(edited)</span>}
               {message.status !== "sent" && <span className="ml-1">{status}</span>}
             </div>
