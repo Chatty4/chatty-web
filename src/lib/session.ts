@@ -7,11 +7,14 @@
 //   replaced inside a Web Lock: tabs refresh one at a time, and a tab that waited finds the token
 //   the previous one stored and uses it.
 // - A tab that refreshes, logs in or logs out tells the other tabs (BroadcastChannel).
+// - Every login gets a session id. A tab whose login was replaced by another one (maybe another
+//   user) reloads instead of using the new token with the old user's data (lib/session-sync.ts).
 // - The access token is refreshed about a minute before it expires, and again when a request
 //   gets 401 (lib/api.ts).
 
 import { ApiError, networkError, readJson, toApiError } from "@/lib/api-error"
 import { CORE_API_URL } from "@/lib/config"
+import { sharedTokenAction } from "@/lib/session-sync"
 
 /** POST /auth/login and POST /auth/refresh return these fields (and more). */
 export type TokenPair = {
@@ -25,7 +28,7 @@ export type SessionEvent = "logged-in" | "logged-out"
 type AccessToken = { token: string; expiresAt: number }
 
 type Message =
-  | { type: "logged-in" | "refreshed"; token: string; expiresAt: number }
+  | { type: "logged-in" | "refreshed"; token: string; expiresAt: number; sessionId: string }
   | { type: "logged-out" }
 
 const REFRESH_TOKEN_KEY = "refresh_token"
@@ -37,6 +40,8 @@ const LOCK_NAME = "chatty:refresh-token"
 const REFRESH_MARGIN_MS = 60_000
 
 let access: AccessToken | null = readSharedAccess()
+/** The login this tab is in: the stored one when it loads, a new one after a login here. */
+let mySessionId: string | null = readLocal(SESSION_ID_KEY)
 let refreshTimer: ReturnType<typeof setTimeout> | undefined
 let inFlight: Promise<string> | null = null
 const listeners = new Set<(event: SessionEvent) => void>()
@@ -147,7 +152,9 @@ function isMessage(data: unknown): data is Message {
     "token" in data &&
     typeof data.token === "string" &&
     "expiresAt" in data &&
-    typeof data.expiresAt === "number"
+    typeof data.expiresAt === "number" &&
+    "sessionId" in data &&
+    typeof data.sessionId === "string"
   )
 }
 
@@ -157,7 +164,13 @@ channel?.addEventListener("message", (event: MessageEvent<unknown>) => {
   if (message.type === "logged-out") {
     endSession({ broadcast: false })
   } else if (message.type === "logged-in" || message.type === "refreshed") {
+    if (sharedTokenAction(mySessionId, message.sessionId) === "reload") {
+      // Another login took over the shared storage; the reload starts this tab from it.
+      window.location.reload()
+      return
+    }
     const wasLoggedIn = access !== null
+    mySessionId = message.sessionId
     adoptAccess({ token: message.token, expiresAt: message.expiresAt })
     if (!wasLoggedIn) emit("logged-in")
   }
@@ -197,9 +210,11 @@ function randomId(): string {
 
 /** After a login: keep the pair and tell the other tabs. */
 export function startSession(pair: TokenPair): void {
-  writeLocal(SESSION_ID_KEY, randomId())
+  const sessionId = randomId()
+  mySessionId = sessionId
+  writeLocal(SESSION_ID_KEY, sessionId)
   const token = storePair(pair)
-  channel?.postMessage({ type: "logged-in", ...token } satisfies Message)
+  channel?.postMessage({ type: "logged-in", ...token, sessionId } satisfies Message)
   emit("logged-in")
 }
 
@@ -208,6 +223,7 @@ export function endSession({ broadcast = true }: { broadcast?: boolean } = {}): 
   const wasLoggedIn = access !== null || readRefreshToken() !== null
   clearTimeout(refreshTimer)
   access = null
+  mySessionId = null
   if (broadcast) {
     writeRefreshToken(null)
     writeSharedAccess(null)
@@ -225,6 +241,15 @@ export function endSession({ broadcast = true }: { broadcast?: boolean } = {}): 
  */
 export function refreshSession(stale: string | null): Promise<string> {
   inFlight ??= withRefreshLock(async () => {
+    // Another tab logged in as someone else, and this tab missed its broadcast: the stored
+    // tokens aren't this tab's login any more. Not a rejected session (that would end the
+    // new login too), so it fails like a network error while the page reloads.
+    const stored = readLocal(SESSION_ID_KEY)
+    if (stored !== null && sharedTokenAction(mySessionId, stored) === "reload") {
+      window.location.reload()
+      throw new ApiError(0, "session_changed", "Another tab logged in")
+    }
+
     // Another tab may have refreshed while this one waited for the lock.
     const shared = readSharedAccess()
     if (isFresh(shared) && shared.token !== stale) return adoptAccess(shared).token
@@ -257,7 +282,10 @@ export function refreshSession(stale: string | null): Promise<string> {
     }
 
     const token = storePair(body as TokenPair)
-    channel?.postMessage({ type: "refreshed", ...token } satisfies Message)
+    // Without a login id (storage blocked) the other tabs can't check it: don't share it.
+    if (mySessionId !== null) {
+      channel?.postMessage({ type: "refreshed", ...token, sessionId: mySessionId } satisfies Message)
+    }
     return token.token
   }).finally(() => {
     inFlight = null
