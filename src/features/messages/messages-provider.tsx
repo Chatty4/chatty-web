@@ -192,7 +192,8 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
 
   const retry = useCallback(async (channelId: string, clientMsgId: string) => {
     const ch = stateRef.current[channelId]
-    const msg = ch?.messages.find((m) => m.client_msg_id === clientMsgId)
+    // Only a failed copy: the message.created event may have turned it into the sent message.
+    const msg = ch?.messages.find((m) => m.client_msg_id === clientMsgId && m.status === "failed")
     if (!msg) return
     doDispatch({ type: "OPTIMISTIC_RETRY", channelId, clientMsgId })
     try {

@@ -217,17 +217,19 @@ export function messagesReducer(state: MessagesState, action: MessagesAction): M
       // lastSeq stays put: only applied events move it. Jumping to this seq would turn
       // any event before it that hasn't arrived yet into a "duplicate" and lose it.
       //
-      // Events carry no client_msg_id, so a message.created that beat the POST
-      // response is already in the list: keep it and drop the optimistic copy.
-      const alreadyApplied = ch.messages.some(
-        (m) => m.id === confirmed.id && m.client_msg_id !== action.clientMsgId,
-      )
+      // A message.created that beat the POST response already put the message in the list,
+      // maybe with later events (reactions, pins) on top. Keep that copy: this answer is older.
+      // Drop only an optimistic copy that is left, which happens when the event had no
+      // client_msg_id to replace it with.
+      const alreadyApplied = ch.messages.some((m) => m.id === confirmed.id)
       return {
         ...state,
         [action.channelId]: {
           ...ch,
           messages: alreadyApplied
-            ? ch.messages.filter((m) => m.client_msg_id !== action.clientMsgId)
+            ? ch.messages.filter(
+                (m) => !(m.client_msg_id === action.clientMsgId && m.id !== confirmed.id),
+              )
             : ch.messages.map((m) => (m.client_msg_id === action.clientMsgId ? confirmed : m)),
         },
       }
@@ -240,8 +242,10 @@ export function messagesReducer(state: MessagesState, action: MessagesAction): M
         ...state,
         [action.channelId]: {
           ...ch,
+          // Only a copy still waiting can fail: the message.created event may already have
+          // turned it into the sent message (the server saved it, then the answer was lost).
           messages: ch.messages.map((m) =>
-            m.client_msg_id === action.clientMsgId
+            m.client_msg_id === action.clientMsgId && m.status === "pending"
               ? { ...m, status: "failed" as const, failure: action.failure }
               : m,
           ),
@@ -270,8 +274,9 @@ export function messagesReducer(state: MessagesState, action: MessagesAction): M
         ...state,
         [action.channelId]: {
           ...ch,
+          // Only a failed copy can be retried; a sent message with this id stays as it is.
           messages: ch.messages.map((m) =>
-            m.client_msg_id === action.clientMsgId
+            m.client_msg_id === action.clientMsgId && m.status === "failed"
               ? { ...m, status: "pending" as const, failure: undefined }
               : m,
           ),
