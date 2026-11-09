@@ -3,6 +3,7 @@ import { ArrowDown } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/features/auth"
+import { useChannels } from "@/features/channels/hooks/channels-context"
 import { usePresence } from "@/features/presence"
 import { TypingIndicator, useSendTyping } from "@/features/typing"
 import { useUnread } from "@/features/unread"
@@ -13,6 +14,7 @@ import { useMessages } from "../context"
 import { useChannelMembers } from "../hooks/use-channel-members"
 import { useMemberNames } from "../hooks/use-member-names"
 import { useScrollAnchor } from "../hooks/use-scroll-anchor"
+import { useWatchChannel } from "../hooks/use-watch-channel"
 import { useWhenVisible } from "../hooks/use-when-visible"
 import { HistoryTop } from "./history-top"
 import { MessageItem } from "./message-item"
@@ -21,6 +23,7 @@ import { MessageListSkeleton } from "./message-skeleton"
 import { DayDivider } from "./day-divider"
 import { dayKey, formatDayLabel } from "../utils/dates"
 import { extractMentionIds } from "../utils/mentions"
+import { shouldWatch } from "../utils/watch"
 import {
   canDelete,
   canEdit,
@@ -90,6 +93,17 @@ export function MessageList({
   const loadFailed = channelState?.loadFailed ?? false
   const loadingMore = channelState?.loadingMore ?? false
   const loadMoreFailed = channelState?.loadMoreFailed ?? false
+
+  // A public channel I haven't joined gets its live events through a watch.
+  const { loading: sidebarLoading, failed: sidebarFailed } = useChannels()
+  useWatchChannel(
+    channelId,
+    shouldWatch({
+      isMember: channel !== null,
+      sidebarLoaded: !sidebarLoading && !sidebarFailed,
+      historyLoaded: !loading && !loadFailed,
+    }),
+  )
 
   // ── Name resolution for authors and <@id> mentions ───────────────────────────
   const userIds = useMemo(
