@@ -9,8 +9,10 @@ import {
 import {
   CHANNEL,
   ME,
+  OTHER,
   apiMessage,
   created,
+  event,
   localMessage,
   pendingMessage,
 } from "./test-fixtures"
@@ -283,6 +285,60 @@ describe("optimistic send", () => {
       confirm(4),
     )
     expect(ids(state)).toEqual(["msg-3", "msg-4"])
+  })
+
+  // The event carries client_msg_id (api-chat.md, message object), so it replaces the
+  // pending copy in place: no second copy shows while the POST answer is on its way.
+  const createdForMe = (seq: number, extra: Record<string, unknown> = {}): MessagesAction => ({
+    type: "APPLY_EVENT",
+    channelId: CHANNEL,
+    event: created(seq, { author_id: ME, client_msg_id: "c1", ...extra }),
+    currentUserId: ME,
+  })
+
+  it("shows the message once when the event with client_msg_id comes before the answer", () => {
+    const afterEvent = reduce(loaded(3), add, createdForMe(4))
+    expect(ids(afterEvent)).toEqual(["msg-3", "msg-4"])
+
+    const state = reduce(afterEvent, confirm(4))
+    expect(ids(state)).toEqual(["msg-3", "msg-4"])
+    expect(channel(state).messages[1]!.status).toBe("sent")
+  })
+
+  it("keeps a reaction that came between the event and the answer", () => {
+    const reacted: MessagesAction = {
+      type: "APPLY_EVENT",
+      channelId: CHANNEL,
+      event: event("reaction.added", 5, { message_id: "msg-4", user_id: OTHER, emoji: "👍" }),
+      currentUserId: ME,
+    }
+
+    const state = reduce(loaded(3), add, createdForMe(4), reacted, confirm(4))
+
+    expect(channel(state).messages[1]!.reactions).toEqual([{ emoji: "👍", count: 1, me: false }])
+  })
+
+  it("keeps the message sent when the answer is lost after the event arrived", () => {
+    const state = reduce(loaded(3), add, createdForMe(4), {
+      type: "OPTIMISTIC_FAIL",
+      failure: { message: "Not sent", retryable: true },
+      channelId: CHANNEL,
+      clientMsgId: "c1",
+    })
+
+    expect(ids(state)).toEqual(["msg-3", "msg-4"])
+    expect(channel(state).messages[1]!.status).toBe("sent")
+    expect(channel(state).messages[1]!.failure).toBeUndefined()
+  })
+
+  it("doesn't turn a sent message back into pending on retry", () => {
+    const state = reduce(loaded(3), add, createdForMe(4), {
+      type: "OPTIMISTIC_RETRY",
+      channelId: CHANNEL,
+      clientMsgId: "c1",
+    })
+
+    expect(channel(state).messages[1]!.status).toBe("sent")
   })
 
   it("marks a failed send and lets it retry", () => {
