@@ -8,6 +8,10 @@ import { getSidebarChannelsRequest, getTeamMemberPreviewsRequest } from "../fetc
 import { ChannelsContext } from "../hooks/channels-context"
 import type { SidebarChannel } from "../types"
 import { applyChannelUpdate } from "../utils/apply-channel-update"
+import { createUnknownChannelTracker } from "../utils/unknown-channels"
+
+/** Several messages for a new channel arrive together; one reload is enough. */
+const RELOAD_DEBOUNCE_MS = 500
 
 type ChannelsState =
   | { status: "loading" }
@@ -17,6 +21,8 @@ type ChannelsState =
       channels: SidebarChannel[]
       dms: SidebarChannel[]
       memberNames: Record<string, string>
+      /** Every channel I'm in, hidden DMs included: a message for one of these needs no reload. */
+      knownIds: ReadonlySet<string>
     }
   | { status: "error"; forTeamId: string }
 
@@ -40,7 +46,8 @@ async function fetchChannels(teamId: string, myUserId: string): Promise<Channels
       for (const m of members) memberNames[m.user_id] = m.display_name
     }
 
-    return { status: "loaded", forTeamId: teamId, channels, dms, memberNames }
+    const knownIds = new Set(all.map((c) => c.id))
+    return { status: "loaded", forTeamId: teamId, channels, dms, memberNames, knownIds }
   } catch {
     return { status: "error", forTeamId: teamId }
   }
@@ -50,7 +57,7 @@ async function fetchChannels(teamId: string, myUserId: string): Promise<Channels
 export function ChannelsProvider({ children }: { children: ReactNode }) {
   const teamId = useActiveTeamId()
   const { user } = useAuth()
-  const { subscribe } = useWs()
+  const { subscribe, onReconnect } = useWs()
   const myUserId = user?.id ?? ""
 
   const [state, setState] = useState<ChannelsState>({ status: "loading" })
@@ -74,6 +81,49 @@ export function ChannelsProvider({ children }: { children: ReactNode }) {
   const reload = useCallback(() => {
     if (teamId) load(teamId, myUserId)
   }, [teamId, myUserId, load])
+
+  // ── Channels others add me to ──────────────────────────────────────────────────
+  // No message says I was added to a channel, removed from one or sent a new DM. A reconnect
+  // may have missed any of that, and a message for a channel the sidebar doesn't list means
+  // I'm in it now.
+  const stateRef = useRef(state)
+  useEffect(() => { stateRef.current = state }, [state])
+  const reloadRef = useRef(reload)
+  useEffect(() => { reloadRef.current = reload }, [reload])
+  const [tracker] = useState(createUnknownChannelTracker)
+  const reloadTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+
+  useEffect(() => {
+    tracker.reset() // ids checked for another team say nothing about this one
+  }, [teamId, tracker])
+
+  useEffect(() => () => clearTimeout(reloadTimer.current), [])
+
+  useEffect(
+    () =>
+      onReconnect(() => {
+        tracker.reset()
+        reloadRef.current()
+      }),
+    [onReconnect, tracker],
+  )
+
+  useEffect(
+    () =>
+      subscribe((message) => {
+        const channelId =
+          message.type === "event" ? message.event.channel_id
+          : message.type === "unread" ? message.channel_id
+          : null
+        const current = stateRef.current
+        // Until the sidebar has loaded, the load in progress lists the channel anyway.
+        if (channelId === null || current.status !== "loaded") return
+        if (!tracker.shouldReload(channelId, current.knownIds)) return
+        clearTimeout(reloadTimer.current)
+        reloadTimer.current = setTimeout(() => reloadRef.current(), RELOAD_DEBOUNCE_MS)
+      }),
+    [subscribe, tracker],
+  )
 
   // Renames and archives by other people: the sidebar and composer follow without a reload.
   useEffect(

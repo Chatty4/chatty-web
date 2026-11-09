@@ -78,9 +78,18 @@ export function WsProvider({ children }: { children: ReactNode }) {
       void connect()
     }
 
-    async function connect() {
+    // The socket that replaces the current one before its token expires, until it opens.
+    let replacement: WsClient | null = null
+
+    /**
+     * Opens a socket. With `replacing`, it is a proactive reconnect: the current socket stays
+     * open until the new one is, so the user never has no socket and other people never see
+     * them go offline and online again. If the new one fails, the current one carries on until
+     * the server closes it with 4001, which reconnects the usual way.
+     */
+    async function connect(replacing?: WsClient) {
       if (!alive) return
-      clearTimeout(reconnectTimer)
+      if (!replacing) clearTimeout(reconnectTimer)
 
       let token: string
       try {
@@ -88,7 +97,7 @@ export function WsProvider({ children }: { children: ReactNode }) {
         token = tokenRejected ? await refreshSession(getAccessToken()) : await freshAccessToken()
         tokenRejected = false
       } catch (error) {
-        if (!alive) return
+        if (!alive || replacing) return // the current socket is still open
         // Only a rejected session stops here. Offline, down or rate limited: keep trying.
         if (isSessionRejected(error)) {
           setStatus("disconnected")
@@ -99,20 +108,32 @@ export function WsProvider({ children }: { children: ReactNode }) {
         }
         return
       }
-      if (!alive) return
+      if (!alive || (replacing && clientRef.current !== replacing)) return
 
-      setStatus(connectedOnce ? "reconnecting" : "connecting")
+      if (!replacing) setStatus(connectedOnce ? "reconnecting" : "connecting")
 
       const client = new WsClient(token, {
         onOpen() {
+          if (replacing) {
+            replacement = null
+            // The current socket closed meanwhile, and its onClose already reconnects.
+            if (clientRef.current !== replacing) {
+              client.close()
+              return
+            }
+            replacing.close() // intentional: no onClose
+          }
+          clientRef.current = client
           const reconnected = connectedOnce
           connectedOnce = true
           openedAt = Date.now()
           setStatus("connected")
+          scheduleProactiveReconnect()
           // Also on the first open: a channel may have loaded before the socket connected.
           const synced =
             Object.keys(cursorsRef.current).length > 0 ? doSync() : Promise.resolve()
           // After the held-back messages are out, so a fresh GET /unread doesn't count them twice.
+          // Also after a replacement: the new socket has no watch until it is sent again.
           if (reconnected) {
             void synced.then(() => {
               if (alive) reconnectHandlersRef.current.forEach((h) => h())
@@ -123,6 +144,11 @@ export function WsProvider({ children }: { children: ReactNode }) {
         onMessage: gate.receive,
 
         onClose(code) {
+          // A replacement that never opened: the current socket carries on.
+          if (clientRef.current !== client) {
+            if (replacement === client) replacement = null
+            return
+          }
           clientRef.current = null
           clearTimeout(proactiveTimer)
           if (!alive) return
@@ -143,23 +169,23 @@ export function WsProvider({ children }: { children: ReactNode }) {
         },
       })
 
-      clientRef.current = client
+      if (replacing) replacement = client
+      else clientRef.current = client
+    }
 
-      // Proactively reconnect before the token expires so the server never
-      // closes with 4001. The new connect() calls freshAccessToken() which
-      // will pick up the already-refreshed token from session.ts.
-      // session.ts measures the expiry on this device's clock: comparing the token's exp
-      // with a wrong clock here would reconnect in a loop.
+    // Proactively reconnect before the token expires so the server never closes with 4001.
+    // connect() calls freshAccessToken(), which refreshes the token first (session.ts).
+    // session.ts measures the expiry on this device's clock: comparing the token's exp
+    // with a wrong clock here would reconnect in a loop.
+    function scheduleProactiveReconnect() {
+      clearTimeout(proactiveTimer)
       const expiresAt = getAccessExpiry()
-      if (expiresAt !== null) {
-        const delay = Math.max(0, expiresAt - PROACTIVE_MS - Date.now())
-        proactiveTimer = setTimeout(() => {
-          client.close()
-          clientRef.current = null
-          attempt = 0
-          void connect()
-        }, delay)
-      }
+      if (expiresAt === null) return
+      const delay = Math.max(0, expiresAt - PROACTIVE_MS - Date.now())
+      proactiveTimer = setTimeout(() => {
+        const current = clientRef.current
+        if (current && !replacement) void connect(current)
+      }, delay)
     }
 
     window.addEventListener("online", handleOnline)
@@ -170,6 +196,8 @@ export function WsProvider({ children }: { children: ReactNode }) {
       window.removeEventListener("online", handleOnline)
       clearTimeout(reconnectTimer)
       clearTimeout(proactiveTimer)
+      replacement?.close()
+      replacement = null
       clientRef.current?.close()
       clientRef.current = null
       setStatus("disconnected")
