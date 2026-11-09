@@ -22,12 +22,16 @@ server {
     resolver 127.0.0.11 valid=10s;
     set $core ${CORE_API_UPSTREAM};
     set $chat ${CHAT_API_UPSTREAM};
+    # Only our own files, styles inline too (React style props, sonner's injected <style>).
+    # connect-src: the API and WebSocket ('self' covers ws:/wss: to this host), plus jsDelivr,
+    # where the emoji picker (frimousse) loads its emoji data from.
+    set $csp "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://cdn.jsdelivr.net; frame-ancestors 'none'";
 
     # Security headers. A location with its own add_header drops all of these, so the two
     # locations below repeat them. Change all three copies together.
     add_header X-Content-Type-Options "nosniff" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    add_header Content-Security-Policy "frame-ancestors 'none'" always;
+    add_header Content-Security-Policy $csp always;
 
     location /api/core/ {
         proxy_pass $core;
@@ -64,7 +68,7 @@ server {
         add_header Cache-Control "public, immutable";
         add_header X-Content-Type-Options "nosniff" always;
         add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-        add_header Content-Security-Policy "frame-ancestors 'none'" always;
+        add_header Content-Security-Policy $csp always;
     }
 
     # Single-page app: every other path loads index.html, and React Router shows the page.
@@ -74,7 +78,7 @@ server {
         add_header Cache-Control "no-cache";
         add_header X-Content-Type-Options "nosniff" always;
         add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-        add_header Content-Security-Policy "frame-ancestors 'none'" always;
+        add_header Content-Security-Policy $csp always;
         try_files $uri /index.html;
     }
 }
