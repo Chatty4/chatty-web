@@ -13,10 +13,12 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          # the same as the Dockerfile (node:24-alpine) and the README
+          node-version: 24
           cache: npm
 
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
+      - run: npm test
       - run: npm run build
