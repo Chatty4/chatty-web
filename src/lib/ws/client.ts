@@ -3,9 +3,8 @@
 // Contract: chatty-infra/docs/api-chat.md#get-ws and docs/events.md.
 
 import { CHAT_API_URL } from "@/lib/config"
+import { createHeartbeat, type Heartbeat } from "./heartbeat"
 import type { InboundWsMessage, OutboundWsMessage } from "./types"
-
-const HEARTBEAT_MS = 20_000
 
 type WsClientCallbacks = {
   onOpen?: () => void
@@ -25,18 +24,23 @@ function buildWsUrl(token: string): string {
 }
 
 /**
- * Manages one WebSocket connection. Sends a heartbeat every 20 s with the
- * current tab visibility flag. Calling `close()` is intentional and does not
- * trigger `onClose`; a server-initiated close does.
+ * Manages one WebSocket connection. Sends a heartbeat with the current tab
+ * visibility when it opens, every 20 s and whenever the tab is shown or hidden.
+ * Calling `close()` is intentional and does not trigger `onClose`; a
+ * server-initiated close does.
  */
 export class WsClient {
   private readonly socket: WebSocket
   private readonly callbacks: WsClientCallbacks
-  private heartbeatTimer: ReturnType<typeof setInterval> | undefined
+  private readonly heartbeat: Heartbeat
   private intentional = false
 
   constructor(token: string, callbacks: WsClientCallbacks) {
     this.callbacks = callbacks
+    this.heartbeat = createHeartbeat({
+      send: (message) => this.send(message),
+      isVisible: () => document.visibilityState === "visible",
+    })
     this.socket = new WebSocket(buildWsUrl(token))
     this.socket.addEventListener("open", this.handleOpen)
     this.socket.addEventListener("message", this.handleMessage)
@@ -45,7 +49,7 @@ export class WsClient {
   }
 
   private handleOpen = () => {
-    this.heartbeatTimer = setInterval(this.sendHeartbeat, HEARTBEAT_MS)
+    this.heartbeat.start()
     this.callbacks.onOpen?.()
   }
 
@@ -70,12 +74,8 @@ export class WsClient {
 
   private handleVisibility = () => {
     if (this.socket.readyState === WebSocket.OPEN) {
-      this.sendHeartbeat()
+      this.heartbeat.beat()
     }
-  }
-
-  private sendHeartbeat = () => {
-    this.send({ type: "heartbeat", visible: document.visibilityState === "visible" })
   }
 
   send(msg: OutboundWsMessage): void {
@@ -93,8 +93,7 @@ export class WsClient {
   }
 
   private teardown() {
-    clearInterval(this.heartbeatTimer)
-    this.heartbeatTimer = undefined
+    this.heartbeat.stop()
     document.removeEventListener("visibilitychange", this.handleVisibility)
     this.socket.removeEventListener("open", this.handleOpen)
     this.socket.removeEventListener("message", this.handleMessage)
