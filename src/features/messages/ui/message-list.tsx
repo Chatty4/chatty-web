@@ -23,6 +23,7 @@ import { MessageListSkeleton } from "./message-skeleton"
 import { DayDivider } from "./day-divider"
 import { dayKey, formatDayLabel } from "../utils/dates"
 import { extractMentionIds } from "../utils/mentions"
+import { countNewMessages, messageKey } from "../utils/new-messages"
 import { shouldWatch } from "../utils/watch"
 import {
   canDelete,
@@ -128,9 +129,8 @@ export function MessageList({
 
   // ── Scroll management ────────────────────────────────────────────────────────
   const listRef = useRef<HTMLDivElement>(null)
-  const prevLengthRef = useRef(messages.length)
   const lastMessage = messages.at(-1)
-  const lastKey = lastMessage ? (lastMessage.client_msg_id ?? lastMessage.id) : undefined
+  const lastKey = lastMessage ? messageKey(lastMessage) : undefined
   const lastKeyRef = useRef<string | undefined>(undefined)
 
   type ScrollState = { atBottom: boolean; farFromBottom: boolean; newCount: number }
@@ -178,7 +178,6 @@ export function MessageList({
 
   // On channel switch: jump to bottom immediately.
   useEffect(() => {
-    prevLengthRef.current = messages.length
     lastKeyRef.current = undefined
     clearAnchor()
     // Defer the scroll + state reset into rAF so DOM is ready.
@@ -195,9 +194,7 @@ export function MessageList({
   // when I'm already at the bottom and otherwise bump the "new" badge.
   useEffect(() => {
     const previousKey = lastKeyRef.current
-    const added = messages.length - prevLengthRef.current
     lastKeyRef.current = lastKey
-    prevLengthRef.current = messages.length
     if (!lastKey || lastKey === previousKey) return
 
     if (previousKey === undefined) {
@@ -205,6 +202,8 @@ export function MessageList({
     } else if ((user && lastMessage?.author_id === user.id) || atBottom) {
       requestAnimationFrame(() => scrollToBottom("smooth"))
     } else {
+      // By position: older pages loaded at the top since then don't count (countNewMessages).
+      const added = countNewMessages(messages, previousKey, user?.id)
       setScrollState((s) => ({ ...s, newCount: s.newCount + Math.max(added, 1) }))
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
