@@ -7,6 +7,9 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 COPY . .
+# .env isn't copied (.dockerignore), so pass the public VAPID key to turn push notifications on:
+# docker build --build-arg VITE_VAPID_PUBLIC_KEY=... (Vite reads VITE_* from the environment)
+ARG VITE_VAPID_PUBLIC_KEY=
 RUN npm run build
 
 # 2. Serve them with Nginx, which also proxies the APIs (same paths as the Vite dev proxy)
