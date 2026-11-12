@@ -5,6 +5,7 @@ import { Avatar } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { FormField } from "@/components/ui/form-field"
 import { Input } from "@/components/ui/input"
+import { NotificationsSection } from "@/features/push"
 import { toast } from "@/lib/toast"
 
 import { useProfile } from "../hooks/use-profile"
@@ -212,7 +213,7 @@ function PasswordSection({
 
 // ── Root component ────────────────────────────────────────────────────────────
 
-/** Account settings: profile (name, timezone) and password change. */
+/** Account settings: profile (name, timezone), push notifications and password change. */
 export function ProfilePage() {
   const { user, updateProfile, changePassword } = useProfile()
 
@@ -222,7 +223,7 @@ export function ProfilePage() {
     <div className="flex flex-col gap-[18px]">
       <div className="flex flex-col gap-1">
         <h1 className="text-[20px] font-semibold tracking-tight">Account settings</h1>
-        <p className="text-sm text-muted-foreground">Manage your profile and security.</p>
+        <p className="text-sm text-muted-foreground">Manage your profile, notifications and security.</p>
       </div>
 
       <ProfileSection
@@ -230,6 +231,8 @@ export function ProfilePage() {
         timezone={user.timezone}
         onSave={(displayName, timezone) => updateProfile({ display_name: displayName, timezone })}
       />
+
+      <NotificationsSection />
 
       <PasswordSection onSave={changePassword} />
     </div>

@@ -7,6 +7,7 @@ import { TeamRail } from "@/components/app/team-rail"
 import { ChannelsProvider } from "@/features/channels"
 import { MessagesProvider } from "@/features/messages"
 import { PresenceProvider } from "@/features/presence"
+import { resavePushSubscription } from "@/features/push"
 import { TeamsProvider } from "@/features/teams"
 import { TypingProvider } from "@/features/typing"
 import { UnreadProvider } from "@/features/unread"
@@ -31,6 +32,11 @@ export function AppLayout() {
   const [drawerOpenOn, setDrawerOpenOn] = useState<string | null>(null)
   const drawerOpen = drawerOpenOn === location.pathname
   const closeDrawer = () => setDrawerOpenOn(null)
+
+  // Browsers sometimes change a push subscription, so save it again on every app start.
+  useEffect(() => {
+    void resavePushSubscription().catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (!drawerOpen) return

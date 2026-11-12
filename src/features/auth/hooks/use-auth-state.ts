@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
+import { disablePush } from "@/features/push"
 import { isSessionRejected } from "@/lib/api-error"
 import {
   endSession,
@@ -107,6 +108,9 @@ export function useAuthState(): AuthContextValue {
 
   const logout = useCallback(async () => {
     generation.current++
+    // Before chatty-core's logout, while the access token still works (api-chat.md). Never
+    // blocks the logout: an undeleted row is removed by the worker on the next push (410).
+    await disablePush().catch(() => {})
     await logoutRequest()
     update(ANONYMOUS)
   }, [update])
