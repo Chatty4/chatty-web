@@ -124,6 +124,23 @@ through REST. A message shows as pending at once, then as sent or failed; a retr
 
 More: the `chatty-docs` repo, `services/web/index.md` and `architecture/flows/from-login-to-logout.md`.
 
+## Push notifications
+
+chatty-chat's push worker sends a Web Push for new messages while Chatty isn't on screen (D-13). Here
+(`src/features/push/`, `public/sw.js`):
+
+- **Setup:** set `VITE_VAPID_PUBLIC_KEY` in `.env` to `VAPID_PUBLIC_KEY` from `chatty-chat/.env` (made by
+  chatty-infra's `setup.bat`). Without it the settings page says push isn't set up. For Docker, pass it with
+  `--build-arg`. Push needs a secure origin: `localhost`, `127.0.0.1` or https.
+- **Turning it on:** Account settings → Notifications asks for permission, registers `/sw.js`, subscribes with
+  the key and saves the subscription (`POST /push/subscriptions`).
+- **App start:** a browser that turned it on saves its subscription again, because browsers sometimes change
+  it. A subscription made for another key is replaced.
+- **Turning it off and logging out:** `DELETE /push/subscriptions` and unsubscribe, before chatty-core's
+  logout, so the next person on this browser doesn't get pushes they didn't turn on.
+- **The service worker** shows one notification per channel (a newer one replaces it), and a click focuses
+  or opens Chatty. It can't open the channel yet: the payload has no `team_id`.
+
 ## Project layout
 
 Each feature keeps its API calls, state and components together; pages only put features together.
@@ -138,7 +155,7 @@ src/
   components/
     ui/                 generic components (Button, Input, FormField, ...; shadcn ones too)
     app/                the app shell: team rail, sidebar, header, user menu, ...
-  features/<name>/      auth, channels, invites, messages, presence, profile, teams, typing, unread, ws
+  features/<name>/      auth, channels, invites, messages, presence, profile, push, teams, typing, unread, ws
     fetchers/           API calls
     hooks/              state and logic
     store/              messages, presence, typing, unread: the pure state changes, tested without a browser
@@ -150,7 +167,7 @@ src/
   lib/
     api.ts              API client: Authorization header, refresh on 401, contract error body -> ApiError
     api-error.ts        ApiError and how a response becomes one
-    config.ts           API base paths
+    config.ts           API base paths, VAPID public key
     session.ts          the tokens: storage, refresh, other tabs
     session-sync.ts     whether a token another tab shares belongs to this tab's login
     theme.ts            light and dark theme
