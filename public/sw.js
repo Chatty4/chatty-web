@@ -20,15 +20,23 @@ self.addEventListener("push", (event) => {
   )
 })
 
-// Focus an open Chatty tab, or open one.
-// shortcut: the payload has no team_id, so this can't open the channel itself; add team_id to the
-// payload when deep links are wanted.
+// Take over the tabs that are already open, so a click can navigate them (only works for tabs
+// this worker controls).
+self.addEventListener("activate", (event) => {
+  event.waitUntil(self.clients.claim())
+})
+
+// Open the channel: in a Chatty tab that is already open, or in a new one.
 self.addEventListener("notificationclick", (event) => {
   event.notification.close()
+  const { team_id: teamId, channel_id: channelId } = event.notification.data ?? {}
+  const url = teamId && channelId ? `/teams/${teamId}/channels/${channelId}` : "/"
   event.waitUntil(
-    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((tabs) => {
-      const tab = tabs.find((client) => new URL(client.url).origin === self.location.origin)
-      return tab ? tab.focus() : self.clients.openWindow("/")
-    }),
+    (async () => {
+      const [tab] = await self.clients.matchAll({ type: "window" })
+      if (!tab) return self.clients.openWindow(url)
+      await tab.focus()
+      return tab.navigate(url)
+    })(),
   )
 })

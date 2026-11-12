@@ -138,8 +138,8 @@ chatty-chat's push worker sends a Web Push for new messages while Chatty isn't o
   it. A subscription made for another key is replaced.
 - **Turning it off and logging out:** `DELETE /push/subscriptions` and unsubscribe, before chatty-core's
   logout, so the next person on this browser doesn't get pushes they didn't turn on.
-- **The service worker** shows one notification per channel (a newer one replaces it), and a click focuses
-  or opens Chatty. It can't open the channel yet: the payload has no `team_id`.
+- **The service worker** shows one notification per channel (a newer one replaces it). A click opens
+  `/teams/{team_id}/channels/{channel_id}` in an open Chatty tab, or in a new one.
 
 ## Project layout
 
