@@ -4,6 +4,7 @@ import { Outlet, useLocation, useMatches } from "react-router"
 import { AppHeader } from "@/components/app/app-header"
 import { Sidebar } from "@/components/app/sidebar"
 import { TeamRail } from "@/components/app/team-rail"
+import { useAuth } from "@/features/auth"
 import { ChannelsProvider } from "@/features/channels"
 import { MessagesProvider } from "@/features/messages"
 import { PresenceProvider } from "@/features/presence"
@@ -34,9 +35,10 @@ export function AppLayout() {
   const closeDrawer = () => setDrawerOpenOn(null)
 
   // Browsers sometimes change a push subscription, so save it again on every app start.
+  const userId = useAuth().user?.id
   useEffect(() => {
-    void resavePushSubscription().catch(() => {})
-  }, [])
+    if (userId) void resavePushSubscription(userId).catch(() => {})
+  }, [userId])
 
   useEffect(() => {
     if (!drawerOpen) return

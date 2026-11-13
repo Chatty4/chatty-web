@@ -9,6 +9,11 @@ import { base64UrlToBytes, isSameKey, pushStatus, toSaveInput } from "./utils/su
 
 const SERVICE_WORKER_URL = "/sw.js"
 
+/** The worker reads ?user= to write "@you" for this user's mentions. */
+function workerUrl(userId: string): string {
+  return `${SERVICE_WORKER_URL}?user=${encodeURIComponent(userId)}`
+}
+
 function isSupported(): boolean {
   return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window
 }
@@ -38,11 +43,11 @@ export async function readPushStatus(): Promise<PushStatus> {
 }
 
 /** Asks for permission (call it from a click), subscribes and saves. Returns the new status. */
-export async function enablePush(): Promise<PushStatus> {
+export async function enablePush(userId: string): Promise<PushStatus> {
   if (!isSupported() || !VAPID_PUBLIC_KEY) return readPushStatus()
   const permission = await Notification.requestPermission()
   if (permission !== "granted") return pushStatus(permission, false)
-  const registration = await navigator.serviceWorker.register(SERVICE_WORKER_URL)
+  const registration = await navigator.serviceWorker.register(workerUrl(userId))
   await navigator.serviceWorker.ready
   await save(await subscriptionForKey(registration))
   return "on"
@@ -67,9 +72,12 @@ export async function disablePush(): Promise<void> {
  * On every app start, for a browser that turned push on: saves the subscription again, because
  * browsers sometimes change it (api-chat.md#post-push-subscriptions). Never asks for permission.
  */
-export async function resavePushSubscription(): Promise<void> {
+export async function resavePushSubscription(userId: string): Promise<void> {
   if (!isSupported() || !VAPID_PUBLIC_KEY || Notification.permission !== "granted") return
-  const registration = await navigator.serviceWorker.getRegistration()
-  if (!registration || !(await registration.pushManager.getSubscription())) return
+  const existing = await navigator.serviceWorker.getRegistration()
+  if (!existing || !(await existing.pushManager.getSubscription())) return
+  // Same scope, so this updates the worker (for another user, or one from before ?user=)
+  // and keeps the subscription.
+  const registration = await navigator.serviceWorker.register(workerUrl(userId))
   await save(await subscriptionForKey(registration))
 }
