@@ -1,5 +1,5 @@
 import { Menu } from "@base-ui/react/menu"
-import { ChevronDown, Hash, Headphones, Lock, MessageSquare, Plus, Search, Settings, X } from "lucide-react"
+import { BellOff, ChevronDown, Hash, Headphones, Lock, MessageSquare, Plus, Search, Settings, X } from "lucide-react"
 import { Link, useMatches, useNavigate } from "react-router"
 
 import { Button } from "@/components/ui/button"
@@ -23,6 +23,16 @@ function useActiveChannelId(): string | null {
     if (id) return id
   }
   return null
+}
+
+function MutedIcon({ muted }: { muted: boolean }) {
+  if (!muted) return null
+  return (
+    <>
+      <BellOff className="size-[13px] shrink-0" aria-hidden="true" />
+      <span className="sr-only">, muted</span>
+    </>
+  )
 }
 
 type SidebarProps = {
@@ -175,13 +185,14 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                   isActive
                     ? "bg-accent font-medium text-accent-foreground"
                     : "text-muted-foreground hover:bg-surface-hover hover:text-foreground",
-                  counts.unread > 0 && "font-semibold text-foreground",
-                  ch.archived && "opacity-50",
+                  counts.unread > 0 && !ch.my.muted && "font-semibold text-foreground",
+                  (ch.archived || ch.my.muted) && "opacity-50",
                 )}
                 aria-current={isActive ? "page" : undefined}
               >
                 <Icon className="size-[15px] shrink-0" />
                 <span className="min-w-0 flex-1 truncate">{ch.name}</span>
+                <MutedIcon muted={ch.my.muted} />
                 {ch.archived && (
                   <span className="ml-auto shrink-0 text-[10px] text-faint-foreground">archived</span>
                 )}
@@ -229,7 +240,8 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                   isActive
                     ? "bg-accent font-medium text-accent-foreground"
                     : "text-muted-foreground hover:bg-surface-hover hover:text-foreground",
-                  counts.unread > 0 && "font-semibold text-foreground",
+                  counts.unread > 0 && !dm.my.muted && "font-semibold text-foreground",
+                  dm.my.muted && "opacity-50",
                 )}
                 aria-current={isActive ? "page" : undefined}
               >
@@ -244,6 +256,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                 </span>
                 <span className="min-w-0 flex-1 truncate">{label}</span>
                 {online && <span className="sr-only">, online</span>}
+                <MutedIcon muted={dm.my.muted} />
                 <UnreadBadge {...counts} />
               </Link>
             )
