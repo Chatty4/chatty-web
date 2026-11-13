@@ -1,4 +1,6 @@
 import { type FormEvent, useEffect, useState } from "react"
+import { Switch } from "@base-ui/react/switch"
+import { BellOff } from "lucide-react"
 import { useNavigate } from "react-router"
 
 import { Alert } from "@/components/ui/alert"
@@ -8,12 +10,12 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { Dialog } from "@/components/ui/dialog"
 import { FormField } from "@/components/ui/form-field"
 import { Input } from "@/components/ui/input"
-import { Select } from "@/components/ui/select"
 import { DataList, DataRow, RowMain, SectionTitle, SettingsTabs } from "@/components/ui/settings"
 import { SidePanel } from "@/components/ui/side-panel"
 import { useAuth } from "@/features/auth"
 import { getAllTeamMembersRequest } from "@/features/teams/fetchers/team-fetchers"
 import { useConfirm } from "@/hooks/use-confirm"
+import { cn } from "@/lib/utils"
 
 import { useChannels } from "../hooks/channels-context"
 import { useChannelSettings } from "../hooks/use-channel-settings"
@@ -319,26 +321,63 @@ function NotificationsTab({
   return (
     <div className="flex flex-col gap-[18px]">
       {error && <Alert>{error}</Alert>}
-      <FormField label="Notification level">
-        {(control) => (
-          <Select
-            {...control}
-            value={my.notify_level}
-            disabled={saving}
-            onChange={(e) => void update({ notify_level: e.target.value as NotifyLevel })}
-          >
-            <option value="all">All messages</option>
-            <option value="mentions">Mentions only</option>
-            <option value="none">Nothing</option>
-          </Select>
+
+      <label className="flex cursor-pointer items-start gap-3 rounded-md border p-3">
+        <BellOff className="mt-0.5 size-[17px] shrink-0 text-muted-foreground" aria-hidden="true" />
+        <span className="flex min-w-0 flex-1 flex-col">
+          <strong className="font-semibold">Mute channel</strong>
+          <span className="text-xs text-muted-foreground">
+            No notifications, and the channel is dimmed in the sidebar.
+          </span>
+        </span>
+        <Switch.Root
+          checked={my.muted}
+          disabled={saving}
+          onCheckedChange={(muted) => void update({ muted })}
+          className="relative mt-0.5 inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full bg-border-strong p-0.5 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring data-[checked]:bg-primary data-[disabled]:cursor-default data-[disabled]:opacity-60"
+        >
+          <Switch.Thumb className="size-4 rounded-full bg-background shadow-sm transition-transform data-[checked]:translate-x-4" />
+        </Switch.Root>
+      </label>
+
+      <fieldset disabled={saving || my.muted} className="flex flex-col gap-1.5">
+        <legend className="mb-1.5 font-semibold">Notify me about</legend>
+        {my.muted && (
+          <p className="mb-1 text-xs text-muted-foreground">Unmute the channel to use these.</p>
         )}
-      </FormField>
-      <Button variant="secondary" disabled={saving} onClick={() => void update({ muted: !my.muted })}>
-        {my.muted ? "Unmute channel" : "Mute channel"}
-      </Button>
+        {LEVELS.map(({ value, label, detail }) => (
+          <label
+            key={value}
+            className={cn(
+              "flex cursor-pointer items-start gap-3 rounded-md border p-3 transition-colors hover:bg-surface-hover",
+              "has-[:checked]:border-primary has-[:checked]:bg-accent",
+              my.muted && "cursor-default opacity-50 hover:bg-transparent",
+            )}
+          >
+            <input
+              type="radio"
+              name="notify_level"
+              value={value}
+              checked={my.notify_level === value}
+              onChange={() => void update({ notify_level: value })}
+              className="mt-0.5 size-4 shrink-0 accent-primary"
+            />
+            <span className="flex min-w-0 flex-col">
+              <span className="font-medium">{label}</span>
+              <span className="text-xs text-muted-foreground">{detail}</span>
+            </span>
+          </label>
+        ))}
+      </fieldset>
     </div>
   )
 }
+
+const LEVELS: { value: NotifyLevel; label: string; detail: string }[] = [
+  { value: "all", label: "All messages", detail: "Every new message in this channel." },
+  { value: "mentions", label: "Mentions only", detail: "Only when someone @mentions you." },
+  { value: "none", label: "Nothing", detail: "No notifications from this channel." },
+]
 
 // ── Archive ──────────────────────────────────────────────────────────────────
 
