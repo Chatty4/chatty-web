@@ -12,6 +12,7 @@ import {
   updateMyChannelSettingsRequest,
 } from "../fetchers/channel-fetchers"
 import type { ChannelDetail, ChannelMember, NotifyLevel } from "../types"
+import { useChannels } from "./channels-context"
 
 export type ChannelSettingsState =
   | { status: "loading" }
@@ -55,6 +56,7 @@ async function fetchChannelSettings(channelId: string): Promise<ChannelSettingsS
 export function useChannelSettings(channelId: string) {
   const [state, setState] = useState<ChannelSettingsState>({ status: "loading" })
   const generation = useRef(0)
+  const { reload: reloadSidebar } = useChannels()
 
   const load = useCallback((cid: string) => {
     const current = ++generation.current
@@ -107,8 +109,9 @@ export function useChannelSettings(channelId: string) {
           channel: { ...prev.channel, my: { ...prev.channel.my, ...settings } },
         }
       })
+      reloadSidebar() // the sidebar shows muted channels
     },
-    [channelId],
+    [channelId, reloadSidebar],
   )
 
   const addMembers = useCallback(

@@ -1,6 +1,20 @@
 // Service worker for Web Push (CHAT-219). Plain JS in public/, so it is served as /sw.js and its
 // scope is the whole app. The payload is chatty-chat's push payload (api-chat.md#push-payload).
 
+// Mentions arrive as <@user_id> (api-chat.md#push-payload). The worker has no names, only the
+// signed-in user's id, which the app passes as /sw.js?user=<id>.
+const MENTION = /<@([0-9a-fA-F-]{36})>/g
+const MY_ID = (new URLSearchParams(self.location.search).get("user") || "").toLowerCase()
+
+function previewText(preview) {
+  return (preview || "")
+    .replace(MENTION, (_, id) => (id.toLowerCase() === MY_ID ? "@you" : "@someone"))
+    .trim()
+}
+
+// A new ?user= installs a new worker; take over now instead of after every tab is closed.
+self.addEventListener("install", () => self.skipWaiting())
+
 self.addEventListener("push", (event) => {
   let data = {}
   try {
@@ -10,7 +24,7 @@ self.addEventListener("push", (event) => {
   }
   event.waitUntil(
     self.registration.showNotification(data.mentioned ? "You were mentioned" : "New message", {
-      body: data.preview || "Open Chatty to read it.",
+      body: previewText(data.preview) || "Open Chatty to read it.",
       icon: "/favicon.svg",
       // One notification per channel: a newer message replaces the older one.
       tag: data.channel_id,

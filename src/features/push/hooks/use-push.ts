@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react"
 
+import { useAuth } from "@/features/auth"
+
 import { disablePush, enablePush, readPushStatus } from "../push"
 import type { PushStatus } from "../types"
 
@@ -28,7 +30,8 @@ export function usePush() {
     }
   }, [])
 
-  const turnOn = useCallback(() => run(enablePush), [run])
+  const userId = useAuth().user?.id ?? ""
+  const turnOn = useCallback(() => run(() => enablePush(userId)), [run, userId])
   const turnOff = useCallback(() => run(disablePush), [run])
 
   return { status, busy, turnOn, turnOff }
