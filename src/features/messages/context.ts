@@ -6,6 +6,15 @@ export type MessagesContextValue = {
   getChannel: (channelId: string) => ChannelState | undefined
   loadChannel: (channelId: string) => void
   loadMoreHistory: (channelId: string) => Promise<void>
+  /**
+   * Shows a message: scrolls to it when loaded, otherwise loads the messages around it
+   * (around_seq). Resolves false when that page couldn't be loaded.
+   */
+  jumpTo: (channelId: string, messageId: string, seq: number) => Promise<boolean>
+  /** After a jump: loads the next newer page (after_seq). */
+  loadNewer: (channelId: string) => Promise<void>
+  /** Leaves a jumped-to window and shows the newest messages again. */
+  returnToPresent: (channelId: string) => Promise<void>
   /** Never rejects: a failure shows on the message. Resolves with the error code, if any. */
   send: (channelId: string, body: string) => Promise<string | undefined>
   retry: (channelId: string, clientMsgId: string) => Promise<string | undefined>

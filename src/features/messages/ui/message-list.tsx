@@ -16,7 +16,9 @@ import { useMemberNames } from "../hooks/use-member-names"
 import { useScrollAnchor } from "../hooks/use-scroll-anchor"
 import { useWatchChannel } from "../hooks/use-watch-channel"
 import { useWhenVisible } from "../hooks/use-when-visible"
+import { HistoryBottom } from "./history-bottom"
 import { HistoryTop } from "./history-top"
+import { jumpToMessage } from "../utils/jump-to-message"
 import { MessageItem } from "./message-item"
 import { MessageComposer } from "./message-composer"
 import { MessageListSkeleton } from "./message-skeleton"
@@ -38,6 +40,8 @@ import type { SidebarChannel } from "@/features/channels/types"
 
 /** Start fetching older messages this far before the user reaches the top. */
 const PREFETCH_MARGIN = "300px 0px 0px 0px"
+/** The same before the bottom, for newer messages after a jump. */
+const PREFETCH_MARGIN_BOTTOM = "0px 0px 300px 0px"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -69,6 +73,8 @@ export function MessageList({
     getChannel,
     loadChannel,
     loadMoreHistory,
+    loadNewer,
+    returnToPresent,
     send,
     retry,
     discard,
@@ -94,6 +100,11 @@ export function MessageList({
   const loadFailed = channelState?.loadFailed ?? false
   const loadingMore = channelState?.loadingMore ?? false
   const loadMoreFailed = channelState?.loadMoreFailed ?? false
+  // After a jump to an older message, newer ones are below the loaded window.
+  const hasMoreAfter = channelState?.hasMoreAfter ?? false
+  const loadingNewer = channelState?.loadingNewer ?? false
+  const loadNewerFailed = channelState?.loadNewerFailed ?? false
+  const focus = channelState?.focus
 
   // A public channel I haven't joined gets its live events through a watch.
   const { loading: sidebarLoading, failed: sidebarFailed } = useChannels()
@@ -132,12 +143,13 @@ export function MessageList({
   const lastMessage = messages.at(-1)
   const lastKey = lastMessage ? messageKey(lastMessage) : undefined
   const lastKeyRef = useRef<string | undefined>(undefined)
+  const wasDetachedRef = useRef(hasMoreAfter)
 
   type ScrollState = { atBottom: boolean; farFromBottom: boolean; newCount: number }
   const resetScroll: ScrollState = { atBottom: true, farFromBottom: false, newCount: 0 }
   const [scrollState, setScrollState] = useState<ScrollState>(resetScroll)
   const { atBottom, farFromBottom, newCount } = scrollState
-  const showJump = farFromBottom || newCount > 0
+  const showJump = farFromBottom || newCount > 0 || hasMoreAfter
 
   // ── Older history ────────────────────────────────────────────────────────────
   const { capture: captureAnchor, clear: clearAnchor } = useScrollAnchor(
@@ -157,6 +169,15 @@ export function MessageList({
     resetKey: channelId,
     rootMargin: PREFETCH_MARGIN,
     onVisible: loadOlder,
+  })
+
+  // ── Newer history (after a jump) ─────────────────────────────────────────────
+  const bottomSentinelRef = useWhenVisible<HTMLDivElement>({
+    rootRef: listRef,
+    enabled: hasMoreAfter && !loading && !loadingNewer && !loadNewerFailed,
+    resetKey: channelId,
+    rootMargin: PREFETCH_MARGIN_BOTTOM,
+    onVisible: () => void loadNewer(channelId),
   })
 
   const scrollToBottom =(behavior: ScrollBehavior = "smooth") => {
@@ -196,6 +217,8 @@ export function MessageList({
     const previousKey = lastKeyRef.current
     lastKeyRef.current = lastKey
     if (!lastKey || lastKey === previousKey) return
+    // A jumped-to window, or a newer page added under it: the user is reading, don't move.
+    if (hasMoreAfter || wasDetachedRef.current) return
 
     if (previousKey === undefined) {
       requestAnimationFrame(() => scrollToBottom("instant" as ScrollBehavior))
@@ -209,6 +232,17 @@ export function MessageList({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastKey])
 
+  // After the effect above, so it still sees whether the list was detached before this change.
+  useEffect(() => {
+    wasDetachedRef.current = hasMoreAfter
+  }, [hasMoreAfter])
+
+  // Scroll to a jumped-to message (search result, pin), after the effects above.
+  useEffect(() => {
+    if (focus) requestAnimationFrame(() => jumpToMessage(focus.messageId))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus?.key])
+
   // ── Read state ───────────────────────────────────────────────────────────────
   // Read up to the newest message while I can see it. Only members have a read position.
   const { getCounts, markRead } = useUnread()
@@ -221,8 +255,9 @@ export function MessageList({
   // is still marked.
   const { unread } = getCounts(channelId)
   useEffect(() => {
-    if (isMember && atBottom && tabVisible && !loading) markRead(channelId, lastSeq)
-  }, [isMember, atBottom, tabVisible, loading, channelId, lastSeq, unread, markRead])
+    // The bottom of a jumped-to window isn't the newest message.
+    if (isMember && atBottom && tabVisible && !loading && !hasMoreAfter) markRead(channelId, lastSeq)
+  }, [isMember, atBottom, tabVisible, loading, hasMoreAfter, channelId, lastSeq, unread, markRead])
 
   const handleScroll = () => {
     const el = listRef.current
@@ -362,6 +397,14 @@ export function MessageList({
             </Fragment>
             )
           })}
+          {!loading && !loadFailed && hasMoreAfter && (
+            <HistoryBottom
+              loadingNewer={loadingNewer}
+              failed={loadNewerFailed}
+              onLoadNewer={() => void loadNewer(channelId)}
+              sentinelRef={bottomSentinelRef}
+            />
+          )}
           {!loading && !loadFailed && (
             <TypingIndicator
               channelId={channelId}
@@ -377,7 +420,13 @@ export function MessageList({
       <Button
         size={newCount > 0 ? "sm" : "icon"}
         inert={!showJump}
-        onClick={() => scrollToBottom()}
+        onClick={() => {
+          if (!hasMoreAfter) return scrollToBottom()
+          // The newest messages aren't loaded: fetch them, then go to the bottom.
+          void returnToPresent(channelId).then(() =>
+            requestAnimationFrame(() => scrollToBottom("instant" as ScrollBehavior)),
+          )
+        }}
         aria-label={
           newCount
             ? `Jump to latest, ${newCount} new message${newCount === 1 ? "" : "s"}`

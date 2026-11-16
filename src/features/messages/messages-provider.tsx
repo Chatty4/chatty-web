@@ -24,6 +24,8 @@ import {
   editMessageApi,
   getChannelEvents,
   getMessages,
+  getMessagesAfter,
+  getMessagesAround,
   listPinsApi,
   pinMessageApi,
   removeReactionApi,
@@ -32,6 +34,7 @@ import {
 } from "./fetchers/message-fetchers"
 import {
   messagesReducer,
+  newestLoadedSeq,
   oldestLoadedSeq,
   type MessagesAction,
   type MessagesState,
@@ -157,7 +160,65 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
     }
   }, [doDispatch])
 
+  const jumpTo = useCallback(
+    async (channelId: string, messageId: string, seq: number): Promise<boolean> => {
+      const key = Date.now()
+      const ch = stateRef.current[channelId]
+      if (ch?.messages.some((m) => m.id === messageId)) {
+        doDispatch({ type: "FOCUS", channelId, messageId, key })
+        return true
+      }
+      // Claim the channel first, so opening it doesn't also load the newest page over the jump.
+      const fresh = !ch || !!ch.loadFailed
+      if (fresh) doDispatch({ type: "LOAD_START", channelId })
+      try {
+        const res = await getMessagesAround(channelId, seq)
+        doDispatch({
+          type: "JUMP_LOADED",
+          channelId,
+          messages: res.messages,
+          lastSeq: res.last_seq,
+          hasMore: res.has_more,
+          hasMoreAfter: res.has_more_after ?? false,
+          messageId,
+          key,
+        })
+        return true
+      } catch {
+        if (fresh) doDispatch({ type: "LOAD_FAIL", channelId })
+        return false
+      } finally {
+        if (fresh) sequencerRef.current?.release(channelId)
+      }
+    },
+    [doDispatch],
+  )
+
+  const loadNewer = useCallback(async (channelId: string) => {
+    const ch = stateRef.current[channelId]
+    if (!ch?.hasMoreAfter || ch.loading || ch.loadingNewer) return
+    const afterSeq = newestLoadedSeq(ch.messages)
+    if (afterSeq === undefined) return
+
+    doDispatch({ type: "LOAD_NEWER_START", channelId })
+    try {
+      const res = await getMessagesAfter(channelId, afterSeq)
+      doDispatch({
+        type: "APPEND",
+        channelId,
+        messages: res.messages,
+        hasMoreAfter: res.has_more_after ?? false,
+        afterSeq,
+        lastSeq: res.last_seq,
+      })
+    } catch {
+      doDispatch({ type: "LOAD_NEWER_FAIL", channelId })
+    }
+  }, [doDispatch])
+
   const send = useCallback(async (channelId: string, body: string) => {
+    // After a jump the list shows older messages: go back to the newest before adding mine.
+    if (stateRef.current[channelId]?.hasMoreAfter) await reloadChannel(channelId)
     const userId = userIdRef.current ?? ""
     const clientMsgId = uuid()
     doDispatch({
@@ -188,7 +249,7 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
       doDispatch({ type: "OPTIMISTIC_FAIL", channelId, clientMsgId, failure: describeSendFailure(err) })
       return messageErrorCode(err)
     }
-  }, [doDispatch])
+  }, [doDispatch, reloadChannel])
 
   const retry = useCallback(async (channelId: string, clientMsgId: string) => {
     const ch = stateRef.current[channelId]
@@ -296,7 +357,7 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <MessagesContext.Provider value={{ getChannel, loadChannel, loadMoreHistory, send, retry, discard, edit, remove, setReaction, setPinned, loadPins, getDraft, setDraft }}>
+    <MessagesContext.Provider value={{ getChannel, loadChannel, loadMoreHistory, jumpTo, loadNewer, returnToPresent: reloadChannel, send, retry, discard, edit, remove, setReaction, setPinned, loadPins, getDraft, setDraft }}>
       {children}
     </MessagesContext.Provider>
   )

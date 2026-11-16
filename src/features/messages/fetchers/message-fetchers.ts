@@ -17,6 +17,16 @@ export function getMessages(channelId: string, beforeSeq?: number): Promise<GetM
   return chatApi.get<GetMessagesResponse>(`/channels/${channelId}/messages${params}`)
 }
 
+/** Messages on both sides of a seq, for jumping to a message (e.g. a search result). */
+export function getMessagesAround(channelId: string, aroundSeq: number): Promise<GetMessagesResponse> {
+  return chatApi.get<GetMessagesResponse>(`/channels/${channelId}/messages?around_seq=${aroundSeq}`)
+}
+
+/** The next messages after a seq, for scrolling down after a jump. */
+export function getMessagesAfter(channelId: string, afterSeq: number): Promise<GetMessagesResponse> {
+  return chatApi.get<GetMessagesResponse>(`/channels/${channelId}/messages?after_seq=${afterSeq}`)
+}
+
 export function sendMessageApi(
   channelId: string,
   body: string,
