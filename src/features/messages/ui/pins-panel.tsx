@@ -9,7 +9,6 @@ import { useMessages } from "../context"
 import { useMemberNames } from "../hooks/use-member-names"
 import { usePinToggle } from "../hooks/use-pin-toggle"
 import { usePins } from "../hooks/use-pins"
-import { jumpToMessage } from "../utils/jump-to-message"
 import { extractMentionIds } from "../utils/mentions"
 import { PinCard } from "./pin-card"
 
@@ -47,7 +46,7 @@ export function PinsPanel({
   onClose,
   onChannelArchived,
 }: PinsPanelProps) {
-  const { loadPins, setPinned } = useMessages()
+  const { loadPins, setPinned, jumpTo } = useMessages()
   const pins = usePins(channelId)
   const items = useMemo(() => pins?.items ?? [], [pins])
 
@@ -70,9 +69,9 @@ export function PinsPanel({
     onChannelArchived,
   })
 
-  const jump = (messageId: string) => {
-    if (!jumpToMessage(messageId)) {
-      toast.error("Scroll up to load this message")
+  const jump = async (messageId: string, seq: number) => {
+    if (!(await jumpTo(channelId, messageId, seq))) {
+      toast.error("Couldn't load this message. Try again.")
       return
     }
     // On small screens the panel covers the list, so get out of the way.
@@ -122,7 +121,7 @@ export function PinsPanel({
                 names={names}
                 canUnpin={canUnpin}
                 unpinning={busyId === pin.message.id}
-                onJump={() => jump(pin.message.id)}
+                onJump={() => void jump(pin.message.id, pin.message.seq)}
                 onUnpin={() => void toggle(pin.message.id, false)}
               />
             ))}

@@ -23,6 +23,30 @@ export type MessagesAction =
       lastSeq: number
     }
   | { type: "LOAD_MORE_FAIL"; channelId: string }
+  // A window around a message (around_seq); `key` tells the list to scroll to it again.
+  | {
+      type: "JUMP_LOADED"
+      channelId: string
+      messages: ApiMessage[]
+      lastSeq: number
+      hasMore: boolean
+      hasMoreAfter: boolean
+      messageId: string
+      key: number
+    }
+  // The message is already loaded: only scroll to it.
+  | { type: "FOCUS"; channelId: string; messageId: string; key: number }
+  | { type: "LOAD_NEWER_START"; channelId: string }
+  // afterSeq is the cursor the page was requested with; lastSeq is its answer's last_seq.
+  | {
+      type: "APPEND"
+      channelId: string
+      messages: ApiMessage[]
+      hasMoreAfter: boolean
+      afterSeq: number
+      lastSeq: number
+    }
+  | { type: "LOAD_NEWER_FAIL"; channelId: string }
   | { type: "RELOAD"; channelId: string; messages: ApiMessage[]; lastSeq: number; hasMore: boolean }
   | { type: "APPLY_EVENT"; channelId: string; event: ChannelEvent; currentUserId: string }
   | { type: "APPLY_EVENTS"; channelId: string; events: ChannelEvent[]; lastSeq: number; currentUserId: string }
@@ -70,6 +94,26 @@ function makeChannelState(
 /** The seq to request the next older page with, or undefined with nothing from the server yet. */
 export function oldestLoadedSeq(messages: LocalMessage[]): number | undefined {
   return messages.find((m) => m.seq > 0)?.seq
+}
+
+/** The seq to request the next newer page with, or undefined with nothing from the server yet. */
+export function newestLoadedSeq(messages: LocalMessage[]): number | undefined {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i]!.seq > 0) return messages[i]!.seq
+  }
+  return undefined
+}
+
+/**
+ * A new message while the list shows an older window: it belongs below messages that aren't
+ * loaded yet, so it comes with the newer pages instead. One of mine still replaces its copy.
+ */
+function isPastWindow(ch: ChannelState, event: ChannelEvent): boolean {
+  if (!ch.hasMoreAfter || event.type !== "message.created") return false
+  const { message } = event.payload as { message: ApiMessage }
+  return !ch.messages.some(
+    (m) => m.id === message.id || (!!message.client_msg_id && m.client_msg_id === message.client_msg_id),
+  )
 }
 
 export function messagesReducer(state: MessagesState, action: MessagesAction): MessagesState {
@@ -151,6 +195,76 @@ export function messagesReducer(state: MessagesState, action: MessagesAction): M
       }
     }
 
+    case "JUMP_LOADED":
+      return {
+        ...state,
+        [action.channelId]: {
+          ...makeChannelState(
+            state[action.channelId],
+            action.messages,
+            action.lastSeq,
+            action.hasMore,
+          ),
+          hasMoreAfter: action.hasMoreAfter,
+          focus: { messageId: action.messageId, key: action.key },
+        },
+      }
+
+    case "FOCUS": {
+      const ch = state[action.channelId]
+      if (!ch) return state
+      return {
+        ...state,
+        [action.channelId]: { ...ch, focus: { messageId: action.messageId, key: action.key } },
+      }
+    }
+
+    case "LOAD_NEWER_START": {
+      const ch = state[action.channelId]
+      if (!ch) return state
+      return {
+        ...state,
+        [action.channelId]: { ...ch, loadingNewer: true, loadNewerFailed: false },
+      }
+    }
+
+    case "LOAD_NEWER_FAIL": {
+      const ch = state[action.channelId]
+      if (!ch) return state
+      return {
+        ...state,
+        [action.channelId]: { ...ch, loadingNewer: false, loadNewerFailed: true },
+      }
+    }
+
+    case "APPEND": {
+      const ch = state[action.channelId]
+      if (!ch) return state
+      const done = { ...state, [action.channelId]: { ...ch, loadingNewer: false } }
+      // A reload or another jump replaced the list while this page was in flight.
+      if (!ch.hasMoreAfter || newestLoadedSeq(ch.messages) !== action.afterSeq) return done
+      // Events newer than this page were already applied, and the new messages among them
+      // skipped (isPastWindow). Drop the page: the next one, asked right away, includes them.
+      if (action.lastSeq < ch.lastSeq) return done
+
+      const known = new Set(ch.messages.map((m) => m.id))
+      const newer = newestFirstToAsc(action.messages)
+        .filter((m) => !known.has(m.id))
+        .map((m) => ({ ...m, asOfSeq: action.lastSeq }))
+      const sent = ch.messages.filter((m) => m.status === "sent")
+      const unsent = ch.messages.filter((m) => m.status !== "sent")
+      return {
+        ...state,
+        [action.channelId]: {
+          ...ch,
+          messages: [...sent, ...newer, ...unsent],
+          // An empty page can't move the cursor, so asking again would loop forever.
+          hasMoreAfter: action.hasMoreAfter && newer.length > 0,
+          loadingNewer: false,
+        },
+      }
+    }
+
     case "RELOAD":
       return {
         ...state,
@@ -166,7 +280,9 @@ export function messagesReducer(state: MessagesState, action: MessagesAction): M
       const ch = state[action.channelId]
       if (!ch) return state
       if (action.event.seq <= ch.lastSeq) return state // dedup
-      const messages = applyEvent(ch.messages, action.event, action.currentUserId)
+      const messages = isPastWindow(ch, action.event)
+        ? ch.messages
+        : applyEvent(ch.messages, action.event, action.currentUserId)
       return {
         ...state,
         [action.channelId]: {
@@ -186,7 +302,9 @@ export function messagesReducer(state: MessagesState, action: MessagesAction): M
       let lastSeq = ch.lastSeq
       for (const event of action.events) {
         if (event.seq <= lastSeq) continue
-        msgs = applyEvent(msgs, event, action.currentUserId)
+        if (!isPastWindow({ ...ch, messages: msgs }, event)) {
+          msgs = applyEvent(msgs, event, action.currentUserId)
+        }
         pins = applyEventToPins(pins, event, msgs)
         lastSeq = event.seq
       }

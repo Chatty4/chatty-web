@@ -90,6 +90,17 @@ export type ChannelState = {
   loadingMore: boolean
   /** The last older page failed. Stops automatic fetches until the user retries. */
   loadMoreFailed: boolean
+  /**
+   * True after a jump to an older message: newer messages exist below the loaded window.
+   * New messages from events aren't added then; they come with the newer pages.
+   */
+  hasMoreAfter?: boolean
+  /** True while a newer page is being fetched; blocks further fetches. */
+  loadingNewer?: boolean
+  /** The last newer page failed. Stops automatic fetches until the user retries. */
+  loadNewerFailed?: boolean
+  /** A message the list should scroll to and highlight; `key` changes on every jump. */
+  focus?: { messageId: string; key: number }
   /** The channel's pins, once something asked for them. */
   pins?: PinsState
 }
@@ -98,7 +109,10 @@ export type ChannelState = {
 
 export type GetMessagesResponse = {
   messages: ApiMessage[]
+  /** Older messages exist (scroll up). */
   has_more: boolean
+  /** Newer messages exist (scroll down); only with around_seq or after_seq. */
+  has_more_after?: boolean
   /** The channel's newest event number; used as the initial lastSeq cursor. */
   last_seq: number
 }

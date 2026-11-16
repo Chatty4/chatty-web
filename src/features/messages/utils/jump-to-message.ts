@@ -2,7 +2,7 @@ const HIGHLIGHT_MS = 1500
 
 /**
  * Scrolls to a message in the list and briefly highlights it. Returns false when it isn't
- * loaded: the API only pages backwards, so an older message can't be fetched directly.
+ * rendered; useMessages().jumpTo loads it first (around_seq).
  */
 export function jumpToMessage(messageId: string): boolean {
   const row = document.querySelector<HTMLElement>(`[data-message-id="${CSS.escape(messageId)}"]`)
