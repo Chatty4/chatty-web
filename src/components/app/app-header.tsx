@@ -28,16 +28,18 @@ export function AppHeader({ title, subtitle, onOpenMenu }: AppHeaderProps) {
   const [searchParams, setSearchParams] = useSearchParams()
   const detailsOpen = searchParams.has("details")
   const pinsOpen = searchParams.has("pins")
+  const searchOpen = searchParams.has("search")
   const inChannel = !!teamId && !!channelId && !pathname.endsWith("/settings")
   const pinCount = usePins(inChannel ? channelId : undefined)?.items.length ?? 0
 
-  // Only one right-hand panel at a time: opening one closes the other.
-  const togglePanel = (panel: "details" | "pins") =>
+  // Only one right-hand panel at a time: opening one closes the others.
+  const togglePanel = (panel: "details" | "pins" | "search") =>
     setSearchParams(
       (prev) => {
         const wasOpen = prev.has(panel)
         prev.delete("details")
         prev.delete("pins")
+        prev.delete("search")
         if (!wasOpen) prev.set(panel, "")
         return prev
       },
@@ -108,9 +110,14 @@ export function AppHeader({ title, subtitle, onOpenMenu }: AppHeaderProps) {
         <Button
           variant="ghost"
           size="icon"
-          aria-label="Search"
+          aria-label={inChannel ? "Search messages" : "Browse channels"}
+          aria-pressed={inChannel ? searchOpen : undefined}
+          className={searchOpen ? "bg-surface-hover text-foreground" : undefined}
           disabled={!activeTeamId}
-          onClick={() => navigate(`/teams/${activeTeamId}/channels/browse`)}
+          // Message search lives beside a channel; elsewhere this still finds channels.
+          onClick={() =>
+            inChannel ? togglePanel("search") : navigate(`/teams/${activeTeamId}/channels/browse`)
+          }
         >
           <Search className="size-[18px]" />
         </Button>

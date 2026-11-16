@@ -9,6 +9,7 @@ import {
   type SidebarChannel,
 } from "@/features/channels"
 import { ChannelIntro, MessageList, PinsPanel } from "@/features/messages"
+import { SearchPanel } from "@/features/search"
 import { useTeams } from "@/features/teams"
 
 const DETAILS_TABS: ChannelDetailsTab[] = ["about", "members", "notifications", "archive"]
@@ -26,12 +27,14 @@ export function ChannelPage() {
   const showDetails = detailsParam !== null
   const detailsTab = DETAILS_TABS.find((t) => t === detailsParam) ?? "about"
   const showPins = searchParams.has("pins")
+  const showSearch = searchParams.has("search")
 
-  // Only one right-hand panel at a time, so opening one clears the other.
+  // Only one right-hand panel at a time, so opening one clears the others.
   const setDetails = (tab: ChannelDetailsTab | null) =>
     setSearchParams(
       (prev) => {
         prev.delete("pins")
+        prev.delete("search")
         if (tab) prev.set("details", tab)
         else prev.delete("details")
         return prev
@@ -39,10 +42,10 @@ export function ChannelPage() {
       { replace: true },
     )
 
-  const closePins = () =>
+  const closePanel = (panel: "pins" | "search") =>
     setSearchParams(
       (prev) => {
-        prev.delete("pins")
+        prev.delete(panel)
         return prev
       },
       { replace: true },
@@ -88,9 +91,13 @@ export function ChannelPage() {
           teamId={teamId}
           label={channel?.kind === "dm" ? dmName : `#${channel?.name ?? ""}`}
           canUnpin={!!channel && !channel.archived}
-          onClose={closePins}
+          onClose={() => closePanel("pins")}
           onChannelArchived={reload}
         />
+      )}
+      {/* Not keyed by channel: the results stay while the user opens one after another. */}
+      {showSearch && (
+        <SearchPanel teamId={teamId} channelId={channelId} onClose={() => closePanel("search")} />
       )}
     </div>
   )
