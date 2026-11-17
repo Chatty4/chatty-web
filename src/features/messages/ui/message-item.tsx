@@ -1,6 +1,6 @@
 import { memo, useState } from "react"
 import {
-  MoreHorizontal,
+  Copy,
   Pencil,
   Pin,
   PinOff,
@@ -233,6 +233,16 @@ export const MessageItem = memo(function MessageItem({
     />
   )
 
+  // The text as the user reads it: mentions as @Name, not <@id>.
+  const copyText = async () => {
+    try {
+      await navigator.clipboard.writeText(decodeMentions(message.body, names))
+      toast.success("Copied to clipboard")
+    } catch {
+      toast.error("Couldn't copy. Select the text and copy it instead.")
+    }
+  }
+
   const toolbar = !isDeleted && !showEditor && (
     <div
       className={cn(
@@ -282,14 +292,11 @@ export const MessageItem = memo(function MessageItem({
           {isPinned ? <PinOff /> : <Pin />}
         </Button>
       )}
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        aria-label="More message options"
-        onClick={() => {/* reactions / thread — future tickets */}}
-      >
-        <MoreHorizontal />
-      </Button>
+      {message.body && (
+        <Button variant="ghost" size="icon-sm" aria-label="Copy text" onClick={() => void copyText()}>
+          <Copy />
+        </Button>
+      )}
     </div>
   )
 
