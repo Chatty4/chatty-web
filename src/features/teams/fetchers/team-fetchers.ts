@@ -32,6 +32,20 @@ export function leaveTeamRequest(teamId: string): Promise<void> {
   return coreApi.post(`/teams/${teamId}/leave`)
 }
 
+/** The first members whose name has a word starting with `q`, for a type-to-search picker. */
+export async function searchTeamMembersRequest(
+  teamId: string,
+  q: string,
+  signal?: AbortSignal,
+): Promise<TeamMember[]> {
+  const params = new URLSearchParams({ q, limit: "8" })
+  const page = await coreApi.get<{ members: TeamMember[]; next_cursor: string | null }>(
+    `/teams/${teamId}/members?${params}`,
+    { signal },
+  )
+  return page.members
+}
+
 /** Every member of the team, however many pages that takes. */
 export function getAllTeamMembersRequest(teamId: string): Promise<TeamMember[]> {
   return fetchAllPages(async (cursor) => {
