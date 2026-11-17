@@ -5,11 +5,13 @@ import { useNavigate } from "react-router"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { SidePanel } from "@/components/ui/side-panel"
+import { useAuth } from "@/features/auth"
 import { useChannels } from "@/features/channels"
 import { useMessages } from "@/features/messages"
 import { useMemberNames } from "@/features/messages/hooks/use-member-names"
 import { extractMentionIds } from "@/features/messages/utils/mentions"
 import { toast } from "@/lib/toast"
+import { cn } from "@/lib/utils"
 
 import { searchMessages } from "../fetchers/search-fetchers"
 import type { SearchResult } from "../types"
@@ -37,6 +39,7 @@ export type SearchPanelProps = {
 /** Full-text search in the team's messages. Click a result to jump to it. */
 export function SearchPanel({ teamId, channelId, onClose }: SearchPanelProps) {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const { jumpTo } = useMessages()
   const { channels, dms } = useChannels()
 
@@ -167,19 +170,25 @@ export function SearchPanel({ teamId, channelId, onClose }: SearchPanelProps) {
 
         {results.length > 0 && (
           <ul className="flex flex-col gap-[9px]" aria-label={`Results for ${query}`}>
-            {results.map((result) => (
+            {results.map((result) => {
+              const own = result.message.author_id === user?.id
+              return (
               <li
                 key={result.message.id}
                 tabIndex={0}
                 role="button"
                 onClick={() => void open(result)}
                 onKeyDown={(event) => handleKeyDown(event, result)}
-                className="cursor-pointer rounded-md border p-3 hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-ring"
+                className={cn(
+                  "cursor-pointer rounded-md border p-3 focus-visible:outline-2 focus-visible:outline-ring",
+                  // The light blue of my own bubbles in the chat.
+                  own ? "border-primary/30 bg-accent hover:bg-accent/70" : "hover:bg-surface-hover",
+                )}
               >
                 <div className="flex items-baseline justify-between gap-2 text-xs text-muted-foreground">
                   <span className="truncate">
                     <strong className="font-semibold text-foreground">
-                      {names[result.message.author_id] ?? "Unknown member"}
+                      {own ? "You" : (names[result.message.author_id] ?? "Unknown member")}
                     </strong>{" "}
                     in {channelLabel(result.message.channel_id)}
                   </span>
@@ -199,7 +208,8 @@ export function SearchPanel({ teamId, channelId, onClose }: SearchPanelProps) {
                   )}
                 </p>
               </li>
-            ))}
+              )
+            })}
           </ul>
         )}
 
