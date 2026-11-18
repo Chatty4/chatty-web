@@ -5,6 +5,7 @@ import { useNavigate } from "react-router"
 
 import { Avatar } from "@/components/ui/avatar"
 import { useAuth } from "@/features/auth"
+import { useFileImage } from "@/features/files"
 import { useTheme } from "@/hooks/use-theme"
 
 const itemClass =
@@ -16,6 +17,7 @@ export function UserMenu() {
   const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
   const [loggingOut, setLoggingOut] = useState(false)
+  const avatarSrc = useFileImage(user?.avatar_file_id)
 
   if (!user) return null
 
@@ -28,7 +30,7 @@ export function UserMenu() {
   return (
     <Menu.Root>
       <Menu.Trigger className="flex h-11 min-w-0 flex-1 cursor-pointer items-center gap-2.5 rounded-sm px-2 text-left text-foreground transition-colors outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring data-[popup-open]:bg-surface-hover">
-        <Avatar name={user.display_name} />
+        <Avatar name={user.display_name} src={avatarSrc} />
         <span className="flex min-w-0 flex-1 flex-col leading-tight">
           <strong className="truncate font-semibold">{user.display_name}</strong>
           <small className="truncate text-[11px] text-muted-foreground">Available</small>

@@ -16,6 +16,11 @@ export function confirmUploadApi(fileId: string): Promise<UploadedFile> {
   return coreApi.post<UploadedFile>(`/files/${fileId}/confirm`)
 }
 
+/** GET /files/{id}: an avatar or a team icon. chatty-core answers with a redirect to MinIO. */
+export function getFileBlobApi(fileId: string): Promise<Blob> {
+  return coreApi.getBlob(`/files/${fileId}`)
+}
+
 /**
  * Step 2: the bytes go straight to MinIO, without a token. XMLHttpRequest, because fetch can't
  * report upload progress. `onProgress` gets 0..1.
