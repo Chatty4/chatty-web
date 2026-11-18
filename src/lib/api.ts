@@ -39,31 +39,45 @@ async function send(url: string, options: RequestOptions, token: string | null) 
   }
 }
 
-export async function request<T>(url: string, options: RequestOptions = {}): Promise<T> {
+async function sendWithRefresh(url: string, options: RequestOptions): Promise<Response> {
   const auth = options.auth ?? true
   const token = auth ? getAccessToken() : null
+  const response = await send(url, options, token)
 
-  let response = await send(url, options, token)
-  let body = response.status === 204 ? null : await readJson(response)
-
+  if (!auth || response.status !== 401 || !(options.refreshOnExpiry ?? true) || !hasStoredSession()) {
+    return response
+  }
   // The access token expired or was rejected: refresh it once and try again. Other 401 codes
   // (invalid_credentials, invalid_refresh_token, ...) are answers, not an expired token.
-  const expired =
-    response.status === 401 && toApiError(response, body).code === "unauthorized"
-  if (auth && expired && (options.refreshOnExpiry ?? true) && hasStoredSession()) {
-    const fresh = await refreshSession(token)
-    response = await send(url, options, fresh)
-    body = response.status === 204 ? null : await readJson(response)
-  }
+  const body = await readJson(response.clone())
+  if (toApiError(response, body).code !== "unauthorized") return response
+  return send(url, options, await refreshSession(token))
+}
 
+export async function request<T>(url: string, options: RequestOptions = {}): Promise<T> {
+  const response = await sendWithRefresh(url, options)
+  const body = response.status === 204 ? null : await readJson(response)
   if (!response.ok) throw toApiError(response, body)
   return body as T
+}
+
+/** A GET whose answer is a file, not JSON. Redirects (a presigned URL) are followed. */
+export async function requestBlob(url: string, options: Pick<RequestOptions, "signal"> = {}): Promise<Blob> {
+  const response = await sendWithRefresh(url, options)
+  if (!response.ok) throw toApiError(response, await readJson(response))
+  try {
+    return await response.blob()
+  } catch {
+    throw networkError()
+  }
 }
 
 function client(baseUrl: string) {
   return {
     get: <T>(path: string, options?: Omit<RequestOptions, "method" | "body">) =>
       request<T>(baseUrl + path, options),
+    getBlob: (path: string, options?: Pick<RequestOptions, "signal">) =>
+      requestBlob(baseUrl + path, options),
     post: <T>(path: string, body?: unknown, options?: Omit<RequestOptions, "method" | "body">) =>
       request<T>(baseUrl + path, { ...options, method: "POST", body }),
     put: <T>(path: string, body?: unknown, options?: Omit<RequestOptions, "method" | "body">) =>
