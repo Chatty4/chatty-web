@@ -16,8 +16,10 @@ RUN npm run build
 FROM nginx:1.29-alpine
 
 # Backends inside the Docker network. Override with -e when the service names differ.
+# MINIO_PUBLIC_URL: the MinIO address the browser uses, the same as chatty-core's (for the CSP).
 ENV CORE_API_UPSTREAM=http://core:8000 \
-    CHAT_API_UPSTREAM=http://chat:8001
+    CHAT_API_UPSTREAM=http://chat:8001 \
+    MINIO_PUBLIC_URL=http://127.0.0.1:9000
 
 COPY nginx/default.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html

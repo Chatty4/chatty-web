@@ -1,4 +1,4 @@
-# The nginx image fills in ${CORE_API_UPSTREAM} and ${CHAT_API_UPSTREAM} at startup.
+# The nginx image fills in ${CORE_API_UPSTREAM}, ${CHAT_API_UPSTREAM} and ${MINIO_PUBLIC_URL} at startup.
 # Standard map for WebSocket upgrades: sends "upgrade" on WS requests, "" otherwise.
 # Forwarding $http_connection directly would pass "keep-alive" to the upstream, which
 # prevents the WebSocket handshake from completing.
@@ -25,7 +25,9 @@ server {
     # Only our own files, styles inline too (React style props, sonner's injected <style>).
     # connect-src: the API and WebSocket ('self' covers ws:/wss: to this host), plus jsDelivr,
     # where the emoji picker (frimousse) loads its emoji data from.
-    set $csp "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://cdn.jsdelivr.net; frame-ancestors 'none'";
+    # MinIO (D-16): uploads go straight to it, and attachment images and avatars come from its
+    # presigned URLs. blob: is an avatar downloaded through GET /files/{id}.
+    set $csp "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: ${MINIO_PUBLIC_URL}; connect-src 'self' https://cdn.jsdelivr.net ${MINIO_PUBLIC_URL}; frame-ancestors 'none'";
 
     # Security headers. A location with its own add_header drops all of these, so the two
     # locations below repeat them. Change all three copies together.
