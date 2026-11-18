@@ -1,10 +1,11 @@
-import { useMemo, useRef, useState, type KeyboardEvent } from "react"
+import { useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from "react"
 import { AtSign, Paperclip, Send } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { EmojiPickerButton } from "@/components/ui/emoji-picker"
 import { UploadChip, useFileUploads } from "@/features/files"
 import { toast } from "@/lib/toast"
+import { cn } from "@/lib/utils"
 
 import { MAX_MESSAGE_FILES, MAX_MESSAGE_LENGTH as MAX_LENGTH } from "../constants"
 import type { Attachment } from "../types"
@@ -98,11 +99,15 @@ export function MessageComposer({
   }
 
   const pickFiles = (files: FileList | null) => {
-    if (!files) return
+    if (!files || files.length === 0 || archived) return
     const room = MAX_MESSAGE_FILES - uploads.length
     if (files.length > room) toast.error(`A message can have at most ${MAX_MESSAGE_FILES} files.`)
     addUploads(Array.from(files).slice(0, Math.max(room, 0)))
   }
+
+  // A file dragged over the composer: it shows where to drop it.
+  const [dragging, setDragging] = useState(false)
+  const hasFiles = (e: DragEvent) => e.dataTransfer.types.includes("Files")
 
   const moveCaret = (position: number) => {
     setCaret(position)
@@ -206,7 +211,32 @@ export function MessageComposer({
       )}
 
       {/* Composer box */}
-      <div className="flex flex-col rounded-md border border-input bg-surface focus-within:border-primary focus-within:ring-2 focus-within:ring-accent">
+      <div
+        className={cn(
+          "relative flex flex-col rounded-md border border-input bg-surface focus-within:border-primary focus-within:ring-2 focus-within:ring-accent",
+          dragging && "border-primary ring-2 ring-accent",
+        )}
+        onDragOver={(e) => {
+          if (archived || !hasFiles(e)) return
+          e.preventDefault() // allows the drop
+          setDragging(true)
+        }}
+        onDragLeave={(e) => {
+          // Moving onto a child also fires dragleave: only leaving the box counts.
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false)
+        }}
+        onDrop={(e) => {
+          if (!hasFiles(e)) return
+          e.preventDefault()
+          setDragging(false)
+          pickFiles(e.dataTransfer.files)
+        }}
+      >
+        {dragging && (
+          <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center rounded-md bg-surface/90 text-sm font-medium text-primary">
+            Drop files to attach
+          </div>
+        )}
         {uploads.length > 0 && (
           <ul aria-label="Attached files" className="flex flex-wrap gap-2 px-3 pt-3">
             {uploads.map((upload) => (
@@ -236,6 +266,12 @@ export function MessageComposer({
           }}
           onSelect={(e) => setCaret(e.currentTarget.selectionStart)}
           onKeyDown={handleKeyDown}
+          onPaste={(e) => {
+            // Ctrl+V of a copied file or screenshot attaches it; plain text pastes as usual.
+            if (e.clipboardData.files.length === 0) return
+            e.preventDefault()
+            pickFiles(e.clipboardData.files)
+          }}
         />
 
         <div className="flex items-center justify-between px-2 pb-2 pt-1">
