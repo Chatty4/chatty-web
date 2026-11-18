@@ -446,14 +446,15 @@ export function MessageList({
       {/* Keyed so a draft can never be sent to the channel opened after it. */}
       <MessageComposer
         key={channelId}
+        teamId={teamId}
         members={mentionable}
         archived={archived}
         initialDraft={getDraft(channelId)}
         onDraftChange={(text) => setDraft(channelId, text)}
         // Only who can write here: someone just watching a public channel sends nothing.
         onTextChange={isMember && !archived ? sendTyping : undefined}
-        onSend={async (body) => {
-          if ((await send(channelId, body)) === "channel_archived") onChannelArchived()
+        onSend={async (body, attachments) => {
+          if ((await send(channelId, body, attachments)) === "channel_archived") onChannelArchived()
         }}
       />
     </div>

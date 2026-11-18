@@ -3,8 +3,11 @@ import { AtSign, Paperclip, Send } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { EmojiPickerButton } from "@/components/ui/emoji-picker"
+import { UploadChip, useFileUploads } from "@/features/files"
+import { toast } from "@/lib/toast"
 
-import { MAX_MESSAGE_LENGTH as MAX_LENGTH } from "../constants"
+import { MAX_MESSAGE_FILES, MAX_MESSAGE_LENGTH as MAX_LENGTH } from "../constants"
+import type { Attachment } from "../types"
 import {
   encodeMentions,
   extractMentionIds,
@@ -15,6 +18,8 @@ import {
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type MessageComposerProps = {
+  /** The channel's team: attachments are uploaded for it. */
+  teamId: string
   /** Channel members used for @mention autocomplete. */
   members: MentionCandidate[]
   /** When true the textarea is disabled and shows an archived notice. */
@@ -24,13 +29,14 @@ export type MessageComposerProps = {
   onDraftChange?: (text: string) => void
   /** Called on every change, with whether any text is left in the box. */
   onTextChange?: (hasText: boolean) => void
-  /** Called when the user submits a message. */
-  onSend: (body: string) => Promise<void>
+  /** Called when the user submits a message, with its files in the order they were picked. */
+  onSend: (body: string, attachments: Attachment[]) => Promise<void>
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function MessageComposer({
+  teamId,
   members,
   archived = false,
   initialDraft = "",
@@ -46,6 +52,9 @@ export function MessageComposer({
   // Who was chosen from the list: the text alone can't tell two people with one name apart.
   const [picks, setPicks] = useState<MentionCandidate[]>([])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const { uploads, add: addUploads, remove: removeUpload, clear: clearUploads } =
+    useFileUploads("attachment", teamId)
 
   const setValue = (next: string) => {
     setStoredValue(next)
@@ -70,13 +79,29 @@ export function MessageComposer({
   )
   const tooLong = encoded.length > MAX_LENGTH
 
+  const attachments: Attachment[] = uploads.flatMap(({ uploaded }) =>
+    uploaded
+      ? [{ file_id: uploaded.id, filename: uploaded.filename, mime: uploaded.mime, size: uploaded.size }]
+      : [],
+  )
+  // Every picked file must be ready: a failed one has to be removed first.
+  const filesReady = attachments.length === uploads.length
+  const canSend = !archived && !tooLong && filesReady && (encoded !== "" || attachments.length > 0)
+
   const send = () => {
-    const body = encoded
-    if (!body || archived || tooLong) return
+    if (!canSend) return
     setValue("")
     setPicks([])
-    void onSend(body)
+    clearUploads()
+    void onSend(encoded, attachments)
     requestAnimationFrame(() => textareaRef.current?.focus())
+  }
+
+  const pickFiles = (files: FileList | null) => {
+    if (!files) return
+    const room = MAX_MESSAGE_FILES - uploads.length
+    if (files.length > room) toast.error(`A message can have at most ${MAX_MESSAGE_FILES} files.`)
+    addUploads(Array.from(files).slice(0, Math.max(room, 0)))
   }
 
   const moveCaret = (position: number) => {
@@ -182,6 +207,15 @@ export function MessageComposer({
 
       {/* Composer box */}
       <div className="flex flex-col rounded-md border border-input bg-surface focus-within:border-primary focus-within:ring-2 focus-within:ring-accent">
+        {uploads.length > 0 && (
+          <ul aria-label="Attached files" className="flex flex-wrap gap-2 px-3 pt-3">
+            {uploads.map((upload) => (
+              <li key={upload.key}>
+                <UploadChip upload={upload} onRemove={() => removeUpload(upload.key)} />
+              </li>
+            ))}
+          </ul>
+        )}
         <textarea
           ref={textareaRef}
           className="min-h-[60px] w-full resize-none bg-transparent px-3 pt-3 text-sm text-foreground outline-none placeholder:text-faint-foreground disabled:cursor-not-allowed disabled:opacity-50"
@@ -211,11 +245,21 @@ export function MessageComposer({
               variant="ghost"
               size="icon-sm"
               aria-label="Attach file"
-              disabled={archived}
-              onClick={() => {/* file uploads — future ticket */}}
+              disabled={archived || uploads.length >= MAX_MESSAGE_FILES}
+              onClick={() => fileInputRef.current?.click()}
             >
               <Paperclip />
             </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              hidden
+              onChange={(e) => {
+                pickFiles(e.target.files)
+                e.target.value = "" // so the same file can be picked again
+              }}
+            />
             <EmojiPickerButton
               disabled={archived}
               returnFocusRef={textareaRef}
@@ -247,7 +291,7 @@ export function MessageComposer({
             <Button
               size="icon-sm"
               aria-label="Send message"
-              disabled={!value.trim() || archived || tooLong}
+              disabled={!canSend}
               onClick={send}
             >
               <Send />
