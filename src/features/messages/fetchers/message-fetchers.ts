@@ -5,6 +5,7 @@ import { chatApi } from "@/lib/api"
 
 import type {
   ApiMessage,
+  GetAttachmentUrlsResponse,
   GetEventsResponse,
   GetMessagesResponse,
   GetPinsResponse,
@@ -38,6 +39,11 @@ export function sendMessageApi(
     client_msg_id: clientMsgId,
     file_ids: fileIds,
   })
+}
+
+/** GET /messages/{id}/attachments — download URLs for the message's files (D-02). */
+export function getAttachmentUrlsApi(messageId: string): Promise<GetAttachmentUrlsResponse> {
+  return chatApi.get<GetAttachmentUrlsResponse>(`/messages/${messageId}/attachments`)
 }
 
 export function editMessageApi(messageId: string, body: string): Promise<ApiMessage> {
