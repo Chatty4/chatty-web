@@ -31,10 +31,12 @@ export function sendMessageApi(
   channelId: string,
   body: string,
   clientMsgId: string,
+  fileIds: string[] = [],
 ): Promise<SendMessageResponse> {
   return chatApi.post<SendMessageResponse>(`/channels/${channelId}/messages`, {
     body,
     client_msg_id: clientMsgId,
+    file_ids: fileIds,
   })
 }
 

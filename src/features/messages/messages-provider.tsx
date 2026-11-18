@@ -41,7 +41,7 @@ import {
 } from "./store/channel-reducer"
 import { createEventSequencer, type EventSequencer } from "./store/event-sequencer"
 import { planSync, selectCursors } from "./store/sequence"
-import type { ApiMessage, ChannelState } from "./types"
+import type { ApiMessage, Attachment, ChannelState } from "./types"
 import { describePinError, describeSendFailure, messageErrorCode } from "./utils/errors"
 
 // ── Provider ──────────────────────────────────────────────────────────────────
@@ -216,7 +216,7 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
     }
   }, [doDispatch])
 
-  const send = useCallback(async (channelId: string, body: string) => {
+  const send = useCallback(async (channelId: string, body: string, attachments: Attachment[] = []) => {
     // After a jump the list shows older messages: go back to the newest before adding mine.
     if (stateRef.current[channelId]?.hasMoreAfter) await reloadChannel(channelId)
     const userId = userIdRef.current ?? ""
@@ -230,8 +230,8 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
         seq: 0,
         author_id: userId,
         body,
-        file_ids: [],
-        attachments: [],
+        file_ids: attachments.map((a) => a.file_id),
+        attachments,
         mentions: [],
         reactions: [],
         pinned: false,
@@ -243,7 +243,12 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
       },
     })
     try {
-      const confirmed: ApiMessage = await sendMessageApi(channelId, body, clientMsgId)
+      const confirmed: ApiMessage = await sendMessageApi(
+        channelId,
+        body,
+        clientMsgId,
+        attachments.map((a) => a.file_id),
+      )
       doDispatch({ type: "OPTIMISTIC_CONFIRM", channelId, clientMsgId, confirmed })
     } catch (err) {
       doDispatch({ type: "OPTIMISTIC_FAIL", channelId, clientMsgId, failure: describeSendFailure(err) })
@@ -258,7 +263,7 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
     if (!msg) return
     doDispatch({ type: "OPTIMISTIC_RETRY", channelId, clientMsgId })
     try {
-      const confirmed = await sendMessageApi(channelId, msg.body, clientMsgId)
+      const confirmed = await sendMessageApi(channelId, msg.body, clientMsgId, msg.file_ids)
       doDispatch({ type: "OPTIMISTIC_CONFIRM", channelId, clientMsgId, confirmed })
     } catch (err) {
       doDispatch({ type: "OPTIMISTIC_FAIL", channelId, clientMsgId, failure: describeSendFailure(err) })
