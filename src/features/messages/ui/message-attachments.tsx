@@ -27,7 +27,8 @@ export function MessageAttachments({ message, align }: { message: LocalMessage; 
   return (
     <ul
       aria-label="Files"
-      className={cn("mt-1 flex max-w-[75%] flex-wrap gap-2", align === "end" && "justify-end")}
+      // One per row, so the list is only as wide as its widest file.
+      className={cn("mt-1 flex flex-col gap-1.5", align === "end" ? "items-end" : "items-start")}
     >
       {message.attachments.map((attachment) => {
         const url = urls[attachment.file_id]?.url
