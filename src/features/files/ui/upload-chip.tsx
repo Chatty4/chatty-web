@@ -18,6 +18,8 @@ export function UploadChip({ upload, onRemove }: { upload: FileUpload; onRemove:
     >
       {failed ? (
         <AlertCircle className="size-4 shrink-0 text-destructive" aria-hidden="true" />
+      ) : upload.preview ? (
+        <img src={upload.preview} alt="" className="size-9 shrink-0 rounded-sm object-cover" />
       ) : (
         <FileText className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
       )}
