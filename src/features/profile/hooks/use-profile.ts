@@ -18,9 +18,23 @@ export function useProfile() {
     [user, updateUser],
   )
 
+  /** A ready avatar file from POST /files, or null to remove it. */
+  const updateAvatar = useCallback(
+    async (avatarFileId: string | null) => {
+      if (!user) throw new Error("Not authenticated")
+      const me = await updateMeRequest({
+        display_name: user.display_name,
+        timezone: user.timezone,
+        avatar_file_id: avatarFileId,
+      })
+      updateUser(me)
+    },
+    [user, updateUser],
+  )
+
   const changePassword = useCallback(async (input: ChangePasswordInput) => {
     await changePasswordRequest(input)
   }, [])
 
-  return { user, updateProfile, changePassword }
+  return { user, updateProfile, updateAvatar, changePassword }
 }

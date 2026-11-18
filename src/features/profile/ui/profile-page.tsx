@@ -1,10 +1,11 @@
-import { type FormEvent, useState } from "react"
+import { type FormEvent, useRef, useState } from "react"
 
 import { Alert } from "@/components/ui/alert"
 import { Avatar } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { FormField } from "@/components/ui/form-field"
 import { Input } from "@/components/ui/input"
+import { checkFile, describeUploadError, IMAGE_MIMES, uploadFile, useFileImage } from "@/features/files"
 import { NotificationsSection } from "@/features/push"
 import { toast } from "@/lib/toast"
 
@@ -13,16 +14,99 @@ import type { ChangePasswordInput } from "../types"
 import { describePasswordError } from "../utils/errors"
 import { TimezoneSelect } from "./timezone-select"
 
+// ── Avatar row ────────────────────────────────────────────────────────────────
+
+function AvatarRow({
+  name,
+  avatarFileId,
+  onChange,
+}: {
+  name: string
+  avatarFileId: string | null
+  /** Saves a ready avatar file, or null to remove it. */
+  onChange: (avatarFileId: string | null) => Promise<void>
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const src = useFileImage(avatarFileId)
+  // 0..1 while uploading, null otherwise.
+  const [progress, setProgress] = useState<number | null>(null)
+  const [removing, setRemoving] = useState(false)
+  const busy = progress !== null || removing
+
+  const upload = async (file: File) => {
+    const refused = checkFile(file, "avatar")
+    if (refused) return toast.error(refused)
+    setProgress(0)
+    try {
+      const uploaded = await uploadFile(file, "avatar", { teamId: null, onProgress: setProgress })
+      await onChange(uploaded.id)
+      toast.success("Profile photo saved")
+    } catch (error) {
+      toast.error(describeUploadError(error))
+    } finally {
+      setProgress(null)
+    }
+  }
+
+  const remove = async () => {
+    setRemoving(true)
+    try {
+      await onChange(null)
+    } catch {
+      toast.error("Could not remove the photo. Try again.")
+    } finally {
+      setRemoving(false)
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-3 border-b border-border pb-4">
+      <Avatar name={name} src={src} className="size-12 text-base" />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <strong className="text-sm font-medium">Profile photo</strong>
+        <span className="text-[12px] text-muted-foreground">
+          {progress !== null
+            ? `Uploading… ${Math.round(progress * 100)}%`
+            : "PNG, JPEG, WebP or GIF, up to 2 MB."}
+        </span>
+      </div>
+      {avatarFileId && (
+        <Button variant="ghost" size="sm" disabled={busy} onClick={() => void remove()}>
+          Remove
+        </Button>
+      )}
+      <Button variant="ghost" size="sm" disabled={busy} onClick={() => inputRef.current?.click()}>
+        Upload
+      </Button>
+      <input
+        ref={inputRef}
+        type="file"
+        accept={IMAGE_MIMES.join(",")}
+        hidden
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          e.target.value = "" // so the same file can be picked again
+          if (file) void upload(file)
+        }}
+      />
+    </div>
+  )
+}
+
 // ── Profile section ───────────────────────────────────────────────────────────
 
 function ProfileSection({
   displayName: initialDisplayName,
   timezone: initialTimezone,
+  avatarFileId,
   onSave,
+  onAvatarChange,
 }: {
   displayName: string
   timezone: string
+  avatarFileId: string | null
   onSave: (displayName: string, timezone: string) => Promise<void>
+  onAvatarChange: (avatarFileId: string | null) => Promise<void>
 }) {
   const [displayName, setDisplayName] = useState(initialDisplayName)
   const [timezone, setTimezone] = useState(initialTimezone)
@@ -54,17 +138,7 @@ function ProfileSection({
         <span className="text-[13px] text-muted-foreground">Update how teammates see you.</span>
       </div>
 
-      {/* Avatar row */}
-      <div className="flex items-center gap-3 border-b border-border pb-4">
-        <Avatar name={displayName} className="size-12 text-base" />
-        <div className="flex min-w-0 flex-1 flex-col">
-          <strong className="text-sm font-medium">Profile photo</strong>
-          <span className="text-[12px] text-muted-foreground">Avatar uploads are coming soon.</span>
-        </div>
-        <Button variant="ghost" size="sm" disabled>
-          Upload
-        </Button>
-      </div>
+      <AvatarRow name={displayName} avatarFileId={avatarFileId} onChange={onAvatarChange} />
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-[18px]">
         {error && <Alert>{error}</Alert>}
@@ -215,7 +289,7 @@ function PasswordSection({
 
 /** Account settings: profile (name, timezone), push notifications and password change. */
 export function ProfilePage() {
-  const { user, updateProfile, changePassword } = useProfile()
+  const { user, updateProfile, updateAvatar, changePassword } = useProfile()
 
   if (!user) return null
 
@@ -229,7 +303,9 @@ export function ProfilePage() {
       <ProfileSection
         displayName={user.display_name}
         timezone={user.timezone}
+        avatarFileId={user.avatar_file_id}
         onSave={(displayName, timezone) => updateProfile({ display_name: displayName, timezone })}
+        onAvatarChange={updateAvatar}
       />
 
       <NotificationsSection />

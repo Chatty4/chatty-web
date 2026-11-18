@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils"
 
-/** "Ana Maria Pop" -> "AM". Avatar images come with file uploads. */
+/** "Ana Maria Pop" -> "AM": shown when there is no avatar image. */
 export function initials(name: string): string {
   const letters = name
     .trim()
@@ -12,10 +12,13 @@ export function initials(name: string): string {
 
 export function Avatar({
   name,
+  src,
   className,
   online = false,
 }: {
   name: string
+  /** The avatar image. Without it, the initials. */
+  src?: string
   className?: string
   /** Shows the green presence dot. The caller says "online" in text for screen readers. */
   online?: boolean
@@ -24,11 +27,11 @@ export function Avatar({
     <span
       aria-hidden="true"
       className={cn(
-        "grid size-8 shrink-0 place-items-center rounded-full bg-accent text-[11px] font-semibold text-primary",
+        "grid size-8 shrink-0 place-items-center overflow-hidden rounded-full bg-accent text-[11px] font-semibold text-primary",
         className,
       )}
     >
-      {initials(name)}
+      {src ? <img src={src} alt="" className="size-full object-cover" /> : initials(name)}
     </span>
   )
   if (!online) return avatar

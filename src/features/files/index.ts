@@ -1,5 +1,6 @@
 export { uploadFile } from "./fetchers/file-fetchers"
 export type { UploadOptions } from "./fetchers/file-fetchers"
+export { useFileImage } from "./hooks/use-file-image"
 export { useFileUploads } from "./hooks/use-file-uploads"
 export type { FileUpload } from "./hooks/use-file-uploads"
 export type { FilePurpose, UploadedFile } from "./types"
