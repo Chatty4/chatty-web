@@ -21,6 +21,16 @@ export type Attachment = {
   size: number
 }
 
+/** One entry of GET /messages/{id}/attachments: a presigned download URL, valid 5 minutes. */
+export type AttachmentUrl = Attachment & {
+  url: string
+  expires_at: string
+}
+
+export type GetAttachmentUrlsResponse = {
+  attachments: AttachmentUrl[]
+}
+
 /** The message object returned by the REST API (no local-only fields). */
 export type ApiMessage = {
   id: string

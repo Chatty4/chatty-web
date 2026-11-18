@@ -29,6 +29,7 @@ import {
   type MentionCandidate,
 } from "../utils/mentions"
 import { MessageEditor } from "./message-editor"
+import { MessageAttachments } from "./message-attachments"
 import { MessageMarkdown } from "./message-markdown"
 import { PinnedMark } from "./pinned-mark"
 import { ReactionChips } from "./reaction-chips"
@@ -127,6 +128,8 @@ export const MessageItem = memo(function MessageItem({
 
   const isDeleted = message.deleted_at !== null
   const isEdited = message.edited_at !== null && !isDeleted
+  // A message of only files has no text bubble.
+  const hasText = message.body !== "" || isEdited || (!own && message.status !== "sent")
   const isPinned = message.pinned && !isDeleted
   // Close the editor if the message gets deleted (e.g. from another tab) while open.
   const showEditor = editing && !isDeleted
@@ -337,19 +340,22 @@ export const MessageItem = memo(function MessageItem({
             This message was deleted.
           </p>
         ) : (
-          <div className="relative max-w-[75%]">
-            <div
-              className={cn(
-                "rounded-lg bg-accent px-3 py-1.5 text-sm leading-relaxed break-words text-foreground",
-                MARKDOWN_BLOCK_CLASS,
-                !grouped && "rounded-tr-sm",
-                message.status === "pending" && "opacity-70",
-                message.status === "failed" && "ring-1 ring-destructive/50",
-              )}
-            >
-              <MessageMarkdown body={message.body} own names={names} />
-              {isEdited && <span className="ml-1 text-xs text-muted-foreground">(edited)</span>}
-            </div>
+          <div className="relative flex max-w-[75%] flex-col items-end">
+            {hasText && (
+              <div
+                className={cn(
+                  "rounded-lg bg-accent px-3 py-1.5 text-sm leading-relaxed break-words text-foreground",
+                  MARKDOWN_BLOCK_CLASS,
+                  !grouped && "rounded-tr-sm",
+                  message.status === "pending" && "opacity-70",
+                  message.status === "failed" && "ring-1 ring-destructive/50",
+                )}
+              >
+                <MessageMarkdown body={message.body} own names={names} />
+                {isEdited && <span className="ml-1 text-xs text-muted-foreground">(edited)</span>}
+              </div>
+            )}
+            <MessageAttachments message={message} align="end" />
             {toolbar}
           </div>
         )}
@@ -404,20 +410,23 @@ export const MessageItem = memo(function MessageItem({
           editor
         ) : (
           <div className="relative w-fit max-w-[75%]">
-            <div
-              className={cn(
-                "rounded-lg px-3 py-1.5 text-sm leading-relaxed break-words text-foreground",
-                // A mention of me gets the light-blue of my own bubbles, with a thin edge.
-                mentionsMe ? "bg-accent ring-1 ring-primary/30" : "bg-surface-hover",
-                MARKDOWN_BLOCK_CLASS,
-                !grouped && "rounded-tl-sm",
-              )}
-            >
-              {/* `own` styles mention chips for a light-blue bubble. */}
-              <MessageMarkdown body={message.body} own={mentionsMe} names={names} />
-              {isEdited && <span className="ml-1 text-xs text-muted-foreground">(edited)</span>}
-              {message.status !== "sent" && <span className="ml-1">{status}</span>}
-            </div>
+            {hasText && (
+              <div
+                className={cn(
+                  "rounded-lg px-3 py-1.5 text-sm leading-relaxed break-words text-foreground",
+                  // A mention of me gets the light-blue of my own bubbles, with a thin edge.
+                  mentionsMe ? "bg-accent ring-1 ring-primary/30" : "bg-surface-hover",
+                  MARKDOWN_BLOCK_CLASS,
+                  !grouped && "rounded-tl-sm",
+                )}
+              >
+                {/* `own` styles mention chips for a light-blue bubble. */}
+                <MessageMarkdown body={message.body} own={mentionsMe} names={names} />
+                {isEdited && <span className="ml-1 text-xs text-muted-foreground">(edited)</span>}
+                {message.status !== "sent" && <span className="ml-1">{status}</span>}
+              </div>
+            )}
+            <MessageAttachments message={message} align="start" />
             {toolbar}
           </div>
         )}
