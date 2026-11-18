@@ -33,7 +33,9 @@ edit and delete messages, with reactions, pins, unread badges, presence dots and
 channel you open without joining updates live too. Logging in needs chatty-core running, and messages need
 chatty-chat. `/status` calls each backend's `/health` through the proxy, to check that the wiring works.
 
-Not built yet: file uploads.
+Messages can carry up to 10 files: they upload while you write, straight to MinIO (`src/features/files/`),
+and show as images or file cards. The account settings page uploads a profile photo. Uploads and downloads
+need MinIO running, from `chatty-infra`.
 
 | Path in the browser | Forwarded to |
 |---|---|
@@ -70,6 +72,8 @@ docker run --rm -p 8080:80 --network chatty_default chatty-web
 Open http://localhost:8080. Nginx serves the built app and forwards the API paths to `http://core:8000` and
 `http://chat:8001` on the infra network. Override them with `-e CORE_API_UPSTREAM=...` and
 `-e CHAT_API_UPSTREAM=...`. Nginx starts even if a backend isn't running; its paths then return 502.
+`-e MINIO_PUBLIC_URL=...` (default `http://127.0.0.1:9000`) must be chatty-core's `MINIO_PUBLIC_URL`: the CSP
+allows uploads to it and images from it.
 
 The config is `nginx/default.conf.template`:
 
@@ -77,7 +81,8 @@ The config is `nginx/default.conf.template`:
   `Content-Security-Policy`. A location with its own `add_header` drops the server-level ones, so `/assets/`
   and `/` repeat them: change all three copies together.
 - **The CSP** is in `$csp`: only our own scripts, styles (inline too) and images, `connect-src` for the API, the
-  WebSocket and jsDelivr (the emoji data), and no framing. Adding a script, font or API from another origin
+  WebSocket, jsDelivr (the emoji data) and MinIO (uploads), images also from MinIO and `blob:` (avatars), and
+  no framing. Adding a script, font or API from another origin
   means adding it there.
 - **The access log** writes the path without the query string, because the WebSocket sends the access token
   as `?token=`.
@@ -155,7 +160,8 @@ src/
   components/
     ui/                 generic components (Button, Input, FormField, ...; shadcn ones too)
     app/                the app shell: team rail, sidebar, header, user menu, ...
-  features/<name>/      auth, channels, invites, messages, presence, profile, push, teams, typing, unread, ws
+  features/<name>/      auth, channels, files, invites, messages, presence, profile, push, teams, typing,
+                        unread, ws
     fetchers/           API calls
     hooks/              state and logic
     store/              messages, presence, typing, unread: the pure state changes, tested without a browser
