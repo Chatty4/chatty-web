@@ -12,6 +12,13 @@ describe("describeSendFailure", () => {
     })
   })
 
+  it("asks to attach again when a file can't be sent, without a retry", () => {
+    expect(describeSendFailure(new ApiError(400, "invalid_file", "File f1 can't be sent"))).toEqual({
+      message: "A file can't be sent. Attach it again.",
+      retryable: false,
+    })
+  })
+
   it.each([0, 429, 500, 503])("allows a retry after status %i", (status) => {
     expect(describeSendFailure(new ApiError(status, "x", "x")).retryable).toBe(true)
   })

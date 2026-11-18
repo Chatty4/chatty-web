@@ -20,6 +20,8 @@ export function describeMessageError(error: unknown): string {
       return "This message was deleted."
     case "channel_archived":
       return "This channel is archived and read-only."
+    case "invalid_file":
+      return "A file can't be sent. Attach it again."
     default:
       return "Something went wrong. Try again."
   }

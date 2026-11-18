@@ -1,6 +1,6 @@
 import { createContext, useContext } from "react"
 
-import type { ChannelState } from "./types"
+import type { Attachment, ChannelState } from "./types"
 
 export type MessagesContextValue = {
   getChannel: (channelId: string) => ChannelState | undefined
@@ -16,7 +16,7 @@ export type MessagesContextValue = {
   /** Leaves a jumped-to window and shows the newest messages again. */
   returnToPresent: (channelId: string) => Promise<void>
   /** Never rejects: a failure shows on the message. Resolves with the error code, if any. */
-  send: (channelId: string, body: string) => Promise<string | undefined>
+  send: (channelId: string, body: string, attachments?: Attachment[]) => Promise<string | undefined>
   retry: (channelId: string, clientMsgId: string) => Promise<string | undefined>
   /** Removes a message that failed to send. */
   discard: (channelId: string, clientMsgId: string) => void
