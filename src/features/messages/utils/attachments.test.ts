@@ -1,6 +1,24 @@
 import { describe, expect, it } from "vitest"
 
-import { isInlineImage, needsFreshUrl } from "./attachments"
+import { imageRows, isInlineImage, needsFreshUrl } from "./attachments"
+
+describe("imageRows", () => {
+  it.each([
+    [0, []],
+    [1, [1]],
+    [2, [2]],
+    [3, [1, 2]],
+    [4, [2, 2]],
+    [5, [2, 3]],
+    [6, [3, 3]],
+    [7, [1, 3, 3]],
+    [9, [3, 3, 3]],
+    [10, [1, 3, 3, 3]],
+  ])("puts %i images in rows of %j", (count, rows) => {
+    expect(imageRows(count)).toEqual(rows)
+    expect(imageRows(count).reduce((a, b) => a + b, 0)).toBe(count)
+  })
+})
 
 describe("isInlineImage", () => {
   it("shows the four image types inline, and SVG as a file", () => {
