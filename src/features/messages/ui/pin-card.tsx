@@ -3,6 +3,7 @@ import { PinOff } from "lucide-react"
 
 import { Avatar } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
+import { GifEmbed, isGifMessage } from "@/features/gifs"
 
 import type { Pin } from "../types"
 import { formatTimeAgo } from "../utils/dates"
@@ -61,7 +62,11 @@ export function PinCard({ pin, names, canUnpin, unpinning, onJump, onUnpin }: Pi
         inert
         className="my-[9px] line-clamp-3 text-sm [overflow-wrap:anywhere] [&>*+*]:mt-1"
       >
-        <MessageMarkdown body={message.body} own={false} names={names} />
+        {isGifMessage(message.body) ? (
+          <GifEmbed url={message.body} className="h-24" />
+        ) : (
+          <MessageMarkdown body={message.body} own={false} names={names} />
+        )}
       </div>
 
       <div className="flex min-h-7 items-center gap-1 text-[11px] text-muted-foreground">

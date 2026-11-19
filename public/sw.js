@@ -6,7 +6,12 @@
 const MENTION = /<@([0-9a-fA-F-]{36})>/g
 const MY_ID = (new URLSearchParams(self.location.search).get("user") || "").toLowerCase()
 
+// A GIF is sent as its GIPHY link (src/features/gifs). The preview may be cut short, so only its
+// start is checked, the same hosts as isGifMessage().
+const GIF_LINK = /^https:\/\/(media\d*|i)\.giphy\.com\//
+
 function previewText(preview) {
+  if (GIF_LINK.test((preview || "").trim())) return "Sent a GIF"
   return (preview || "")
     .replace(MENTION, (_, id) => (id.toLowerCase() === MY_ID ? "@you" : "@someone"))
     .trim()
