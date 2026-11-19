@@ -4,7 +4,7 @@ import { BellOff } from "lucide-react"
 import { useNavigate } from "react-router"
 
 import { Alert } from "@/components/ui/alert"
-import { Avatar } from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/app/user-avatar"
 import { Button } from "@/components/ui/button"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { Dialog } from "@/components/ui/dialog"
@@ -100,7 +100,7 @@ function AboutTab({
 
 // ── Add members dialog ───────────────────────────────────────────────────────
 
-type Candidate = { user_id: string; display_name: string }
+type Candidate = { user_id: string; display_name: string; avatar_file_id: string | null }
 
 function AddMembersForm({
   teamId,
@@ -181,7 +181,7 @@ function AddMembersForm({
                 )
               }
             />
-            <Avatar name={m.display_name} />
+            <UserAvatar name={m.display_name} avatarFileId={m.avatar_file_id} />
             <span>{m.display_name}</span>
           </label>
         ))}
@@ -206,6 +206,7 @@ function MembersTab({
   teamId,
   members,
   memberNames,
+  memberAvatars,
   canManage,
   onAdd,
   onRemove,
@@ -214,6 +215,7 @@ function MembersTab({
   teamId: string
   members: ChannelMember[]
   memberNames: Record<string, string>
+  memberAvatars: Record<string, string | null>
   canManage: boolean
   onAdd: (userIds: string[]) => Promise<void>
   onRemove: (userId: string) => Promise<void>
@@ -258,7 +260,7 @@ function MembersTab({
           const name = memberNames[m.user_id] ?? "Unknown member"
           return (
             <DataRow key={m.user_id}>
-              <Avatar name={name} />
+              <UserAvatar name={name} avatarFileId={memberAvatars[m.user_id]} />
               <RowMain title={name} detail={m.role === "owner" ? "Channel owner" : "Member"} />
               {editable && m.role !== "owner" && (
                 <Button
@@ -553,6 +555,7 @@ export function ChannelDetailsPanel({
                 teamId={teamId}
                 members={state.members}
                 memberNames={state.memberNames}
+                memberAvatars={state.memberAvatars}
                 canManage={canManage}
                 onAdd={(userIds) => settings.addMembers(userIds, teamId)}
                 onRemove={settings.removeMember}

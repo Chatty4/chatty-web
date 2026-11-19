@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { useNavigate, useParams } from "react-router"
 
 import { Alert } from "@/components/ui/alert"
-import { Avatar } from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/app/user-avatar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useAuth } from "@/features/auth"
@@ -131,7 +131,7 @@ export function StartDmPage() {
                   checked={isSelected}
                   onChange={() => toggle(member.user_id)}
                 />
-                <Avatar name={member.display_name} />
+                <UserAvatar name={member.display_name} avatarFileId={member.avatar_file_id} />
                 <span className="text-sm">{member.display_name}</span>
               </label>
             )

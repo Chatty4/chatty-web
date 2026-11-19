@@ -22,6 +22,8 @@ export type ChannelSettingsState =
       channel: ChannelDetail
       members: ChannelMember[]
       memberNames: Record<string, string>
+      /** userId -> avatar file, from the same member previews as the names. */
+      memberAvatars: Record<string, string | null>
     }
   | { status: "error"; forChannelId: string; message: string }
 
@@ -35,9 +37,13 @@ async function fetchChannelSettings(channelId: string): Promise<ChannelSettingsS
     // Batch-resolve display names for channel members
     const userIds = members.map((m) => m.user_id)
     const memberNames: Record<string, string> = {}
+    const memberAvatars: Record<string, string | null> = {}
     if (userIds.length > 0 && channel.team_id) {
       const { members: previews } = await getTeamMemberPreviewsRequest(channel.team_id, userIds)
-      for (const p of previews) memberNames[p.user_id] = p.display_name
+      for (const p of previews) {
+        memberNames[p.user_id] = p.display_name
+        memberAvatars[p.user_id] = p.avatar_file_id
+      }
     }
 
     return {
@@ -46,6 +52,7 @@ async function fetchChannelSettings(channelId: string): Promise<ChannelSettingsS
       channel,
       members,
       memberNames,
+      memberAvatars,
     }
   } catch {
     return { status: "error", forChannelId: channelId, message: "Could not load channel settings." }
@@ -123,13 +130,18 @@ export function useChannelSettings(channelId: string) {
         getTeamMemberPreviewsRequest(teamId, userIds),
       ])
       const newNames: Record<string, string> = {}
-      for (const p of previews.members) newNames[p.user_id] = p.display_name
+      const newAvatars: Record<string, string | null> = {}
+      for (const p of previews.members) {
+        newNames[p.user_id] = p.display_name
+        newAvatars[p.user_id] = p.avatar_file_id
+      }
       setState((prev) => {
         if (prev.status !== "loaded") return prev
         return {
           ...prev,
           members,
           memberNames: { ...prev.memberNames, ...newNames },
+          memberAvatars: { ...prev.memberAvatars, ...newAvatars },
         }
       })
     },

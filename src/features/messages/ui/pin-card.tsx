@@ -1,7 +1,7 @@
 import type { KeyboardEvent } from "react"
 import { PinOff } from "lucide-react"
 
-import { Avatar } from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/app/user-avatar"
 import { Button } from "@/components/ui/button"
 import { GifEmbed, isGifMessage } from "@/features/gifs"
 
@@ -19,6 +19,7 @@ const dateFormat = new Intl.DateTimeFormat("en", {
 type PinCardProps = {
   pin: Pin
   names: Record<string, string>
+  authorAvatarFileId: string | null
   canUnpin: boolean
   unpinning: boolean
   onJump: () => void
@@ -26,7 +27,15 @@ type PinCardProps = {
 }
 
 /** One pinned message: who wrote it, the text, and who pinned it. Click to jump to it. */
-export function PinCard({ pin, names, canUnpin, unpinning, onJump, onUnpin }: PinCardProps) {
+export function PinCard({
+  pin,
+  names,
+  authorAvatarFileId,
+  canUnpin,
+  unpinning,
+  onJump,
+  onUnpin,
+}: PinCardProps) {
   const { message } = pin
   const authorName = names[message.author_id] ?? "Unknown member"
 
@@ -47,7 +56,11 @@ export function PinCard({ pin, names, canUnpin, unpinning, onJump, onUnpin }: Pi
       onKeyDown={handleKeyDown}
     >
       <div className="flex items-center gap-[7px]">
-        <Avatar name={authorName} className="size-[22px] text-[9px]" />
+        <UserAvatar
+          name={authorName}
+          avatarFileId={authorAvatarFileId}
+          className="size-[22px] text-[9px]"
+        />
         <strong className="min-w-0 truncate text-xs font-semibold">{authorName}</strong>
         <time
           className="ml-auto text-[10px] whitespace-nowrap text-faint-foreground"
