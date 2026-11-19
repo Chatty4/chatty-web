@@ -1,14 +1,16 @@
+import { useEffect } from "react"
 import { Menu } from "@base-ui/react/menu"
 import { BellOff, ChevronDown, Hash, Headphones, Lock, MessageSquare, Plus, Search, Settings, X } from "lucide-react"
 import { Link, useMatches, useNavigate } from "react-router"
 
 import { Button } from "@/components/ui/button"
 import { initials } from "@/components/ui/avatar"
-import { dmDisplayName, useChannels } from "@/features/channels"
+import { describeChannelError, dmDisplayName, useChannels } from "@/features/channels"
 import { useAuth } from "@/features/auth"
 import { usePresence } from "@/features/presence"
 import { TeamIcon, useActiveTeamId, useTeams } from "@/features/teams"
 import { UnreadBadge, useUnread } from "@/features/unread"
+import { toast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
 
 import { UserMenu } from "./user-menu"
@@ -44,10 +46,10 @@ type SidebarProps = {
 export function Sidebar({ open, onClose }: SidebarProps) {
   const teamId = useActiveTeamId()
   const activeChannelId = useActiveChannelId()
-  const { channels, dms, memberNames, failed, reload } = useChannels()
+  const { channels, dms, hiddenDms, memberNames, failed, reload, hideDm, showDm } = useChannels()
   const { user } = useAuth()
   const { teams, loading: teamsLoading, failed: teamsFailed } = useTeams()
-  const { getCounts } = useUnread()
+  const { getCounts, markAllRead } = useUnread()
   const { isOnline } = usePresence()
   const navigate = useNavigate()
   const myUserId = user?.id ?? ""
@@ -61,6 +63,24 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   const go = (path: string) => {
     navigate(path)
     onClose()
+  }
+
+  // D-04: a hidden DM with unread messages comes back, whether they came in live or while away.
+  useEffect(() => {
+    for (const dm of hiddenDms) if (getCounts(dm.id).unread > 0) showDm(dm.id)
+  }, [hiddenDms, getCounts, showDm])
+
+  // Hiding dismisses the DM: it's marked read first, or its unread messages would bring it right
+  // back. Hiding the open DM leaves it: the team's home picks a channel to show.
+  const hide = async (channelId: string, isActive: boolean) => {
+    try {
+      if (getCounts(channelId).unread > 0) await markAllRead(channelId)
+      await hideDm(channelId)
+      if (isActive) navigate(`/teams/${teamId}`)
+      toast.success("Conversation hidden. It comes back when there's a new message.")
+    } catch (error) {
+      toast.error(describeChannelError(error))
+    }
   }
 
   return (
@@ -235,34 +255,46 @@ export function Sidebar({ open, onClose }: SidebarProps) {
             // A group DM shows the dot while anyone else in it is online.
             const online = (dm.dm_member_ids ?? []).some((id) => id !== myUserId && isOnline(id))
             return (
-              <Link
-                key={dm.id}
-                to={`/teams/${teamId}/channels/${dm.id}`}
-                onClick={onClose}
-                className={cn(
-                  "flex h-[34px] w-full items-center gap-2 rounded-sm px-[9px] text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
-                  isActive
-                    ? "bg-accent font-medium text-accent-foreground"
-                    : "text-muted-foreground hover:bg-surface-hover hover:text-foreground",
-                  counts.unread > 0 && !dm.my.muted && "font-semibold text-foreground",
-                  dm.my.muted && "opacity-50",
-                )}
-                aria-current={isActive ? "page" : undefined}
-              >
-                {/* Mini avatar */}
-                <span className="relative flex-none">
-                  <span className="grid size-[22px] place-items-center rounded-full bg-surface-hover text-[9px] font-semibold text-muted-foreground">
-                    {abbr}
-                  </span>
-                  {online && (
-                    <span className="absolute -right-0.5 bottom-0 size-[7px] rounded-full border border-background bg-online" />
+              // The hide button sits on the row instead of inside the link: a button in a link
+              // isn't valid HTML.
+              <div key={dm.id} className="group/dm relative">
+                <Link
+                  to={`/teams/${teamId}/channels/${dm.id}`}
+                  onClick={onClose}
+                  className={cn(
+                    "flex h-[34px] w-full items-center gap-2 rounded-sm px-[9px] text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+                    isActive
+                      ? "bg-accent font-medium text-accent-foreground"
+                      : "text-muted-foreground hover:bg-surface-hover hover:text-foreground",
+                    counts.unread > 0 && !dm.my.muted && "font-semibold text-foreground",
+                    dm.my.muted && "opacity-50",
                   )}
-                </span>
-                <span className="min-w-0 flex-1 truncate">{label}</span>
-                {online && <span className="sr-only">, online</span>}
-                <MutedIcon muted={dm.my.muted} />
-                <UnreadBadge {...counts} />
-              </Link>
+                  aria-current={isActive ? "page" : undefined}
+                >
+                  {/* Mini avatar */}
+                  <span className="relative flex-none">
+                    <span className="grid size-[22px] place-items-center rounded-full bg-surface-hover text-[9px] font-semibold text-muted-foreground">
+                      {abbr}
+                    </span>
+                    {online && (
+                      <span className="absolute -right-0.5 bottom-0 size-[7px] rounded-full border border-background bg-online" />
+                    )}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate">{label}</span>
+                  {online && <span className="sr-only">, online</span>}
+                  <MutedIcon muted={dm.my.muted} />
+                  <UnreadBadge {...counts} />
+                </Link>
+                <button
+                  type="button"
+                  aria-label={`Hide conversation with ${label}`}
+                  title="Hide conversation"
+                  onClick={() => void hide(dm.id, isActive)}
+                  className="absolute top-1/2 right-1 hidden size-6 -translate-y-1/2 place-items-center rounded-sm bg-surface-hover text-muted-foreground outline-none hover:text-foreground focus-visible:grid focus-visible:ring-2 focus-visible:ring-ring group-hover/dm:grid"
+                >
+                  <X className="size-3.5" />
+                </button>
+              </div>
             )
           })}
 

@@ -9,7 +9,7 @@ import { useAuth } from "@/features/auth"
 import { useActiveTeamId } from "@/features/teams"
 import { useWs } from "@/features/ws"
 
-import { getUnreadRequest, markReadRequest } from "../fetchers/unread-fetchers"
+import { getLastSeqRequest, getUnreadRequest, markReadRequest } from "../fetchers/unread-fetchers"
 import { UnreadContext } from "../hooks/unread-context"
 import {
   countNewMessage,
@@ -114,12 +114,23 @@ export function UnreadProvider({ children }: { children: ReactNode }) {
     [update],
   )
 
+  const markAllRead = useCallback(
+    async (channelId: string) => {
+      const seq = await getLastSeqRequest(channelId)
+      if (seq <= 0) return
+      const response = await markReadRequest(channelId, seq)
+      sentRef.current[channelId] = Math.max(sentRef.current[channelId] ?? 0, seq)
+      update((state) => setChannelCounts(state, response))
+    },
+    [update],
+  )
+
   // Until the new team's GET /unread answers, the old team's counts would be wrong here.
   const getCounts = (channelId: string) =>
     loadedForRef.current === teamId ? selectCounts(stateRef.current, channelId) : EMPTY_COUNTS
 
   return (
-    <UnreadContext.Provider value={{ getCounts, markRead }}>
+    <UnreadContext.Provider value={{ getCounts, markRead, markAllRead }}>
       {children}
     </UnreadContext.Provider>
   )

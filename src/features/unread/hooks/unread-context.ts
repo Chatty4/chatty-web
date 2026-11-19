@@ -11,6 +11,11 @@ export type UnreadContextValue = {
    * a failure is retried on the next call.
    */
   markRead: (channelId: string, seq: number) => void
+  /**
+   * Marks everything in the channel as read without opening it, e.g. before hiding a DM.
+   * Resolves once the counts are updated; rejects with ApiError.
+   */
+  markAllRead: (channelId: string) => Promise<void>
 }
 
 export const UnreadContext = createContext<UnreadContextValue | null>(null)
