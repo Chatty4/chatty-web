@@ -66,7 +66,7 @@ function GifPicker({
   onSelect: (gif: GiphyGif) => void
 }) {
   const [query, setQuery] = useState("")
-  const search = useGifSearch(query, true)
+  const { state: search, loadMore } = useGifSearch(query, true)
 
   return (
     <div className="flex h-[400px] w-[340px] flex-col bg-surface">
@@ -82,7 +82,14 @@ function GifPicker({
         />
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-1.5">
+      <div
+        className="min-h-0 flex-1 overflow-y-auto p-1.5"
+        onScroll={(e) => {
+          // About two rows before the end, so the next page is there when they get to it.
+          const el = e.currentTarget
+          if (el.scrollTop + el.clientHeight > el.scrollHeight - 200) loadMore()
+        }}
+      >
         {search.status === "loading" && <Note>Loading…</Note>}
         {search.status === "error" && <Note>GIFs can't be loaded right now.</Note>}
         {search.status === "loaded" && search.gifs.length === 0 && <Note>No GIFs found.</Note>}
@@ -110,6 +117,9 @@ function GifPicker({
               )
             })}
           </ul>
+        )}
+        {search.status === "loaded" && search.loadingMore && (
+          <p className="py-2 text-center text-xs text-muted-foreground">Loading more…</p>
         )}
       </div>
 
