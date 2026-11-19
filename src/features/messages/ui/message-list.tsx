@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils"
 
 import { useMessages } from "../context"
 import { useChannelMembers } from "../hooks/use-channel-members"
-import { useMemberNames } from "../hooks/use-member-names"
+import { namesOf, useMemberPreviews } from "../hooks/use-member-names"
 import { useScrollAnchor } from "../hooks/use-scroll-anchor"
 import { useWatchChannel } from "../hooks/use-watch-channel"
 import { useWhenVisible } from "../hooks/use-when-visible"
@@ -122,7 +122,8 @@ export function MessageList({
     () => [...new Set(messages.flatMap((m) => [m.author_id, ...extractMentionIds(m.body)]))],
     [messages],
   )
-  const memberNames = useMemberNames(teamId, userIds)
+  const memberPreviews = useMemberPreviews(teamId, userIds)
+  const memberNames = useMemo(() => namesOf(memberPreviews), [memberPreviews])
 
   // ── Channel members (for @mention autocomplete) ──────────────────────────────
   const mentionCandidates = useChannelMembers(channelId, teamId)
@@ -376,6 +377,7 @@ export function MessageList({
             <MessageItem
               message={message}
               authorName={names[message.author_id] ?? "Unknown member"}
+              authorAvatarFileId={memberPreviews[message.author_id]?.avatar_file_id ?? null}
               authorOnline={isOnline(message.author_id)}
               mentionsMe={!!user && message.mentions.includes(user.id)}
               names={names}

@@ -2,7 +2,7 @@ import { type FormEvent, useState } from "react"
 import { useNavigate } from "react-router"
 
 import { Alert } from "@/components/ui/alert"
-import { Avatar } from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/app/user-avatar"
 import { Button } from "@/components/ui/button"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { FormField } from "@/components/ui/form-field"
@@ -189,7 +189,7 @@ function MembersTab({
 
           return (
             <DataRow key={member.user_id}>
-              <Avatar name={member.display_name} />
+              <UserAvatar name={member.display_name} avatarFileId={member.avatar_file_id} />
               <RowMain
                 title={
                   <>

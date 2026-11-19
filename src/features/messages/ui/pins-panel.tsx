@@ -6,7 +6,7 @@ import { SidePanel } from "@/components/ui/side-panel"
 import { toast } from "@/lib/toast"
 
 import { useMessages } from "../context"
-import { useMemberNames } from "../hooks/use-member-names"
+import { namesOf, useMemberPreviews } from "../hooks/use-member-names"
 import { usePinToggle } from "../hooks/use-pin-toggle"
 import { usePins } from "../hooks/use-pins"
 import { extractMentionIds } from "../utils/mentions"
@@ -62,7 +62,8 @@ export function PinsPanel({
     ],
     [items],
   )
-  const names = useMemberNames(teamId, userIds)
+  const previews = useMemberPreviews(teamId, userIds)
+  const names = useMemo(() => namesOf(previews), [previews])
 
   const { busyId, toggle } = usePinToggle({
     setPinned: (messageId, on) => setPinned(channelId, messageId, on),
@@ -119,6 +120,7 @@ export function PinsPanel({
                 key={pin.message.id}
                 pin={pin}
                 names={names}
+                authorAvatarFileId={previews[pin.message.author_id]?.avatar_file_id ?? null}
                 canUnpin={canUnpin}
                 unpinning={busyId === pin.message.id}
                 onJump={() => void jump(pin.message.id, pin.message.seq)}

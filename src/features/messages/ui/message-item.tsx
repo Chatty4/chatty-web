@@ -9,7 +9,7 @@ import {
   Trash2,
 } from "lucide-react"
 
-import { Avatar } from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/app/user-avatar"
 import { Button } from "@/components/ui/button"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { EmojiPickerButton } from "@/components/ui/emoji-picker"
@@ -55,6 +55,7 @@ function formatTime(iso: string): string {
 export type MessageItemProps = {
   message: LocalMessage
   authorName: string
+  authorAvatarFileId: string | null
   /** The author has an open WebSocket: a green dot on the avatar. */
   authorOnline: boolean
   /** The message mentions me: its bubble is highlighted. */
@@ -96,6 +97,7 @@ export type MessageItemProps = {
 export const MessageItem = memo(function MessageItem({
   message,
   authorName,
+  authorAvatarFileId,
   authorOnline,
   mentionsMe,
   names,
@@ -386,7 +388,9 @@ export const MessageItem = memo(function MessageItem({
       {confirmProps.open && <ConfirmDialog {...confirmProps} />}
       {/* Avatar column */}
       <div className="w-8 shrink-0">
-        {!grouped && <Avatar name={authorName} online={authorOnline} />}
+        {!grouped && (
+          <UserAvatar name={authorName} avatarFileId={authorAvatarFileId} online={authorOnline} />
+        )}
       </div>
 
       {/* Content */}
