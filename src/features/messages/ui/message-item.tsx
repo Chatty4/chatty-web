@@ -128,8 +128,7 @@ export const MessageItem = memo(function MessageItem({
 
   const isDeleted = message.deleted_at !== null
   const isEdited = message.edited_at !== null && !isDeleted
-  // A message of only files has no text bubble.
-  const hasText = message.body !== "" || isEdited || (!own && message.status !== "sent")
+  const hasFiles = message.attachments.length > 0
   const isPinned = message.pinned && !isDeleted
   // Close the editor if the message gets deleted (e.g. from another tab) while open.
   const showEditor = editing && !isDeleted
@@ -252,8 +251,8 @@ export const MessageItem = memo(function MessageItem({
         "absolute z-10 -translate-y-1/2 items-center gap-0.5 rounded-md border bg-surface shadow-sm",
         pickingReaction ? "flex" : "hidden group-hover/msg:flex group-focus-within/msg:flex",
         own ? "right-full mr-1.5" : "left-full ml-1.5",
-        // Beside the text, or beside the first file (a file card is about 44px high).
-        hasText ? "top-1/2" : "top-[26px]",
+        // A bubble with files is tall: sit level with its first row, not its middle.
+        hasFiles ? "top-0.5 translate-y-0" : "top-1/2",
         // A wide bubble leaves no room beside it on a phone, so sit on its top edge there.
         "max-sm:inset-auto max-sm:top-0 max-sm:right-0 max-sm:mx-0",
       )}
@@ -342,28 +341,22 @@ export const MessageItem = memo(function MessageItem({
             This message was deleted.
           </p>
         ) : (
-          <div className="flex max-w-[75%] flex-col items-end">
-            {/* The toolbar sits beside the text, or beside the files when there is none. */}
-            <div className="relative">
-              {hasText ? (
-                <div
-                  className={cn(
-                    "rounded-lg bg-accent px-3 py-1.5 text-sm leading-relaxed break-words text-foreground",
-                    MARKDOWN_BLOCK_CLASS,
-                    !grouped && "rounded-tr-sm",
-                    message.status === "pending" && "opacity-70",
-                    message.status === "failed" && "ring-1 ring-destructive/50",
-                  )}
-                >
-                  <MessageMarkdown body={message.body} own names={names} />
-                  {isEdited && <span className="ml-1 text-xs text-muted-foreground">(edited)</span>}
-                </div>
-              ) : (
-                <MessageAttachments message={message} align="end" />
+          <div className="relative max-w-[75%]">
+            {/* The files are inside the bubble, so they read as part of the message. */}
+            <div
+              className={cn(
+                "rounded-lg bg-accent px-3 py-1.5 text-sm leading-relaxed break-words text-foreground",
+                MARKDOWN_BLOCK_CLASS,
+                !grouped && "rounded-tr-sm",
+                message.status === "pending" && "opacity-70",
+                message.status === "failed" && "ring-1 ring-destructive/50",
               )}
-              {toolbar}
+            >
+              {message.body && <MessageMarkdown body={message.body} own names={names} />}
+              {isEdited && <span className="ml-1 text-xs text-muted-foreground">(edited)</span>}
+              <MessageAttachments message={message} />
             </div>
-            {hasText && <MessageAttachments message={message} align="end" />}
+            {toolbar}
           </div>
         )}
 
@@ -416,30 +409,24 @@ export const MessageItem = memo(function MessageItem({
         ) : showEditor ? (
           editor
         ) : (
-          <div className="max-w-[75%]">
-            {/* The toolbar sits beside the text, or beside the files when there is none. */}
-            <div className="relative w-fit">
-              {hasText ? (
-                <div
-                  className={cn(
-                    "rounded-lg px-3 py-1.5 text-sm leading-relaxed break-words text-foreground",
-                    // A mention of me gets the light-blue of my own bubbles, with a thin edge.
-                    mentionsMe ? "bg-accent ring-1 ring-primary/30" : "bg-surface-hover",
-                    MARKDOWN_BLOCK_CLASS,
-                    !grouped && "rounded-tl-sm",
-                  )}
-                >
-                  {/* `own` styles mention chips for a light-blue bubble. */}
-                  <MessageMarkdown body={message.body} own={mentionsMe} names={names} />
-                  {isEdited && <span className="ml-1 text-xs text-muted-foreground">(edited)</span>}
-                  {message.status !== "sent" && <span className="ml-1">{status}</span>}
-                </div>
-              ) : (
-                <MessageAttachments message={message} align="start" />
+          <div className="relative w-fit max-w-[75%]">
+            {/* The files are inside the bubble, so they read as part of the message. */}
+            <div
+              className={cn(
+                "rounded-lg px-3 py-1.5 text-sm leading-relaxed break-words text-foreground",
+                // A mention of me gets the light-blue of my own bubbles, with a thin edge.
+                mentionsMe ? "bg-accent ring-1 ring-primary/30" : "bg-surface-hover",
+                MARKDOWN_BLOCK_CLASS,
+                !grouped && "rounded-tl-sm",
               )}
-              {toolbar}
+            >
+              {/* `own` styles mention chips for a light-blue bubble. */}
+              {message.body && <MessageMarkdown body={message.body} own={mentionsMe} names={names} />}
+              {isEdited && <span className="ml-1 text-xs text-muted-foreground">(edited)</span>}
+              {message.status !== "sent" && <span className="ml-1">{status}</span>}
+              <MessageAttachments message={message} />
             </div>
-            {hasText && <MessageAttachments message={message} align="start" />}
+            {toolbar}
           </div>
         )}
         {reactions}

@@ -2,14 +2,13 @@ import { useRef } from "react"
 import { Download, FileText } from "lucide-react"
 
 import { formatFileSize } from "@/features/files"
-import { cn } from "@/lib/utils"
 
 import { useAttachmentUrls } from "../hooks/use-attachment-urls"
 import type { Attachment, LocalMessage } from "../types"
 import { isInlineImage } from "../utils/attachments"
 
 /** A message's files in the sent order: images inline, other files as cards. */
-export function MessageAttachments({ message, align }: { message: LocalMessage; align: "start" | "end" }) {
+export function MessageAttachments({ message }: { message: LocalMessage }) {
   // A pending message has no id on the server yet: its files show without links.
   const sent = message.status === "sent"
   const { urls, freshUrl, reload } = useAttachmentUrls(message.id, sent && message.file_ids.length > 0)
@@ -27,8 +26,8 @@ export function MessageAttachments({ message, align }: { message: LocalMessage; 
   return (
     <ul
       aria-label="Files"
-      // One per row, so the list is only as wide as its widest file.
-      className={cn("mt-1 flex flex-col gap-1.5", align === "end" ? "items-end" : "items-start")}
+      // One per row, inside the bubble; the bubble's [&>*+*] rule spaces it from the text.
+      className="flex flex-col items-start gap-1.5"
     >
       {message.attachments.map((attachment) => {
         const url = urls[attachment.file_id]?.url
