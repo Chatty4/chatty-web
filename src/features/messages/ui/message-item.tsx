@@ -13,6 +13,7 @@ import { Avatar } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { EmojiPickerButton } from "@/components/ui/emoji-picker"
+import { GifEmbed, isGifMessage } from "@/features/gifs"
 import { useConfirm } from "@/hooks/use-confirm"
 import { toast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
@@ -352,7 +353,11 @@ export const MessageItem = memo(function MessageItem({
                 message.status === "failed" && "ring-1 ring-destructive/50",
               )}
             >
-              {message.body && <MessageMarkdown body={message.body} own names={names} />}
+              {isGifMessage(message.body) ? (
+                <GifEmbed url={message.body} />
+              ) : (
+                message.body && <MessageMarkdown body={message.body} own names={names} />
+              )}
               {isEdited && <span className="ml-1 text-xs text-muted-foreground">(edited)</span>}
               <MessageAttachments message={message} />
             </div>
@@ -421,7 +426,11 @@ export const MessageItem = memo(function MessageItem({
               )}
             >
               {/* `own` styles mention chips for a light-blue bubble. */}
-              {message.body && <MessageMarkdown body={message.body} own={mentionsMe} names={names} />}
+              {isGifMessage(message.body) ? (
+                <GifEmbed url={message.body} />
+              ) : (
+                message.body && <MessageMarkdown body={message.body} own={mentionsMe} names={names} />
+              )}
               {isEdited && <span className="ml-1 text-xs text-muted-foreground">(edited)</span>}
               {message.status !== "sent" && <span className="ml-1">{status}</span>}
               <MessageAttachments message={message} />

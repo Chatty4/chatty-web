@@ -37,6 +37,11 @@ Messages can carry up to 10 files: they upload while you write, straight to MinI
 and show as images or file cards. The account settings page uploads a profile photo. Uploads and downloads
 need MinIO running, from `chatty-infra`.
 
+The GIF button searches GIPHY straight from the browser (`src/features/gifs/`) and needs `VITE_GIPHY_API_KEY`
+in `.env` (empty hides the button). A GIF is sent as a message whose whole body is its GIPHY link, so
+chatty-chat needs no change; the web app shows such a message as the GIF. The key is built into the app, so
+anyone can read it, and what people search for goes to GIPHY.
+
 | Path in the browser | Forwarded to |
 |---|---|
 | `/api/core/...` | chatty-core (`CORE_API_TARGET`, default `http://127.0.0.1:8000`) |
@@ -81,7 +86,8 @@ The config is `nginx/default.conf.template`:
   `Content-Security-Policy`. A location with its own `add_header` drops the server-level ones, so `/assets/`
   and `/` repeat them: change all three copies together.
 - **The CSP** is in `$csp`: only our own scripts, styles (inline too) and images, `connect-src` for the API, the
-  WebSocket, jsDelivr (the emoji data) and MinIO (uploads), images also from MinIO and `blob:` (avatars), and
+  WebSocket, jsDelivr (the emoji data), MinIO (uploads) and GIPHY's API, images also from MinIO, GIPHY's media
+  hosts and `blob:` (avatars), and
   no framing. Adding a script, font or API from another origin
   means adding it there.
 - **The access log** writes the path without the query string, because the WebSocket sends the access token

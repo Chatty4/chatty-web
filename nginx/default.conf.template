@@ -27,7 +27,8 @@ server {
     # where the emoji picker (frimousse) loads its emoji data from.
     # MinIO (D-16): uploads go straight to it, and attachment images and avatars come from its
     # presigned URLs. blob: is an avatar downloaded through GET /files/{id}.
-    set $csp "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: ${MINIO_PUBLIC_URL}; connect-src 'self' https://cdn.jsdelivr.net ${MINIO_PUBLIC_URL}; frame-ancestors 'none'";
+    # GIPHY: the GIF picker searches api.giphy.com, and GIFs load from its media hosts.
+    set $csp "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: ${MINIO_PUBLIC_URL} https://*.giphy.com; connect-src 'self' https://cdn.jsdelivr.net ${MINIO_PUBLIC_URL} https://api.giphy.com; frame-ancestors 'none'";
 
     # Security headers. A location with its own add_header drops all of these, so the two
     # locations below repeat them. Change all three copies together.
