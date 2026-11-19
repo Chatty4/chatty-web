@@ -1,5 +1,5 @@
 import { useRef } from "react"
-import { Download, FileText } from "lucide-react"
+import { Download, FileText, Image as ImageIcon } from "lucide-react"
 
 import { formatFileSize } from "@/features/files"
 
@@ -33,24 +33,34 @@ export function MessageAttachments({ message }: { message: LocalMessage }) {
         const url = urls[attachment.file_id]?.url
         return (
           <li key={attachment.file_id}>
-            {url && isInlineImage(attachment.mime) ? (
+            {isInlineImage(attachment.mime) ? (
+              // A fixed height from the first render: an image that loads later doesn't move the
+              // messages under it, so the list stays scrolled to the bottom.
               <button
                 type="button"
-                className="block overflow-hidden rounded-md border"
+                disabled={!url}
+                className="block h-48 max-w-xs overflow-hidden rounded-md border bg-surface disabled:cursor-default"
                 aria-label={`Download ${attachment.filename}`}
                 onClick={() => void download(attachment.file_id)}
               >
-                <img
-                  src={url}
-                  alt={attachment.filename}
-                  loading="lazy"
-                  className="max-h-60 max-w-xs object-contain"
-                  onError={() => {
-                    if (reloaded.current.has(attachment.file_id)) return
-                    reloaded.current.add(attachment.file_id)
-                    void reload()
-                  }}
-                />
+                {url ? (
+                  <img
+                    src={url}
+                    alt={attachment.filename}
+                    loading="lazy"
+                    className="h-full w-auto object-contain"
+                    onError={() => {
+                      if (reloaded.current.has(attachment.file_id)) return
+                      reloaded.current.add(attachment.file_id)
+                      void reload()
+                    }}
+                  />
+                ) : (
+                  <span className="grid h-full w-48 place-items-center px-2 text-xs text-muted-foreground">
+                    <ImageIcon className="size-6" aria-hidden="true" />
+                    <span className="max-w-full truncate">{attachment.filename}</span>
+                  </span>
+                )}
               </button>
             ) : (
               <FileCard
