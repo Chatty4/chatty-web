@@ -7,6 +7,7 @@ import { GifEmbed, isGifMessage } from "@/features/gifs"
 
 import type { Pin } from "../types"
 import { formatTimeAgo } from "../utils/dates"
+import { AttachmentsPreview } from "./attachments-preview"
 import { MessageMarkdown } from "./message-markdown"
 
 const dateFormat = new Intl.DateTimeFormat("en", {
@@ -71,15 +72,17 @@ export function PinCard({
       </div>
 
       {/* inert: a link in the text shouldn't compete with clicking the card */}
-      <div
-        inert
-        className="my-[9px] line-clamp-3 text-sm [overflow-wrap:anywhere] [&>*+*]:mt-1"
-      >
-        {isGifMessage(message.body) ? (
-          <GifEmbed url={message.body} className="h-24" />
-        ) : (
-          <MessageMarkdown body={message.body} own={false} names={names} />
+      <div inert className="my-[9px] flex flex-col gap-2">
+        {message.body && (
+          <div className="line-clamp-3 text-sm [overflow-wrap:anywhere] [&>*+*]:mt-1">
+            {isGifMessage(message.body) ? (
+              <GifEmbed url={message.body} className="h-24" />
+            ) : (
+              <MessageMarkdown body={message.body} own={false} names={names} />
+            )}
+          </div>
         )}
+        <AttachmentsPreview message={message} />
       </div>
 
       <div className="flex min-h-7 items-center gap-1 text-[11px] text-muted-foreground">
