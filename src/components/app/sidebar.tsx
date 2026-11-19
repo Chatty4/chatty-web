@@ -7,7 +7,7 @@ import { initials } from "@/components/ui/avatar"
 import { dmDisplayName, useChannels } from "@/features/channels"
 import { useAuth } from "@/features/auth"
 import { usePresence } from "@/features/presence"
-import { useActiveTeamId, useTeams } from "@/features/teams"
+import { TeamIcon, useActiveTeamId, useTeams } from "@/features/teams"
 import { UnreadBadge, useUnread } from "@/features/unread"
 import { cn } from "@/lib/utils"
 
@@ -84,9 +84,11 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           <Menu.Root>
             <Menu.Trigger className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-sm px-2 py-[9px] text-sm font-semibold text-foreground outline-none transition-colors hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring data-[popup-open]:bg-surface-hover">
               {activeTeam && (
-                <span className="flex size-7 shrink-0 items-center justify-center rounded-sm bg-primary text-[12px] font-semibold text-primary-foreground">
-                  {activeTeam.name[0]?.toUpperCase()}
-                </span>
+                <TeamIcon
+                  name={activeTeam.name}
+                  iconFileId={activeTeam.icon_file_id}
+                  className="size-7 rounded-sm bg-primary text-[12px] font-semibold text-primary-foreground"
+                />
               )}
               <span className="truncate">{activeTeam?.name ?? "No team"}</span>
               <ChevronDown className="ml-auto size-[15px] shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -100,9 +102,11 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                       className={cn(menuItemClass, team.id === teamId && "font-medium text-primary")}
                       onClick={() => go(`/teams/${team.id}`)}
                     >
-                      <span className="flex size-5 shrink-0 items-center justify-center rounded-sm bg-accent text-[11px] font-semibold text-accent-foreground">
-                        {team.name[0]?.toUpperCase()}
-                      </span>
+                      <TeamIcon
+                        name={team.name}
+                        iconFileId={team.icon_file_id}
+                        className="size-5 rounded-sm bg-accent text-[11px] font-semibold text-accent-foreground"
+                      />
                       <span className="truncate">{team.name}</span>
                     </Menu.Item>
                   ))}

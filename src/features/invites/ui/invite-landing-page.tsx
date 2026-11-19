@@ -104,8 +104,13 @@ export function InviteLandingPage({ code }: Props) {
       {lookup?.valid && (
         <div className="flex flex-col gap-4">
           <div className="flex items-center gap-3">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-md bg-primary text-sm font-bold text-primary-foreground">
-              {lookup.team.name[0]?.toUpperCase()}
+            <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary text-sm font-bold text-primary-foreground">
+              {/* A presigned URL from chatty-core: the visitor may not be in the team yet. */}
+              {lookup.team.icon_url ? (
+                <img src={lookup.team.icon_url} alt="" className="size-full object-cover" />
+              ) : (
+                lookup.team.name[0]?.toUpperCase()
+              )}
             </span>
             <div className="min-w-0">
               <p className="truncate font-semibold">{lookup.team.name}</p>

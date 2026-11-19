@@ -18,12 +18,14 @@ import {
 } from "@/components/ui/settings"
 import { FullScreenMessage } from "@/components/app/full-screen-message"
 import { useAuth } from "@/features/auth"
+import { ImageUploadRow } from "@/features/files"
 import { InviteSettingsPanel } from "@/features/invites/ui/invite-settings-panel"
 import { useConfirm } from "@/hooks/use-confirm"
 
 import { useTeamSettings } from "../hooks/use-team-settings"
 import { describeTeamError } from "../utils/errors"
 import type { Role, TeamMember } from "../types"
+import { TeamIcon } from "./team-icon"
 
 const TABS = ["general", "members", "invites", "danger"] as const
 type Tab = (typeof TABS)[number]
@@ -42,12 +44,17 @@ function formatJoined(iso: string): string {
 // ── General ──────────────────────────────────────────────────────────────────
 
 function GeneralTab({
+  teamId,
   name: initialName,
   iconFileId,
+  canManage,
   onRename,
 }: {
+  teamId: string
   name: string
   iconFileId: string | null
+  /** Owners and admins can change the name and icon (PUT /teams/{id}). */
+  canManage: boolean
   onRename: (name: string, iconFileId: string | null) => Promise<void>
 }) {
   const [name, setName] = useState(initialName)
@@ -77,6 +84,26 @@ function GeneralTab({
 
   return (
     <SettingsPanel>
+      {canManage && (
+        <div className="mb-[18px] border-b border-border pb-4">
+          <ImageUploadRow
+            preview={
+              <TeamIcon
+                name={initialName}
+                iconFileId={iconFileId}
+                className="size-12 rounded-md bg-primary text-base font-semibold text-primary-foreground"
+              />
+            }
+            title="Team icon"
+            purpose="team_icon"
+            teamId={teamId}
+            fileId={iconFileId}
+            // The saved name, not a half-typed one: the icon saves on its own.
+            onChange={(fileId) => onRename(initialName, fileId)}
+            savedMessage="Team icon saved"
+          />
+        </div>
+      )}
       <form onSubmit={save} className="flex flex-col gap-[18px]">
         <FormField label="Team name" error={error}>
           {(control) => (
@@ -312,8 +339,10 @@ export function TeamSettings({ teamId }: { teamId: string }) {
       {tab === "general" && (
         <GeneralTab
           key={team.name}
+          teamId={teamId}
           name={team.name}
           iconFileId={team.icon_file_id}
+          canManage={team.my_role === "owner" || team.my_role === "admin"}
           onRename={renameTeam}
         />
       )}

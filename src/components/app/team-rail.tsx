@@ -2,7 +2,7 @@ import { Bell, MessageCircle, Plus } from "lucide-react"
 import { Link } from "react-router"
 
 import { cn } from "@/lib/utils"
-import { useActiveTeamId, useTeams } from "@/features/teams"
+import { TeamIcon, useActiveTeamId, useTeams } from "@/features/teams"
 
 const tileBase =
   "grid size-[34px] shrink-0 place-items-center rounded-md text-[12px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -38,13 +38,13 @@ export function TeamRail() {
             title={team.name}
             className={cn(
               tileBase,
-              "border",
+              "overflow-hidden border",
               isActive
                 ? "border-primary bg-primary text-primary-foreground hover:bg-primary-hover"
                 : "border-border bg-surface text-muted-foreground hover:bg-surface-hover hover:text-foreground",
             )}
           >
-            {team.name.slice(0, 1).toUpperCase()}
+            <TeamIcon name={team.name} iconFileId={team.icon_file_id} className="size-full" />
           </Link>
         )
       })}
