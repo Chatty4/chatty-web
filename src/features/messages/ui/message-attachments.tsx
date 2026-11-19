@@ -1,21 +1,28 @@
-import { useRef } from "react"
-import { Download, FileText, Image as ImageIcon } from "lucide-react"
+import { useRef, useState } from "react"
+import { Download, FileText } from "lucide-react"
 
 import { formatFileSize } from "@/features/files"
 
 import { useAttachmentUrls } from "../hooks/use-attachment-urls"
 import type { Attachment, LocalMessage } from "../types"
 import { isInlineImage } from "../utils/attachments"
+import { ImageGrid } from "./image-grid"
+import { ImageLightbox } from "./image-lightbox"
 
-/** A message's files in the sent order: images inline, other files as cards. */
+/** A message's files: its images as a grid that opens a preview, then the other files as cards. */
 export function MessageAttachments({ message }: { message: LocalMessage }) {
   // A pending message has no id on the server yet: its files show without links.
   const sent = message.status === "sent"
   const { urls, freshUrl, reload } = useAttachmentUrls(message.id, sent && message.file_ids.length > 0)
   // An image that failed to load gets one new URL (it may have expired), not a loop.
   const reloaded = useRef(new Set<string>())
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null)
 
   if (message.attachments.length === 0) return null
+
+  const images = message.attachments.filter((a) => isInlineImage(a.mime))
+  const files = message.attachments.filter((a) => !isInlineImage(a.mime))
+  const urlOf = Object.fromEntries(message.attachments.map((a) => [a.file_id, urls[a.file_id]?.url]))
 
   // The URL answers with Content-Disposition: attachment, so this downloads under the file's name.
   const download = async (fileId: string) => {
@@ -23,55 +30,38 @@ export function MessageAttachments({ message }: { message: LocalMessage }) {
     if (url) window.location.assign(url)
   }
 
+  const onImageError = (fileId: string) => {
+    if (reloaded.current.has(fileId)) return
+    reloaded.current.add(fileId)
+    void reload()
+  }
+
   return (
-    <ul
-      aria-label="Files"
-      // One per row, inside the bubble; the bubble's [&>*+*] rule spaces it from the text.
-      className="flex flex-col items-start gap-1.5"
-    >
-      {message.attachments.map((attachment) => {
-        const url = urls[attachment.file_id]?.url
-        return (
-          <li key={attachment.file_id}>
-            {isInlineImage(attachment.mime) ? (
-              // A fixed height from the first render: an image that loads later doesn't move the
-              // messages under it, so the list stays scrolled to the bottom.
-              <button
-                type="button"
-                disabled={!url}
-                className="block h-48 max-w-xs overflow-hidden rounded-md border bg-surface disabled:cursor-default"
-                aria-label={`Download ${attachment.filename}`}
-                onClick={() => void download(attachment.file_id)}
-              >
-                {url ? (
-                  <img
-                    src={url}
-                    alt={attachment.filename}
-                    loading="lazy"
-                    className="h-full w-auto object-contain"
-                    onError={() => {
-                      if (reloaded.current.has(attachment.file_id)) return
-                      reloaded.current.add(attachment.file_id)
-                      void reload()
-                    }}
-                  />
-                ) : (
-                  <span className="grid h-full w-48 place-items-center px-2 text-xs text-muted-foreground">
-                    <ImageIcon className="size-6" aria-hidden="true" />
-                    <span className="max-w-full truncate">{attachment.filename}</span>
-                  </span>
-                )}
-              </button>
-            ) : (
+    // Inside the bubble; the bubble's [&>*+*] rule spaces it from the text.
+    <div className="flex flex-col items-start gap-1.5">
+      <ImageGrid images={images} urls={urlOf} onOpen={setPreviewIndex} onImageError={onImageError} />
+      {files.length > 0 && (
+        <ul aria-label="Files" className="flex flex-col items-start gap-1.5">
+          {files.map((file) => (
+            <li key={file.file_id}>
               <FileCard
-                attachment={attachment}
-                onDownload={url ? () => void download(attachment.file_id) : undefined}
+                attachment={file}
+                onDownload={urlOf[file.file_id] ? () => void download(file.file_id) : undefined}
               />
-            )}
-          </li>
-        )
-      })}
-    </ul>
+            </li>
+          ))}
+        </ul>
+      )}
+      <ImageLightbox
+        images={images}
+        index={previewIndex}
+        urls={urlOf}
+        onIndexChange={setPreviewIndex}
+        onClose={() => setPreviewIndex(null)}
+        onDownload={(fileId) => void download(fileId)}
+        onImageError={onImageError}
+      />
+    </div>
   )
 }
 
