@@ -8,6 +8,7 @@ import { Select } from "@/components/ui/select"
 import { SidePanel } from "@/components/ui/side-panel"
 import { useAuth } from "@/features/auth"
 import { dmDisplayName, useChannels } from "@/features/channels"
+import { GifEmbed, isGifMessage } from "@/features/gifs"
 import { useMessages } from "@/features/messages"
 import { useMemberNames } from "@/features/messages/hooks/use-member-names"
 import { extractMentionIds } from "@/features/messages/utils/mentions"
@@ -352,17 +353,21 @@ export function SearchPanel({ teamId, channelId, onClose }: SearchPanelProps) {
                       {dateFormat.format(new Date(result.message.created_at))}
                     </time>
                   </div>
-                  <p className="mt-1 break-words text-sm">
-                    {parseHighlight(result.highlight).map((part, index) =>
-                      part.mark ? (
-                        <mark key={index} className="rounded-sm bg-primary/20 text-foreground">
-                          {showMentions(part.text, names)}
-                        </mark>
-                      ) : (
-                        <span key={index}>{showMentions(part.text, names)}</span>
-                      ),
-                    )}
-                  </p>
+                  {isGifMessage(result.message.body) ? (
+                    <GifEmbed url={result.message.body} className="mt-1 h-20" />
+                  ) : (
+                    <p className="mt-1 break-words text-sm">
+                      {parseHighlight(result.highlight).map((part, index) =>
+                        part.mark ? (
+                          <mark key={index} className="rounded-sm bg-primary/20 text-foreground">
+                            {showMentions(part.text, names)}
+                          </mark>
+                        ) : (
+                          <span key={index}>{showMentions(part.text, names)}</span>
+                        ),
+                      )}
+                    </p>
+                  )}
                 </li>
               )
             })}
