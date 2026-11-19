@@ -3,15 +3,19 @@
 import { ApiError, networkError } from "@/lib/api-error"
 import { GIPHY_API_KEY } from "@/lib/config"
 
-import type { GiphyGif, GiphyResponse } from "../types"
+import type { GifPage, GiphyResponse } from "../types"
 
 const GIPHY_API = "https://api.giphy.com/v1/gifs"
-// shortcut: one page of results, no infinite scroll; add `offset` paging if people ask for more.
-const LIMIT = 30
+export const GIF_PAGE_SIZE = 30
 
-/** Trending GIFs when `query` is empty, otherwise the search results. */
-export async function searchGifs(query: string, signal?: AbortSignal): Promise<GiphyGif[]> {
-  const params = new URLSearchParams({ api_key: GIPHY_API_KEY, limit: String(LIMIT), rating: "pg-13" })
+/** Trending GIFs when `query` is empty, otherwise the search results, from `offset` on. */
+export async function searchGifs(query: string, offset: number, signal?: AbortSignal): Promise<GifPage> {
+  const params = new URLSearchParams({
+    api_key: GIPHY_API_KEY,
+    limit: String(GIF_PAGE_SIZE),
+    offset: String(offset),
+    rating: "pg-13",
+  })
   const q = query.trim()
   if (q) params.set("q", q)
   const url = `${GIPHY_API}/${q ? "search" : "trending"}?${params}`
@@ -24,5 +28,6 @@ export async function searchGifs(query: string, signal?: AbortSignal): Promise<G
     throw networkError()
   }
   if (!response.ok) throw new ApiError(response.status, `giphy_${response.status}`, response.statusText)
-  return ((await response.json()) as GiphyResponse).data
+  const { data, pagination } = (await response.json()) as GiphyResponse
+  return { gifs: data, hasMore: pagination.offset + pagination.count < pagination.total_count }
 }

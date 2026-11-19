@@ -21,4 +21,8 @@ export type GiphyGif = {
 
 export type GiphyResponse = {
   data: GiphyGif[]
+  pagination: { total_count: number; count: number; offset: number }
 }
+
+/** One page of results, and whether GIPHY has more after it. */
+export type GifPage = { gifs: GiphyGif[]; hasMore: boolean }
