@@ -1,4 +1,4 @@
-import { coreApi } from "@/lib/api"
+import { chatApi, coreApi } from "@/lib/api"
 import { chunk } from "@/lib/chunk"
 import { fetchAllPages } from "@/lib/fetch-all-pages"
 
@@ -12,6 +12,17 @@ import type {
   NotifyLevel,
   SidebarChannel,
 } from "../types"
+
+/**
+ * When the channel's newest message was sent, or null without messages: chatty-chat's
+ * GET /channels/{id}/messages with limit=1 (api-chat.md). Used to order DMs.
+ */
+export async function getLastMessageAtRequest(channelId: string): Promise<string | null> {
+  const page = await chatApi.get<{ messages: { created_at: string }[] }>(
+    `/channels/${channelId}/messages?limit=1`,
+  )
+  return page.messages[0]?.created_at ?? null
+}
 
 export function getSidebarChannelsRequest(
   teamId: string,

@@ -7,6 +7,7 @@ export { StartDmPage } from "./ui/start-dm-page"
 export { ChannelDetailsPanel } from "./ui/channel-settings"
 export type { ChannelDetailsPanelProps, ChannelDetailsTab } from "./ui/channel-settings"
 export { dmDisplayName } from "./utils/dm-name"
+export { describeChannelError } from "./utils/errors"
 export type {
   ChannelKind,
   NotifyLevel,
