@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from "react"
+import { useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from "react"
 import { AtSign, Paperclip, Send } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -54,6 +54,15 @@ export function MessageComposer({
   // Who was chosen from the list: the text alone can't tell two people with one name apart.
   const [picks, setPicks] = useState<MentionCandidate[]>([])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Opening a conversation puts the cursor here, after any saved draft, so typing just works.
+  // The composer is keyed by channel, so this runs once per conversation.
+  useEffect(() => {
+    const el = textareaRef.current
+    if (!el || el.disabled) return
+    el.focus({ preventScroll: true })
+    el.setSelectionRange(el.value.length, el.value.length)
+  }, [])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { uploads, add: addUploads, remove: removeUpload, clear: clearUploads } =
     useFileUploads("attachment", teamId)
