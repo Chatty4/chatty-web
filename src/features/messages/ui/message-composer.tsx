@@ -4,6 +4,7 @@ import { AtSign, Paperclip, Send } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { EmojiPickerButton } from "@/components/ui/emoji-picker"
 import { UploadChip, useFileUploads } from "@/features/files"
+import { GifPickerButton } from "@/features/gifs"
 import { toast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
 
@@ -300,6 +301,12 @@ export function MessageComposer({
               disabled={archived}
               returnFocusRef={textareaRef}
               onSelect={insertAtCursor}
+            />
+            {/* A GIF goes out at once as its own message; what's typed stays in the box. */}
+            <GifPickerButton
+              disabled={archived}
+              returnFocusRef={textareaRef}
+              onSelect={(url) => void onSend(url, [])}
             />
             <Button
               variant="ghost"
