@@ -161,6 +161,9 @@ chatty-chat's push worker sends a Web Push for new messages while Chatty isn't o
   it. A subscription made for another key is replaced.
 - **Turning it off and logging out:** `DELETE /push/subscriptions` and unsubscribe, before chatty-core's
   logout, so the next person on this browser doesn't get pushes they didn't turn on.
+- **A session that ends without the logout button** (expired, revoked, deactivated, or logged out in another
+  tab): the browser is unsubscribed too. There is no token left for the `DELETE`; the push service answers
+  410 to the next push and the worker deletes the row.
 - **The service worker** shows one notification per channel (a newer one replaces it). A click opens
   `/teams/{team_id}/channels/{channel_id}` in an open Chatty tab, or in a new one.
 
