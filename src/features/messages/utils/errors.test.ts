@@ -2,9 +2,54 @@ import { describe, expect, it } from "vitest"
 
 import { ApiError } from "@/lib/api"
 
-import { describeSendFailure } from "./errors"
+import {
+  describeMessageError,
+  describePinError,
+  describeReactionError,
+  describeSendFailure,
+} from "./errors"
+
+function rateLimited(retryAfter?: number): ApiError {
+  return new ApiError(429, "rate_limited", "Too many requests", { retryAfter })
+}
+
+describe("rate_limited", () => {
+  it("says how long to wait, from Retry-After", () => {
+    expect(describeMessageError(rateLimited(12))).toBe(
+      "You're doing that too often. Try again in 12 seconds.",
+    )
+  })
+
+  it("says a few minutes without Retry-After", () => {
+    expect(describeMessageError(rateLimited())).toBe(
+      "You're doing that too often. Try again in a few minutes.",
+    )
+  })
+
+  it.each([
+    ["reactions", describeReactionError],
+    ["pins", describePinError],
+  ])("is explained the same way for %s", (_, describe) => {
+    expect(describe(rateLimited(5))).toBe("You're doing that too often. Try again in 5 seconds.")
+  })
+})
+
+describe("describeReactionError", () => {
+  it("explains the limit of different reactions per message", () => {
+    expect(describeReactionError(new ApiError(409, "reaction_limit_reached", "Conflict"))).toBe(
+      "You can add at most 20 different reactions to a message. Remove one first.",
+    )
+  })
+})
 
 describe("describeSendFailure", () => {
+  it("allows a retry after a 429 and says how long to wait", () => {
+    expect(describeSendFailure(rateLimited(30))).toEqual({
+      message: "Not sent: too many messages. Try again in 30 seconds.",
+      retryable: true,
+    })
+  })
+
   it("gives the reason and no retry when the server refused the message", () => {
     expect(describeSendFailure(new ApiError(409, "channel_archived", "Conflict"))).toEqual({
       message: "This channel is archived and read-only.",
