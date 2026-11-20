@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils"
 import { searchMessages, type SearchFilters } from "../fetchers/search-fetchers"
 import type { SearchResult } from "../types"
 import { dateRangeError, toDateRange, type DateFilter, type DatePreset } from "../utils/date-range"
+import { describeSearchError } from "../utils/errors"
 import { parseHighlight, showMentions } from "../utils/highlight"
 import { AuthorPicker, type Author } from "./author-picker"
 
@@ -65,6 +66,7 @@ export function SearchPanel({ teamId, channelId, onClose }: SearchPanelProps) {
   const [results, setResults] = useState<SearchResult[]>([])
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [status, setStatus] = useState<Status>("idle")
+  const [searchError, setSearchError] = useState("")
   const [inputError, setInputError] = useState<string | null>(null)
   // Only the newest request may write: an older answer arriving late is ignored.
   const requestRef = useRef<AbortController | null>(null)
@@ -82,8 +84,9 @@ export function SearchPanel({ teamId, channelId, onClose }: SearchPanelProps) {
       setResults((previous) => (cursor ? [...previous, ...page.results] : page.results))
       setNextCursor(page.next_cursor)
       setStatus("loaded")
-    } catch {
+    } catch (error) {
       if (controller.signal.aborted) return
+      setSearchError(describeSearchError(error, !!cursor))
       setStatus("error")
       if (!cursor) setResults([])
     }
@@ -302,7 +305,7 @@ export function SearchPanel({ teamId, channelId, onClose }: SearchPanelProps) {
 
         {status === "error" && results.length === 0 && (
           <div className="flex min-h-[150px] flex-col items-center justify-center gap-2 text-center">
-            <strong className="font-semibold">Couldn't search.</strong>
+            <strong className="font-semibold">{searchError}</strong>
             <Button variant="secondary" size="sm" onClick={() => search(query, filters)}>
               Try again
             </Button>
@@ -391,7 +394,7 @@ export function SearchPanel({ teamId, channelId, onClose }: SearchPanelProps) {
         )}
         {status === "error" && results.length > 0 && (
           <p role="alert" className="pt-2 text-center text-xs text-destructive">
-            Couldn't load more results.
+            {searchError}
           </p>
         )}
       </div>
