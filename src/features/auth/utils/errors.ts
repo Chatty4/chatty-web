@@ -1,6 +1,7 @@
 // Turns chatty-core's auth errors into text for the forms (api-core.md: Errors, Field reasons).
 
 import { ApiError, isServerUnavailable } from "@/lib/api"
+import { waitText } from "@/lib/retry-after"
 
 import { PASSWORD_MIN_LENGTH } from "./validation"
 
@@ -24,13 +25,6 @@ const FIELD_OVERRIDES: Record<string, Record<string, string>> = {
 
 function fieldMessage(field: string, reason: string): string {
   return FIELD_OVERRIDES[field]?.[reason] ?? FIELD_REASONS[reason] ?? FIELD_REASONS.invalid
-}
-
-function waitText(seconds: number | undefined): string {
-  if (!seconds) return "a few minutes"
-  if (seconds < 60) return `${seconds} seconds`
-  const minutes = Math.ceil(seconds / 60)
-  return minutes === 1 ? "a minute" : `${minutes} minutes`
 }
 
 /** Register worked but the login right after it didn't (rate limit, network): log in by hand. */
