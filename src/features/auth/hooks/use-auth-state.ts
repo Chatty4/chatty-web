@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
-import { disablePush } from "@/features/push"
+import { disablePush, forgetPushSubscription } from "@/features/push"
 import { isSessionRejected } from "@/lib/api-error"
 import {
   endSession,
@@ -74,6 +74,9 @@ export function useAuthState(): AuthContextValue {
         if (event === "logged-out") {
           generation.current++
           update(ANONYMOUS)
+          // Every way a session ends, not only the logout button: this browser must not keep
+          // getting the old user's pushes. After the button, there is nothing left to do.
+          void forgetPushSubscription().catch(() => {})
         } else if (stateRef.current.status !== "authenticated") {
           // Another tab logged in and shared its access token: load the user with it.
           update(LOADING)
