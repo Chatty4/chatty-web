@@ -15,6 +15,7 @@ import { backoffDelay, reconnectDelay, retryAfterMs, retryWithBackoff } from "@/
 import { WsClient } from "@/lib/ws/client"
 import { createSyncGate } from "@/lib/ws/sync-gate"
 import type { InboundWsMessage, OutboundWsMessage } from "@/lib/ws/types"
+import { createWatchThrottle, type WatchThrottle } from "@/lib/ws/watch-throttle"
 
 import { WsContext } from "./context"
 import { syncRequest } from "./fetchers/ws-fetchers"
@@ -35,8 +36,12 @@ export function WsProvider({ children }: { children: ReactNode }) {
   const msgHandlers = useRef(new Set<(msg: InboundWsMessage) => void>())
   const syncHandlersRef = useRef(new Set<(res: SyncResponse) => void | Promise<void>>())
   const reconnectHandlersRef = useRef(new Set<() => void>())
+  // watch frames go through it: the gateway ignores more than one per second per socket
+  const watchThrottleRef = useRef<WatchThrottle | null>(null)
 
   useEffect(() => {
+    const watchThrottle = createWatchThrottle((message) => clientRef.current?.send(message))
+    watchThrottleRef.current = watchThrottle
     let alive = true
     let reconnectTimer: ReturnType<typeof setTimeout> | undefined
     let proactiveTimer: ReturnType<typeof setTimeout> | undefined
@@ -125,6 +130,7 @@ export function WsProvider({ children }: { children: ReactNode }) {
             replacing.close() // intentional: no onClose
           }
           clientRef.current = client
+          watchThrottle.reset() // a new socket: the gateway's count starts over
           const reconnected = connectedOnce
           connectedOnce = true
           openedAt = Date.now()
@@ -201,11 +207,18 @@ export function WsProvider({ children }: { children: ReactNode }) {
       replacement = null
       clientRef.current?.close()
       clientRef.current = null
+      watchThrottle.reset()
+      watchThrottleRef.current = null
       setStatus("disconnected")
     }
   }, [logout]) // logout is stable (useCallback in useAuthState); listed for exhaustive-deps
 
   const send = useCallback((msg: OutboundWsMessage) => {
+    if (msg.type === "watch") {
+      watchThrottleRef.current?.watch(msg.channel_id)
+      return
+    }
+    if (msg.type === "unwatch") watchThrottleRef.current?.unwatch(msg.channel_id)
     clientRef.current?.send(msg)
   }, [])
 
