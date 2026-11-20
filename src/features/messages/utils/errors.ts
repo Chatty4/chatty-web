@@ -59,14 +59,15 @@ export function describePinError(error: unknown): string {
   }
 }
 
-/** Why POST /channels/{id}/messages failed, and whether sending again can work. */
-export function describeSendFailure(error: unknown): SendFailure {
+/**
+ * Why POST /channels/{id}/messages failed, and whether sending again can work. A 429 keeps the
+ * time it can be sent again, so the wait can count down instead of being frozen in the text.
+ */
+export function describeSendFailure(error: unknown, now = Date.now()): SendFailure {
   if (error instanceof ApiError && error.status === 429) {
     // the message itself is fine: it can go once the wait is over
-    return {
-      message: `Not sent: too many messages. Try again in ${waitText(error.retryAfter)}.`,
-      retryable: true,
-    }
+    const retryAt = error.retryAfter ? now + error.retryAfter * 1000 : undefined
+    return { message: "Not sent: too many messages.", retryable: true, retryAt }
   }
   if (error instanceof ApiError && !isServerUnavailable(error)) {
     return { message: describeMessageError(error), retryable: false }

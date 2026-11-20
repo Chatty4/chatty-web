@@ -43,10 +43,19 @@ describe("describeReactionError", () => {
 })
 
 describe("describeSendFailure", () => {
-  it("allows a retry after a 429 and says how long to wait", () => {
-    expect(describeSendFailure(rateLimited(30))).toEqual({
-      message: "Not sent: too many messages. Try again in 30 seconds.",
+  it("allows a retry after a 429, at the time Retry-After gives", () => {
+    expect(describeSendFailure(rateLimited(30), 1_000_000)).toEqual({
+      message: "Not sent: too many messages.",
       retryable: true,
+      retryAt: 1_030_000,
+    })
+  })
+
+  it("allows a retry right away after a 429 without Retry-After", () => {
+    expect(describeSendFailure(rateLimited())).toEqual({
+      message: "Not sent: too many messages.",
+      retryable: true,
+      retryAt: undefined,
     })
   })
 

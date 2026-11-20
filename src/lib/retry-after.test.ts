@@ -1,6 +1,18 @@
 import { describe, expect, it } from "vitest"
 
-import { waitText } from "./retry-after"
+import { secondsUntil, waitText } from "./retry-after"
+
+describe("secondsUntil", () => {
+  it.each([
+    [30_000, 30],
+    [29_001, 30], // rounded up: never shows 0 while there is still a wait
+    [1, 1],
+    [0, 0],
+    [-5_000, 0],
+  ])("is the whole seconds left, %i ms before", (left, seconds) => {
+    expect(secondsUntil(1_000_000 + left, 1_000_000)).toBe(seconds)
+  })
+})
 
 describe("waitText", () => {
   it.each([
