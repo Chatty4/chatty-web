@@ -107,3 +107,8 @@ export function getHealth(service: ServiceName, signal?: AbortSignal): Promise<H
 export function isServerUnavailable(error: unknown): boolean {
   return error instanceof ApiError && (error.status === 0 || error.status >= 500)
 }
+
+/** True for a 429: the request was fine, it only has to wait `retryAfter` seconds. */
+export function isRateLimited(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 429
+}

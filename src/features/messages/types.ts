@@ -63,7 +63,12 @@ export type LocalMessage = ApiMessage & {
   failure?: SendFailure
 }
 
-export type SendFailure = { message: string; retryable: boolean }
+export type SendFailure = {
+  message: string
+  retryable: boolean
+  /** After a 429: when Retry-After allows sending again (epoch ms). The UI counts down to it. */
+  retryAt?: number
+}
 
 // ── Pins ──────────────────────────────────────────────────────────────────────
 

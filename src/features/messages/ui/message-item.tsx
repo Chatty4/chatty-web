@@ -4,7 +4,6 @@ import {
   Pencil,
   Pin,
   PinOff,
-  RotateCcw,
   SmilePlus,
   Trash2,
 } from "lucide-react"
@@ -34,6 +33,7 @@ import { MessageAttachments } from "./message-attachments"
 import { MessageMarkdown } from "./message-markdown"
 import { PinnedMark } from "./pinned-mark"
 import { ReactionChips } from "./reaction-chips"
+import { SendFailureNote } from "./send-failure"
 
 /** jumpToMessage sets data-flash on the row for a moment. */
 const ROW_FLASH_CLASS = "rounded-md transition-colors duration-200 data-[flash]:bg-accent/60"
@@ -198,30 +198,14 @@ export const MessageItem = memo(function MessageItem({
         <span className="text-xs text-faint-foreground">Sending…</span>
       )}
       {message.status === "failed" && (
-        <span className="text-xs text-destructive">
-          {message.failure?.message ?? "Not sent"}{" "}
-          {(message.failure?.retryable ?? true) && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-auto px-1 py-0 text-xs"
-              onClick={() => void retrySend()}
-            >
-              <RotateCcw className="size-3" />
-              Retry
-            </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-auto px-1 py-0 text-xs"
-            onClick={() =>
-              message.client_msg_id && onDiscard(message.channel_id, message.client_msg_id)
-            }
-          >
-            Dismiss
-          </Button>
-        </span>
+        <SendFailureNote
+          key={message.failure?.retryAt}
+          failure={message.failure}
+          onRetry={() => void retrySend()}
+          onDismiss={() =>
+            message.client_msg_id && onDiscard(message.channel_id, message.client_msg_id)
+          }
+        />
       )}
     </>
   )

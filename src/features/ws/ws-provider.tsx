@@ -8,13 +8,14 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 
 import { useAuth } from "@/features/auth"
-import { ApiError, isServerUnavailable } from "@/lib/api"
+import { isServerUnavailable } from "@/lib/api"
 import { isSessionRejected } from "@/lib/api-error"
 import { freshAccessToken, getAccessExpiry, getAccessToken, refreshSession } from "@/lib/session"
-import { backoffDelay, reconnectDelay, retryWithBackoff } from "@/lib/ws/backoff"
+import { backoffDelay, reconnectDelay, retryAfterMs, retryWithBackoff } from "@/lib/ws/backoff"
 import { WsClient } from "@/lib/ws/client"
 import { createSyncGate } from "@/lib/ws/sync-gate"
 import type { InboundWsMessage, OutboundWsMessage } from "@/lib/ws/types"
+import { createWatchThrottle, type WatchThrottle } from "@/lib/ws/watch-throttle"
 
 import { WsContext } from "./context"
 import { syncRequest } from "./fetchers/ws-fetchers"
@@ -35,8 +36,12 @@ export function WsProvider({ children }: { children: ReactNode }) {
   const msgHandlers = useRef(new Set<(msg: InboundWsMessage) => void>())
   const syncHandlersRef = useRef(new Set<(res: SyncResponse) => void | Promise<void>>())
   const reconnectHandlersRef = useRef(new Set<() => void>())
+  // watch frames go through it: the gateway ignores more than one per second per socket
+  const watchThrottleRef = useRef<WatchThrottle | null>(null)
 
   useEffect(() => {
+    const watchThrottle = createWatchThrottle((message) => clientRef.current?.send(message))
+    watchThrottleRef.current = watchThrottle
     let alive = true
     let reconnectTimer: ReturnType<typeof setTimeout> | undefined
     let proactiveTimer: ReturnType<typeof setTimeout> | undefined
@@ -53,6 +58,8 @@ export function WsProvider({ children }: { children: ReactNode }) {
     function doSync() {
       return gate.run(async () => {
         const res = await retryWithBackoff(() => syncRequest(cursorsRef.current), {
+          // Not a 429: its wait can be a minute, and live messages are held until the sync
+          // ends. Each channel's gap fill catches up from its next event instead.
           shouldRetry: isServerUnavailable,
           isCancelled: () => !alive,
         })
@@ -102,9 +109,8 @@ export function WsProvider({ children }: { children: ReactNode }) {
         if (isSessionRejected(error)) {
           setStatus("disconnected")
         } else {
-          const retryAfterMs = error instanceof ApiError ? (error.retryAfter ?? 0) * 1000 : 0
           setStatus("reconnecting")
-          scheduleReconnect(Math.max(backoffDelay(attempt++), retryAfterMs))
+          scheduleReconnect(Math.max(backoffDelay(attempt++), retryAfterMs(error)))
         }
         return
       }
@@ -124,6 +130,7 @@ export function WsProvider({ children }: { children: ReactNode }) {
             replacing.close() // intentional: no onClose
           }
           clientRef.current = client
+          watchThrottle.reset() // a new socket: the gateway's count starts over
           const reconnected = connectedOnce
           connectedOnce = true
           openedAt = Date.now()
@@ -200,11 +207,18 @@ export function WsProvider({ children }: { children: ReactNode }) {
       replacement = null
       clientRef.current?.close()
       clientRef.current = null
+      watchThrottle.reset()
+      watchThrottleRef.current = null
       setStatus("disconnected")
     }
   }, [logout]) // logout is stable (useCallback in useAuthState); listed for exhaustive-deps
 
   const send = useCallback((msg: OutboundWsMessage) => {
+    if (msg.type === "watch") {
+      watchThrottleRef.current?.watch(msg.channel_id)
+      return
+    }
+    if (msg.type === "unwatch") watchThrottleRef.current?.unwatch(msg.channel_id)
     clientRef.current?.send(msg)
   }, [])
 

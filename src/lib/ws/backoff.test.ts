@@ -1,6 +1,18 @@
 import { describe, expect, it, vi } from "vitest"
 
-import { backoffDelay, reconnectDelay, retryWithBackoff } from "./backoff"
+import { ApiError } from "@/lib/api-error"
+
+import { backoffDelay, reconnectDelay, retryAfterMs, retryWithBackoff } from "./backoff"
+
+describe("retryAfterMs", () => {
+  it("is a 429's Retry-After in ms", () => {
+    expect(retryAfterMs(new ApiError(429, "rate_limited", "x", { retryAfter: 7 }))).toBe(7_000)
+  })
+
+  it.each([new ApiError(503, "down", "x"), new Error("boom")])("is 0 for %s", (error) => {
+    expect(retryAfterMs(error)).toBe(0)
+  })
+})
 
 describe("backoffDelay", () => {
   it("doubles the cap up to 30 s", () => {
@@ -49,6 +61,23 @@ describe("retryWithBackoff", () => {
     const task = vi.fn().mockRejectedValue(new Error("bad request"))
     await expect(retryWithBackoff(task, { shouldRetry: () => false, wait })).rejects.toThrow()
     expect(task).toHaveBeenCalledTimes(1)
+  })
+
+  it("waits at least a 429's Retry-After before trying again", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.5)
+    const waits: number[] = []
+    const task = vi
+      .fn()
+      .mockRejectedValueOnce(new ApiError(429, "rate_limited", "slow down", { retryAfter: 12 }))
+      .mockResolvedValue("ok")
+
+    await retryWithBackoff(task, {
+      shouldRetry: () => true,
+      wait: async (ms) => void waits.push(ms),
+    })
+
+    expect(waits).toEqual([12_000]) // not the 500 ms backoff
+    vi.restoreAllMocks()
   })
 
   it("stops when cancelled", async () => {

@@ -1,11 +1,17 @@
 import { ApiError, isServerUnavailable } from "@/lib/api"
+import { waitText } from "@/lib/retry-after"
 
 import type { SendFailure } from "../types"
+
+/** Most different emoji one user can have on one message (api-chat.md, Rate limits). */
+export const MAX_REACTIONS_PER_USER = 20
 
 /** User-facing text for PUT / DELETE /messages/{id} errors (api-chat.md). */
 export function describeMessageError(error: unknown): string {
   if (!(error instanceof ApiError)) return "Something went wrong. Try again."
   switch (error.code) {
+    case "rate_limited":
+      return `You're doing that too often. Try again in ${waitText(error.retryAfter)}.`
     case "validation_error":
       return "The message must be 1–4000 characters."
     case "not_author":
@@ -29,8 +35,14 @@ export function describeMessageError(error: unknown): string {
 
 /** User-facing text for PUT / DELETE /messages/{id}/reactions/{emoji} errors. */
 export function describeReactionError(error: unknown): string {
-  if (messageErrorCode(error) === "validation_error") return "That emoji can't be used as a reaction."
-  return describeMessageError(error)
+  switch (messageErrorCode(error)) {
+    case "validation_error":
+      return "That emoji can't be used as a reaction."
+    case "reaction_limit_reached":
+      return `You can add at most ${MAX_REACTIONS_PER_USER} different reactions to a message. Remove one first.`
+    default:
+      return describeMessageError(error)
+  }
 }
 
 /** User-facing text for the pin endpoints (api-chat.md). */
@@ -47,9 +59,17 @@ export function describePinError(error: unknown): string {
   }
 }
 
-/** Why POST /channels/{id}/messages failed, and whether sending again can work. */
-export function describeSendFailure(error: unknown): SendFailure {
-  if (error instanceof ApiError && !isServerUnavailable(error) && error.status !== 429) {
+/**
+ * Why POST /channels/{id}/messages failed, and whether sending again can work. A 429 keeps the
+ * time it can be sent again, so the wait can count down instead of being frozen in the text.
+ */
+export function describeSendFailure(error: unknown, now = Date.now()): SendFailure {
+  if (error instanceof ApiError && error.status === 429) {
+    // the message itself is fine: it can go once the wait is over
+    const retryAt = error.retryAfter ? now + error.retryAfter * 1000 : undefined
+    return { message: "Not sent: too many messages.", retryable: true, retryAt }
+  }
+  if (error instanceof ApiError && !isServerUnavailable(error)) {
     return { message: describeMessageError(error), retryable: false }
   }
   return { message: "Not sent", retryable: true }

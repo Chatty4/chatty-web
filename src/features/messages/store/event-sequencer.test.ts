@@ -160,6 +160,20 @@ describe("gaps", () => {
     expect(seqs()).toEqual([3, 4, 5, 6])
   })
 
+  it("retries a rate-limited fetch instead of dropping the held events", async () => {
+    const getEvents = vi
+      .fn<(channelId: string, afterSeq: number) => Promise<GetEventsResponse>>()
+      .mockRejectedValueOnce(new ApiError(429, "rate_limited", "slow down", { retryAfter: 3 }))
+      .mockResolvedValueOnce({ events: [created(4), created(5)], last_seq: 5, has_more: false })
+    const { sequencer, seqs } = setup({ getEvents })
+
+    sequencer.receive(created(6))
+    await settle()
+
+    expect(getEvents).toHaveBeenCalledTimes(2)
+    expect(seqs()).toEqual([3, 4, 5, 6])
+  })
+
   it("gives up after the retries, and the next event tries again", async () => {
     const offline = new ApiError(0, "network_error", "offline")
     const getEvents = vi

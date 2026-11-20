@@ -69,6 +69,17 @@ export async function disablePush(): Promise<void> {
 }
 
 /**
+ * After a session ended without the logout button (expired, revoked, deactivated, or logged
+ * out in another tab): stops pushes to this browser, so the old user's messages don't keep
+ * arriving and the next login doesn't take over the subscription. There is no token left for
+ * the DELETE; the push service answers 410 to the next push and the worker deletes the row.
+ */
+export async function forgetPushSubscription(): Promise<void> {
+  if (!isSupported()) return
+  await (await currentSubscription())?.unsubscribe()
+}
+
+/**
  * On every app start, for a browser that turned push on: saves the subscription again, because
  * browsers sometimes change it (api-chat.md#post-push-subscriptions). Never asks for permission.
  */
