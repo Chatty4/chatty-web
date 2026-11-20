@@ -128,7 +128,9 @@ The app shell opens one WebSocket per tab (`src/features/ws/ws-provider.tsx`), w
 - After every open, `POST /sync` fetches what was missed. Live messages wait until it answers
   (`src/lib/ws/sync-gate.ts`).
 - A public channel you open without joining is followed with `watch`, sent again after every reconnect, and
-  ended with `unwatch` when you leave it (`src/features/messages/hooks/use-watch-channel.ts`).
+  ended with `unwatch` when you leave it (`src/features/messages/hooks/use-watch-channel.ts`). The gateway
+  ignores more than one `watch` per second per socket, so one sent sooner waits for its turn, and only the
+  newest waiting one is sent (`src/lib/ws/watch-throttle.ts`).
 - No message says you were added to a channel or sent a new DM. The sidebar reloads after every reconnect, and
   when an event or unread count arrives for a channel it doesn't list, at most once a minute per channel
   (`src/features/channels/utils/unknown-channels.ts`).
@@ -136,6 +138,12 @@ The app shell opens one WebSocket per tab (`src/features/ws/ws-provider.tsx`), w
 The message store (`src/features/messages/`) keeps one state per loaded channel and applies events by `seq`, as
 `chatty-infra/docs/events.md` says: it drops duplicates, applies the next event and fills gaps. Writes always go
 through REST. A message shows as pending at once, then as sent or failed; a retry reuses its `client_msg_id`.
+
+chatty-chat rate limits each user (`chatty-infra/docs/api-chat.md`, Rate limits). A `429 rate_limited` says how
+long to wait, from its `Retry-After` (`src/lib/retry-after.ts`): a message that was not sent keeps its Retry
+button, and reactions, pins, edits and search show the wait. A gap fill that gets a 429 tries again after the
+wait; `POST /sync` doesn't, because live messages wait for it. A user can have at most 20 different reactions on
+one message.
 
 More: the `chatty-docs` repo, `services/web/index.md` and `architecture/flows/from-login-to-logout.md`.
 
