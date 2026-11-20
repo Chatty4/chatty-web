@@ -1,7 +1,7 @@
 // Applies live events by the rules in chatty-infra/docs/events.md#client-rules.
 // Plain code with injected I/O, so the ordering can be tested without a socket or React.
 
-import { ApiError, isServerUnavailable } from "@/lib/api"
+import { ApiError, isRateLimited, isServerUnavailable } from "@/lib/api"
 import { retryWithBackoff } from "@/lib/ws/backoff"
 import type { ChannelEvent } from "@/lib/ws/types"
 
@@ -72,7 +72,8 @@ export function createEventSequencer(deps: EventSequencerDeps): EventSequencer {
     filling.add(channelId)
     try {
       await retryWithBackoff(() => fetchMissing(channelId, afterSeq, userId), {
-        shouldRetry: isServerUnavailable,
+        // a 429 is retried after its Retry-After; only this channel's events wait meanwhile
+        shouldRetry: (error) => isServerUnavailable(error) || isRateLimited(error),
         wait: deps.wait,
       })
     } catch (error) {

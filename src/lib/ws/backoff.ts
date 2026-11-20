@@ -1,5 +1,12 @@
+import { ApiError } from "@/lib/api-error"
+
 const BASE_MS = 1_000
 const MAX_MS = 30_000
+
+/** The wait a failure asks for: Retry-After of a 429, in ms; 0 for anything else. */
+export function retryAfterMs(error: unknown): number {
+  return error instanceof ApiError ? (error.retryAfter ?? 0) * 1000 : 0
+}
 
 /**
  * Close codes that can reconnect right away: the token expired (4001) or a heartbeat
@@ -35,7 +42,10 @@ type RetryOptions = {
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
-/** Runs `task`, retrying transient failures with backoff. Rejects with the last error. */
+/**
+ * Runs `task`, retrying transient failures with backoff, and never sooner than a 429's
+ * Retry-After. Rejects with the last error.
+ */
 export async function retryWithBackoff<T>(
   task: () => Promise<T>,
   { attempts = 3, shouldRetry, isCancelled = () => false, wait = sleep }: RetryOptions,
@@ -45,7 +55,7 @@ export async function retryWithBackoff<T>(
       return await task()
     } catch (error) {
       if (attempt + 1 >= attempts || !shouldRetry(error) || isCancelled()) throw error
-      await wait(backoffDelay(attempt))
+      await wait(Math.max(backoffDelay(attempt), retryAfterMs(error)))
     }
   }
 }

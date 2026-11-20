@@ -8,10 +8,10 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 
 import { useAuth } from "@/features/auth"
-import { ApiError, isServerUnavailable } from "@/lib/api"
+import { isServerUnavailable } from "@/lib/api"
 import { isSessionRejected } from "@/lib/api-error"
 import { freshAccessToken, getAccessExpiry, getAccessToken, refreshSession } from "@/lib/session"
-import { backoffDelay, reconnectDelay, retryWithBackoff } from "@/lib/ws/backoff"
+import { backoffDelay, reconnectDelay, retryAfterMs, retryWithBackoff } from "@/lib/ws/backoff"
 import { WsClient } from "@/lib/ws/client"
 import { createSyncGate } from "@/lib/ws/sync-gate"
 import type { InboundWsMessage, OutboundWsMessage } from "@/lib/ws/types"
@@ -53,6 +53,8 @@ export function WsProvider({ children }: { children: ReactNode }) {
     function doSync() {
       return gate.run(async () => {
         const res = await retryWithBackoff(() => syncRequest(cursorsRef.current), {
+          // Not a 429: its wait can be a minute, and live messages are held until the sync
+          // ends. Each channel's gap fill catches up from its next event instead.
           shouldRetry: isServerUnavailable,
           isCancelled: () => !alive,
         })
@@ -102,9 +104,8 @@ export function WsProvider({ children }: { children: ReactNode }) {
         if (isSessionRejected(error)) {
           setStatus("disconnected")
         } else {
-          const retryAfterMs = error instanceof ApiError ? (error.retryAfter ?? 0) * 1000 : 0
           setStatus("reconnecting")
-          scheduleReconnect(Math.max(backoffDelay(attempt++), retryAfterMs))
+          scheduleReconnect(Math.max(backoffDelay(attempt++), retryAfterMs(error)))
         }
         return
       }
