@@ -4,7 +4,6 @@ import { BellOff, ChevronDown, Hash, Lock, MessageSquare, Plus, Search, Settings
 import { Link, useMatches, useNavigate } from "react-router"
 
 import { Button } from "@/components/ui/button"
-import { initials } from "@/components/ui/avatar"
 import { describeChannelError, dmDisplayName, useChannels } from "@/features/channels"
 import { useAuth } from "@/features/auth"
 import { usePresence } from "@/features/presence"
@@ -13,6 +12,7 @@ import { UnreadBadge, useUnread } from "@/features/unread"
 import { toast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
 
+import { UserAvatar } from "./user-avatar"
 import { UserMenu } from "./user-menu"
 
 const menuItemClass =
@@ -46,7 +46,7 @@ type SidebarProps = {
 export function Sidebar({ open, onClose }: SidebarProps) {
   const teamId = useActiveTeamId()
   const activeChannelId = useActiveChannelId()
-  const { channels, dms, hiddenDms, memberNames, failed, reload, hideDm, showDm } = useChannels()
+  const { channels, dms, hiddenDms, memberNames, memberAvatars, failed, reload, hideDm, showDm } = useChannels()
   const { user } = useAuth()
   const { teams, loading: teamsLoading, failed: teamsFailed } = useTeams()
   const { getCounts, markAllRead } = useUnread()
@@ -250,7 +250,9 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           {dms.map((dm) => {
             const isActive = dm.id === activeChannelId
             const label = dmDisplayName(dm.dm_member_ids ?? [], myUserId, memberNames)
-            const abbr = initials(label).slice(0, 2)
+            const others = (dm.dm_member_ids ?? []).filter((id) => id !== myUserId)
+            // A group DM has no one picture: it keeps the initials.
+            const avatarFileId = others.length === 1 ? memberAvatars[others[0]] : null
             const counts = countsOf(dm.id, isActive)
             // A group DM shows the dot while anyone else in it is online.
             const online = (dm.dm_member_ids ?? []).some((id) => id !== myUserId && isOnline(id))
@@ -273,9 +275,11 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                 >
                   {/* Mini avatar */}
                   <span className="relative flex-none">
-                    <span className="grid size-[22px] place-items-center rounded-full bg-surface-hover text-[9px] font-semibold text-muted-foreground">
-                      {abbr}
-                    </span>
+                    <UserAvatar
+                      name={label}
+                      avatarFileId={avatarFileId}
+                      className="size-[22px] bg-surface-hover text-[9px] text-muted-foreground"
+                    />
                     {online && (
                       <span className="absolute -right-0.5 bottom-0 size-[7px] rounded-full border border-background bg-online" />
                     )}

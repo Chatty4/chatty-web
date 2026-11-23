@@ -9,6 +9,8 @@ export type ChannelsContextValue = {
   dms: SidebarChannel[]
   /** userId → displayName map, resolved from DM participants. */
   memberNames: Record<string, string>
+  /** userId → avatar file, from the same member previews as the names. */
+  memberAvatars: Record<string, string | null>
   loading: boolean
   /** The list couldn't be fetched: not the same as a team with no channels. */
   failed: boolean
