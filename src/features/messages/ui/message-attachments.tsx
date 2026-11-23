@@ -5,11 +5,14 @@ import { formatFileSize } from "@/features/files"
 
 import { useAttachmentUrls } from "../hooks/use-attachment-urls"
 import type { Attachment, LocalMessage } from "../types"
-import { isInlineImage } from "../utils/attachments"
+import { isInlineImage, isInlineVideo } from "../utils/attachments"
 import { ImageGrid } from "./image-grid"
 import { ImageLightbox } from "./image-lightbox"
 
-/** A message's files: its images as a grid that opens a preview, then the other files as cards. */
+/**
+ * A message's files: its images as a grid that opens a preview, its videos as players, then the
+ * other files as cards.
+ */
 export function MessageAttachments({ message }: { message: LocalMessage }) {
   // A pending message has no id on the server yet: its files show without links.
   const sent = message.status === "sent"
@@ -21,7 +24,8 @@ export function MessageAttachments({ message }: { message: LocalMessage }) {
   if (message.attachments.length === 0) return null
 
   const images = message.attachments.filter((a) => isInlineImage(a.mime))
-  const files = message.attachments.filter((a) => !isInlineImage(a.mime))
+  const videos = message.attachments.filter((a) => isInlineVideo(a.mime))
+  const files = message.attachments.filter((a) => !isInlineImage(a.mime) && !isInlineVideo(a.mime))
   const urlOf = Object.fromEntries(message.attachments.map((a) => [a.file_id, urls[a.file_id]?.url]))
 
   // The URL answers with Content-Disposition: attachment, so this downloads under the file's name.
@@ -40,6 +44,24 @@ export function MessageAttachments({ message }: { message: LocalMessage }) {
     // Inside the bubble; the bubble's [&>*+*] rule spaces it from the text.
     <div className="flex flex-col items-start gap-1.5">
       <ImageGrid images={images} urls={urlOf} onOpen={setPreviewIndex} onImageError={onImageError} />
+      {videos.map((video) => (
+        <div key={video.file_id} className="flex w-full max-w-md flex-col gap-1">
+          {urlOf[video.file_id] && (
+            <video
+              src={urlOf[video.file_id]}
+              controls
+              preload="metadata"
+              aria-label={video.filename}
+              onError={() => onImageError(video.file_id)}
+              className="max-h-80 w-full rounded-md bg-black"
+            />
+          )}
+          <FileCard
+            attachment={video}
+            onDownload={urlOf[video.file_id] ? () => void download(video.file_id) : undefined}
+          />
+        </div>
+      ))}
       {files.length > 0 && (
         <ul aria-label="Files" className="flex flex-col items-start gap-1.5">
           {files.map((file) => (
