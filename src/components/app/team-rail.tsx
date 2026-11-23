@@ -1,4 +1,4 @@
-import { Bell, MessageCircle, Plus } from "lucide-react"
+import { MessageCircle, Plus } from "lucide-react"
 import { Link } from "react-router"
 
 import { cn } from "@/lib/utils"
@@ -7,7 +7,7 @@ import { TeamIcon, useActiveTeamId, useTeams } from "@/features/teams"
 const tileBase =
   "grid size-[34px] shrink-0 place-items-center rounded-md text-[12px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring"
 
-/** The narrow column on the left: brand mark, one tile per team, create team, and a bell. */
+/** The narrow column on the left: brand mark, one tile per team, and create team. */
 export function TeamRail() {
   const { teams } = useTeams()
   const activeTeamId = useActiveTeamId()
@@ -57,18 +57,6 @@ export function TeamRail() {
       >
         <Plus className="size-4" />
       </Link>
-
-      {/* Push bell to the bottom */}
-      <div className="flex-1" />
-
-      <button
-        type="button"
-        aria-label="Notifications"
-        onClick={() => {/* notifications — future ticket */}}
-        className={cn(tileBase, "text-muted-foreground hover:bg-surface-hover hover:text-foreground")}
-      >
-        <Bell className="size-[18px]" />
-      </button>
     </aside>
   )
 }

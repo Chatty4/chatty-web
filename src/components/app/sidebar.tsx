@@ -1,6 +1,6 @@
 import { useEffect } from "react"
 import { Menu } from "@base-ui/react/menu"
-import { BellOff, ChevronDown, Hash, Headphones, Lock, MessageSquare, Plus, Search, Settings, X } from "lucide-react"
+import { BellOff, ChevronDown, Hash, Lock, MessageSquare, Plus, Search, Settings, X } from "lucide-react"
 import { Link, useMatches, useNavigate } from "react-router"
 
 import { Button } from "@/components/ui/button"
@@ -320,14 +320,6 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         {/* Footer — user menu + action icons */}
         <div className="flex min-h-[66px] shrink-0 items-center gap-0.5 border-t px-2 py-2.5">
           <UserMenu />
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Start huddle"
-            className="shrink-0"
-          >
-            <Headphones className="size-[17px]" />
-          </Button>
           {teamId && (
             <Button
               variant="ghost"
