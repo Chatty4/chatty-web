@@ -10,6 +10,9 @@ export const MAX_ATTACHMENT_SIZE = 25 * MB
 
 export const IMAGE_MIMES = ["image/png", "image/jpeg", "image/webp", "image/gif"]
 
+/** The video types every current browser plays; others (e.g. .mov, .avi) stay files to download. */
+export const VIDEO_MIMES = ["video/mp4", "video/webm", "video/ogg"]
+
 const PROGRAM_EXTENSIONS = [
   "exe", "dll", "com", "scr", "cpl", "msi", "msp", "msix", "appx", "bat", "cmd",
   "ps1", "vbs", "vbe", "wsf", "hta", "lnk", "jar", "apk", "dmg", "pkg",

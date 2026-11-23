@@ -7,7 +7,7 @@ import { uuid } from "@/lib/uuid"
 import { uploadFile } from "../fetchers/file-fetchers"
 import type { FilePurpose, UploadedFile } from "../types"
 import { describeUploadError } from "../utils/errors"
-import { checkFile, IMAGE_MIMES } from "../utils/limits"
+import { checkFile, IMAGE_MIMES, VIDEO_MIMES } from "../utils/limits"
 
 export type FileUpload = {
   key: string
@@ -18,7 +18,7 @@ export type FileUpload = {
   error?: string
   /** Set once the file is ready. */
   uploaded?: UploadedFile
-  /** A local URL of the picked image, for a thumbnail. Only for images. */
+  /** A local URL of the picked image or video, for a thumbnail. Only for those. */
   preview?: string
 }
 
@@ -50,7 +50,7 @@ export function useFileUploads(purpose: FilePurpose, teamId: string | null) {
   const start = useCallback(
     (file: File) => {
       const key = uuid()
-      const preview = IMAGE_MIMES.includes(file.type) ? URL.createObjectURL(file) : undefined
+      const preview = [...IMAGE_MIMES, ...VIDEO_MIMES].includes(file.type) ? URL.createObjectURL(file) : undefined
       if (preview) previews.current.set(key, preview)
 
       const refused = checkFile(file, purpose)
