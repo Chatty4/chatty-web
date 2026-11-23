@@ -31,6 +31,7 @@ type ChannelsState =
       /** channelId -> when its newest message was sent, to order the DMs. */
       lastMessageAt: Record<string, string>
       memberNames: Record<string, string>
+      memberAvatars: Record<string, string | null>
       /** Every channel I'm in, hidden DMs included: a message for one of these needs no reload. */
       knownIds: ReadonlySet<string>
     }
@@ -52,9 +53,13 @@ async function fetchChannels(teamId: string, myUserId: string): Promise<Channels
     ]
 
     const memberNames: Record<string, string> = {}
+    const memberAvatars: Record<string, string | null> = {}
     if (dmUserIds.length > 0) {
       const { members } = await getTeamMemberPreviewsRequest(teamId, dmUserIds)
-      for (const m of members) memberNames[m.user_id] = m.display_name
+      for (const m of members) {
+        memberNames[m.user_id] = m.display_name
+        memberAvatars[m.user_id] = m.avatar_file_id
+      }
     }
 
     const knownIds = new Set(all.map((c) => c.id))
@@ -66,6 +71,7 @@ async function fetchChannels(teamId: string, myUserId: string): Promise<Channels
       hiddenDms,
       lastMessageAt: {},
       memberNames,
+      memberAvatars,
       knownIds,
     }
   } catch {
@@ -250,6 +256,7 @@ export function ChannelsProvider({ children }: { children: ReactNode }) {
       channels: loaded ? state.channels : [],
       dms: loaded ? sortDmsByActivity(state.dms, state.lastMessageAt) : [],
       memberNames: loaded ? state.memberNames : {},
+      memberAvatars: loaded ? state.memberAvatars : {},
       loading: !!teamId && !loaded && !failed,
       failed,
       hiddenDms: loaded ? state.hiddenDms : [],
