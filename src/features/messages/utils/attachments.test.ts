@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { imageRows, isInlineImage, needsFreshUrl } from "./attachments"
+import { imageRows, isInlineImage, isInlineVideo, needsFreshUrl } from "./attachments"
 
 describe("imageRows", () => {
   it.each([
@@ -25,6 +25,15 @@ describe("isInlineImage", () => {
     expect(isInlineImage("image/png")).toBe(true)
     expect(isInlineImage("image/svg+xml")).toBe(false)
     expect(isInlineImage("application/pdf")).toBe(false)
+  })
+})
+
+describe("isInlineVideo", () => {
+  it("plays MP4, WebM and Ogg inline, and other videos as files", () => {
+    expect(isInlineVideo("video/mp4")).toBe(true)
+    expect(isInlineVideo("video/webm")).toBe(true)
+    expect(isInlineVideo("video/quicktime")).toBe(false)
+    expect(isInlineVideo("image/png")).toBe(false)
   })
 })
 
