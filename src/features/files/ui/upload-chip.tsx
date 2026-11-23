@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils"
 
 import type { FileUpload } from "../hooks/use-file-uploads"
 import { formatFileSize } from "../utils/format"
+import { VIDEO_MIMES } from "../utils/limits"
 
 /** One picked file in the composer: name, size, progress or error, and a remove button. */
 export function UploadChip({ upload, onRemove }: { upload: FileUpload; onRemove: () => void }) {
@@ -18,6 +19,8 @@ export function UploadChip({ upload, onRemove }: { upload: FileUpload; onRemove:
     >
       {failed ? (
         <AlertCircle className="size-4 shrink-0 text-destructive" aria-hidden="true" />
+      ) : upload.preview && VIDEO_MIMES.includes(upload.file.type) ? (
+        <video src={upload.preview} muted preload="metadata" className="size-9 shrink-0 rounded-sm bg-black object-cover" />
       ) : upload.preview ? (
         <img src={upload.preview} alt="" className="size-9 shrink-0 rounded-sm object-cover" />
       ) : (

@@ -1,14 +1,11 @@
 // How a message's files are shown (api-chat.md, GET /messages/{id}/attachments).
 
-import { IMAGE_MIMES } from "@/features/files"
+import { IMAGE_MIMES, VIDEO_MIMES } from "@/features/files"
 
 /** Images we show inline; every other file is a card with a download link. */
 export function isInlineImage(mime: string): boolean {
   return IMAGE_MIMES.includes(mime)
 }
-
-// The types every current browser plays; others (e.g. .mov, .avi) stay files to download.
-const VIDEO_MIMES = ["video/mp4", "video/webm", "video/ogg"]
 
 /** Videos we show inline as a player. */
 export function isInlineVideo(mime: string): boolean {
