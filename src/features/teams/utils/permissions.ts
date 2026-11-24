@@ -10,6 +10,14 @@ export function isTeamManager(role: Role): boolean {
 }
 
 /**
+ * Only owners can delete the team. Anyone can leave it, owners included, as long as another
+ * active owner is left (otherwise 409 last_owner).
+ */
+export function canDeleteTeam(role: Role): boolean {
+  return role === "owner"
+}
+
+/**
  * Change this member's role or remove them: an owner or admin, never myself (that is leave), and
  * an admin can't touch an owner. Only an owner can remove another owner.
  */

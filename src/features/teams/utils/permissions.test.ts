@@ -1,12 +1,20 @@
 import { describe, expect, it } from "vitest"
 
-import { canManageMember, isTeamManager, offersRemove } from "./permissions"
+import { canDeleteTeam, canManageMember, isTeamManager, offersRemove } from "./permissions"
 
 describe("isTeamManager", () => {
   it("is true for owners and admins only", () => {
     expect(isTeamManager("owner")).toBe(true)
     expect(isTeamManager("admin")).toBe(true)
     expect(isTeamManager("member")).toBe(false)
+  })
+})
+
+describe("canDeleteTeam", () => {
+  it("is true for owners only", () => {
+    expect(canDeleteTeam("owner")).toBe(true)
+    expect(canDeleteTeam("admin")).toBe(false)
+    expect(canDeleteTeam("member")).toBe(false)
   })
 })
 
