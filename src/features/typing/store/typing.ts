@@ -72,6 +72,17 @@ export function typingLabel(names: (string | undefined)[]): TypingLabel | null {
   return { names: known, text: known.length === 1 ? "is typing…" : "are typing…" }
 }
 
+/** How many avatars the indicator shows; the others are counted as "+N". */
+export const TYPING_MAX_AVATARS = 3
+
+/** Whose avatar to show, first one first, and how many people are left over. */
+export type TypingAvatars = { shown: string[]; more: number }
+
+/** The users whose avatars the indicator shows, and the count of the rest. */
+export function typingAvatars(userIds: string[], max = TYPING_MAX_AVATARS): TypingAvatars {
+  return { shown: userIds.slice(0, max), more: Math.max(0, userIds.length - max) }
+}
+
 function without<T>(record: Readonly<Record<string, T>>, key: string): Record<string, T> {
   const copy = { ...record }
   delete copy[key]

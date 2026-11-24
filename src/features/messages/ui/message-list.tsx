@@ -412,6 +412,7 @@ export function MessageList({
               channelId={channelId}
               teamId={teamId}
               names={names}
+              previews={memberPreviews}
               onShown={keepTypingInView}
             />
           )}

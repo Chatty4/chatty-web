@@ -9,7 +9,9 @@ import {
   TYPING_SEND_EVERY_MS,
   typingDelay,
   typingIn,
+  typingAvatars,
   typingLabel,
+  TYPING_MAX_AVATARS,
   type TypingState,
 } from "./typing"
 
@@ -123,5 +125,22 @@ describe("typingLabel", () => {
     const someone = { names: ["Someone"], text: "is typing…" }
     expect(typingLabel([undefined])).toEqual(someone)
     expect(typingLabel(["Ana", undefined])).toEqual(someone)
+  })
+})
+
+describe("typingAvatars", () => {
+  it("shows everyone up to the limit, first one first", () => {
+    expect(typingAvatars(["ana"])).toEqual({ shown: ["ana"], more: 0 })
+    expect(typingAvatars(["ana", "bob", "cleo"])).toEqual({ shown: ["ana", "bob", "cleo"], more: 0 })
+  })
+
+  it("counts the people past the limit", () => {
+    const five = ["ana", "bob", "cleo", "dan", "eva"]
+    expect(typingAvatars(five)).toEqual({ shown: five.slice(0, TYPING_MAX_AVATARS), more: 2 })
+    expect(typingAvatars(five, 1)).toEqual({ shown: ["ana"], more: 4 })
+  })
+
+  it("shows nobody when nobody is typing", () => {
+    expect(typingAvatars([])).toEqual({ shown: [], more: 0 })
   })
 })
