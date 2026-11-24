@@ -25,6 +25,7 @@ import { describeChannelError } from "../utils/errors"
 import { dmDisplayName } from "../utils/dm-name"
 import { MAX_DM_OTHERS, startDmWithUrl } from "../utils/dm-with"
 import {
+  canAddChannelMembers,
   canLeaveChannel,
   canManageChannel,
   hasArchiveTab,
@@ -257,7 +258,9 @@ function MembersTab({
   const { confirm, confirmProps } = useConfirm()
   const navigate = useNavigate()
   const isDm = channel.kind === "dm"
-  const editable = canManage && !channel.archived && !isDm
+  // Two rules (api-core.md): any member can add people; removing them is for who manages.
+  const canAdd = canAddChannelMembers(channel)
+  const canRemove = canManage && !channel.archived && !isDm
   const othersInDm = members.filter((m) => m.user_id !== myUserId).length
 
   const handleRemove = async (userId: string) => {
@@ -283,7 +286,7 @@ function MembersTab({
   return (
     <div className="flex flex-col gap-2">
       <ConfirmDialog {...confirmProps} />
-      {editable && (
+      {canAdd && (
         <div className="flex items-center justify-end gap-2">
           <Button onClick={() => setAdding(true)}>Add members</Button>
         </div>
@@ -314,7 +317,7 @@ function MembersTab({
               <UserAvatar name={name} avatarFileId={memberAvatars[m.user_id]} />
               <RowMain title={name} detail={m.role === "owner" ? "Channel owner" : "Member"} />
               {/* Not my own row: leaving is the Archive tab's Leave (DELETE on me is use_leave). */}
-              {editable && m.role !== "owner" && m.user_id !== myUserId && (
+              {canRemove && m.role !== "owner" && m.user_id !== myUserId && (
                 <Button
                   variant="ghost"
                   size="sm"
