@@ -24,6 +24,7 @@ import { useConfirm } from "@/hooks/use-confirm"
 
 import { useTeamSettings } from "../hooks/use-team-settings"
 import { describeTeamError } from "../utils/errors"
+import { canManageMember, isTeamManager, offersRemove } from "../utils/permissions"
 import type { Role, TeamMember } from "../types"
 import { TeamIcon } from "./team-icon"
 
@@ -148,8 +149,6 @@ function MembersTab({
   const [error, setError] = useState<string>()
   const { confirm, confirmProps } = useConfirm()
 
-  const canManage = myRole === "owner" || myRole === "admin"
-
   const run = async (userId: string, action: () => Promise<void>) => {
     setBusy(userId)
     setError(undefined)
@@ -184,7 +183,7 @@ function MembersTab({
         {members.map((member) => {
           const isSelf = member.user_id === myUserId
           const isOwner = member.role === "owner"
-          const canEdit = canManage && !isSelf && !(myRole === "admin" && isOwner)
+          const canEdit = canManageMember(myRole, member.role, isSelf)
           const isBusy = busy === member.user_id
 
           return (
@@ -214,7 +213,7 @@ function MembersTab({
                   {(myRole === "owner" || isOwner) && <option value="owner">Owner</option>}
                 </Select>
               </div>
-              {!isOwner && (
+              {offersRemove(myRole, member.role, isSelf) && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -342,7 +341,7 @@ export function TeamSettings({ teamId }: { teamId: string }) {
           teamId={teamId}
           name={team.name}
           iconFileId={team.icon_file_id}
-          canManage={team.my_role === "owner" || team.my_role === "admin"}
+          canManage={isTeamManager(team.my_role)}
           onRename={renameTeam}
         />
       )}
