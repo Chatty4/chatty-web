@@ -12,7 +12,7 @@ import { FormField } from "@/components/ui/form-field"
 import { Input } from "@/components/ui/input"
 import { DataList, DataRow, RowMain, SectionTitle, SettingsTabs } from "@/components/ui/settings"
 import { SidePanel } from "@/components/ui/side-panel"
-import { useAuth } from "@/features/auth"
+import { useTeams } from "@/features/teams"
 import { getAllTeamMembersRequest } from "@/features/teams/fetchers/team-fetchers"
 import { useConfirm } from "@/hooks/use-confirm"
 import { cn } from "@/lib/utils"
@@ -21,6 +21,7 @@ import { useChannels } from "../hooks/channels-context"
 import { useChannelSettings } from "../hooks/use-channel-settings"
 import type { ChannelDetail, ChannelMember, MyChannelSettings, NotifyLevel } from "../types"
 import { describeChannelError } from "../utils/errors"
+import { canManageChannel } from "../utils/permissions"
 
 const TABS = ["about", "members", "notifications", "archive"] as const
 type Tab = (typeof TABS)[number]
@@ -500,7 +501,7 @@ export function ChannelDetailsPanel({
   initialTab = "about",
   onClose,
 }: ChannelDetailsPanelProps) {
-  const { user } = useAuth()
+  const { teams } = useTeams()
   const { reload } = useChannels()
   const navigate = useNavigate()
   const settings = useChannelSettings(channelId)
@@ -508,7 +509,8 @@ export function ChannelDetailsPanel({
   const [tab, setTab] = useState<Tab>(initialTab)
 
   const channel = state.status === "loaded" ? state.channel : null
-  const canManage = !!channel && (channel.my?.role === "owner" || user?.id === channel.created_by)
+  const teamRole = teams.find((t) => t.id === teamId)?.role ?? null
+  const canManage = !!channel && canManageChannel(channel, teamRole)
   const tabs = channel?.kind === "dm" ? TABS.filter((t) => t !== "archive") : TABS
 
   return (
