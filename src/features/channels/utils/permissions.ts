@@ -13,3 +13,25 @@ export function canManageChannel(
   if (channel.kind === "dm") return false
   return channel.my?.role === "owner" || teamRole === "owner" || teamRole === "admin"
 }
+
+/**
+ * Leave a channel I'm in (api-core.md, POST /channels/{id}/leave). Not one I only view
+ * (403 not_a_member), not a DM (hidden instead) and not the default channel.
+ */
+export function canLeaveChannel(
+  channel: Pick<ChannelDetail, "kind" | "my" | "is_default">,
+): boolean {
+  return channel.kind !== "dm" && !channel.is_default && channel.my !== null
+}
+
+/**
+ * Whether the details panel has an Archive tab: never for a DM, and otherwise only when it shows
+ * something (the default channel's note, "Archived", Archive, or Leave).
+ */
+export function hasArchiveTab(
+  channel: Pick<ChannelDetail, "kind" | "my" | "is_default" | "archived">,
+  canManage: boolean,
+): boolean {
+  if (channel.kind === "dm") return false
+  return channel.is_default || channel.archived || canManage || canLeaveChannel(channel)
+}

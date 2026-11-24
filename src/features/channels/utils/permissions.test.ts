@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 
 import type { ChannelDetail, MyChannelSettings } from "../types"
-import { canManageChannel } from "./permissions"
+import { canLeaveChannel, canManageChannel, hasArchiveTab } from "./permissions"
 
 const my = (role: MyChannelSettings["role"]): MyChannelSettings => ({
   role,
@@ -51,5 +51,40 @@ describe("canManageChannel", () => {
   it("refuses everyone in a DM", () => {
     expect(canManageChannel({ kind: "dm", my: my("owner") }, "owner")).toBe(false)
     expect(canManageChannel({ kind: "dm", my: my("member") }, "admin")).toBe(false)
+  })
+})
+
+describe("canLeaveChannel", () => {
+  it("lets me leave a channel I'm in", () => {
+    expect(canLeaveChannel(createdByMe("member"))).toBe(true)
+    expect(canLeaveChannel(createdByMe("owner"))).toBe(true)
+  })
+
+  it("doesn't offer to leave a channel I only view (403 not_a_member)", () => {
+    expect(canLeaveChannel({ ...createdByMe("member"), my: null })).toBe(false)
+  })
+
+  it("doesn't offer to leave a DM or the default channel", () => {
+    expect(canLeaveChannel({ ...createdByMe("member"), kind: "dm" })).toBe(false)
+    expect(canLeaveChannel({ ...createdByMe("member"), is_default: true })).toBe(false)
+  })
+})
+
+describe("hasArchiveTab", () => {
+  const viewing = { ...createdByMe("member"), my: null }
+
+  it("has nothing to show to someone who only views and can't archive", () => {
+    expect(hasArchiveTab(viewing, false)).toBe(false)
+  })
+
+  it("shows to members, to who can archive, and when there is a note to read", () => {
+    expect(hasArchiveTab(createdByMe("member"), false)).toBe(true)
+    expect(hasArchiveTab(viewing, true)).toBe(true)
+    expect(hasArchiveTab({ ...viewing, archived: true }, false)).toBe(true)
+    expect(hasArchiveTab({ ...viewing, is_default: true }, false)).toBe(true)
+  })
+
+  it("never shows for a DM", () => {
+    expect(hasArchiveTab({ ...createdByMe("member"), kind: "dm" }, false)).toBe(false)
   })
 })
