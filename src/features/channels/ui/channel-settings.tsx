@@ -471,40 +471,45 @@ function ArchiveTab({
     )
   }
 
+  // "Archived" tells everyone; "Archive channel" only shows to whoever can do it.
+  const showArchive = channel.archived || canManage
+
   return (
     <div className="flex flex-col gap-[18px]">
       <ConfirmDialog {...confirmProps} />
       {error && <Alert>{error}</Alert>}
-      <div>
-        <SectionTitle
-          title={channel.archived ? "Archived" : "Archive channel"}
-          description={
-            channel.archived
-              ? "This channel is read-only."
-              : "Members can still read message history."
-          }
-        />
-        {!channel.archived && canManage && (
-          <Button
-            variant="destructive"
-            className="w-full"
-            disabled={busy}
-            onClick={() =>
-              void run(
-                {
-                  title: `Archive #${channel.name}?`,
-                  description: "The channel will become read-only for every member.",
-                  action: "Archive channel",
-                },
-                onArchive,
-              )
+      {showArchive && (
+        <div>
+          <SectionTitle
+            title={channel.archived ? "Archived" : "Archive channel"}
+            description={
+              channel.archived
+                ? "This channel is read-only."
+                : "Members can still read message history."
             }
-          >
-            Archive channel
-          </Button>
-        )}
-      </div>
-      <div className="border-t pt-[18px]">
+          />
+          {!channel.archived && (
+            <Button
+              variant="destructive"
+              className="w-full"
+              disabled={busy}
+              onClick={() =>
+                void run(
+                  {
+                    title: `Archive #${channel.name}?`,
+                    description: "The channel will become read-only for every member.",
+                    action: "Archive channel",
+                  },
+                  onArchive,
+                )
+              }
+            >
+              Archive channel
+            </Button>
+          )}
+        </div>
+      )}
+      <div className={cn(showArchive && "border-t pt-[18px]")}>
         <SectionTitle title="Leave channel" description="You can rejoin later if the channel is public." />
         <Button
           variant="secondary"
