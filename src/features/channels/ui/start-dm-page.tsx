@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
-import { useNavigate, useParams } from "react-router"
+import { useNavigate, useParams, useSearchParams } from "react-router"
 
 import { Alert } from "@/components/ui/alert"
 import { UserAvatar } from "@/components/app/user-avatar"
@@ -11,6 +11,7 @@ import { getAllTeamMembersRequest } from "@/features/teams/fetchers/team-fetcher
 import { startDmRequest } from "../fetchers/channel-fetchers"
 import { useChannels } from "../hooks/channels-context"
 import type { MemberPreview } from "../types"
+import { MAX_DM_OTHERS, parseStartDmWith } from "../utils/dm-with"
 import { describeChannelError } from "../utils/errors"
 
 type MembersState =
@@ -55,7 +56,17 @@ export function StartDmPage() {
   }, [teamId, myUserId, load])
 
   const [query, setQuery] = useState("")
-  const [selected, setSelected] = useState<string[]>([])
+  // "New conversation with…" from a DM opens this page with that DM's people selected.
+  const [searchParams] = useSearchParams()
+  const [picked, setSelected] = useState<string[]>(() =>
+    parseStartDmWith(searchParams.get("with"), myUserId),
+  )
+  // Someone who left the team since can't be in the new DM (400 user_not_in_team).
+  const selected =
+    membersState.status === "loaded"
+      ? picked.filter((id) => membersState.members.some((m) => m.user_id === id))
+      : picked
+  const atLimit = selected.length >= MAX_DM_OTHERS
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string>()
 
@@ -92,7 +103,7 @@ export function StartDmPage() {
       <div>
         <h1 className="text-lg font-semibold">New message</h1>
         <p className="text-sm text-muted-foreground">
-          Choose one or more people to start a conversation.
+          Choose up to {MAX_DM_OTHERS} people to start a conversation.
         </p>
       </div>
 
@@ -129,6 +140,7 @@ export function StartDmPage() {
                   type="checkbox"
                   className="rounded"
                   checked={isSelected}
+                  disabled={!isSelected && atLimit}
                   onChange={() => toggle(member.user_id)}
                 />
                 <UserAvatar name={member.display_name} avatarFileId={member.avatar_file_id} />
