@@ -287,7 +287,8 @@ function MembersTab({
             <DataRow key={m.user_id}>
               <UserAvatar name={name} avatarFileId={memberAvatars[m.user_id]} />
               <RowMain title={name} detail={m.role === "owner" ? "Channel owner" : "Member"} />
-              {editable && m.role !== "owner" && (
+              {/* Not my own row: leaving is the Archive tab's Leave (DELETE on me is use_leave). */}
+              {editable && m.role !== "owner" && m.user_id !== myUserId && (
                 <Button
                   variant="ghost"
                   size="sm"
