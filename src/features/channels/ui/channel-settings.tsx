@@ -24,7 +24,12 @@ import type { ChannelDetail, ChannelMember, MyChannelSettings, NotifyLevel } fro
 import { describeChannelError } from "../utils/errors"
 import { dmDisplayName } from "../utils/dm-name"
 import { MAX_DM_OTHERS, startDmWithUrl } from "../utils/dm-with"
-import { canLeaveChannel, canManageChannel, hasArchiveTab } from "../utils/permissions"
+import {
+  canLeaveChannel,
+  canManageChannel,
+  hasArchiveTab,
+  hasNotificationsTab,
+} from "../utils/permissions"
 
 const TABS = ["about", "members", "notifications", "archive"] as const
 type Tab = (typeof TABS)[number]
@@ -570,8 +575,14 @@ export function ChannelDetailsPanel({
   const teamRole = teams.find((t) => t.id === teamId)?.role ?? null
   const canManage = !!channel && canManageChannel(channel, teamRole)
   const isDm = channel?.kind === "dm"
-  const tabs: readonly Tab[] =
-    channel && !hasArchiveTab(channel, canManage) ? TABS.filter((t) => t !== "archive") : TABS
+  // Only the tabs that have something in them for me (a channel I only view has no settings).
+  const tabs: readonly Tab[] = channel
+    ? TABS.filter(
+        (t) =>
+          (t !== "archive" || hasArchiveTab(channel, canManage)) &&
+          (t !== "notifications" || hasNotificationsTab(channel)),
+      )
+    : TABS
   // Opened on a tab this channel doesn't have (?details=archive): show About instead.
   const activeTab = tabs.includes(tab) ? tab : "about"
   const dmName =

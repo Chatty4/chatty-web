@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest"
 
 import type { ChannelDetail, MyChannelSettings } from "../types"
-import { canLeaveChannel, canManageChannel, hasArchiveTab } from "./permissions"
+import {
+  canLeaveChannel,
+  canManageChannel,
+  hasArchiveTab,
+  hasNotificationsTab,
+} from "./permissions"
 
 const my = (role: MyChannelSettings["role"]): MyChannelSettings => ({
   role,
@@ -86,5 +91,12 @@ describe("hasArchiveTab", () => {
 
   it("never shows for a DM", () => {
     expect(hasArchiveTab({ ...createdByMe("member"), kind: "dm" }, false)).toBe(false)
+  })
+})
+
+describe("hasNotificationsTab", () => {
+  it("shows for a channel I'm in, not for one I only view", () => {
+    expect(hasNotificationsTab(createdByMe("member"))).toBe(true)
+    expect(hasNotificationsTab({ my: null })).toBe(false)
   })
 })

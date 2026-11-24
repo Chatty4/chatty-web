@@ -35,3 +35,8 @@ export function hasArchiveTab(
   if (channel.kind === "dm") return false
   return channel.is_default || channel.archived || canManage || canLeaveChannel(channel)
 }
+
+/** Notification settings belong to my membership (PUT /channels/{id}/me: members only). */
+export function hasNotificationsTab(channel: Pick<ChannelDetail, "my">): boolean {
+  return channel.my !== null
+}
