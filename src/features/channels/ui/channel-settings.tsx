@@ -24,7 +24,7 @@ import type { ChannelDetail, ChannelMember, MyChannelSettings, NotifyLevel } fro
 import { describeChannelError } from "../utils/errors"
 import { dmDisplayName } from "../utils/dm-name"
 import { MAX_DM_OTHERS, startDmWithUrl } from "../utils/dm-with"
-import { canManageChannel } from "../utils/permissions"
+import { canLeaveChannel, canManageChannel, hasArchiveTab } from "../utils/permissions"
 
 const TABS = ["about", "members", "notifications", "archive"] as const
 type Tab = (typeof TABS)[number]
@@ -509,26 +509,32 @@ function ArchiveTab({
           )}
         </div>
       )}
-      <div className={cn(showArchive && "border-t pt-[18px]")}>
-        <SectionTitle title="Leave channel" description="You can rejoin later if the channel is public." />
-        <Button
-          variant="secondary"
-          className="w-full"
-          disabled={busy}
-          onClick={() =>
-            void run(
-              {
-                title: `Leave #${channel.name}?`,
-                description: "You will stop receiving messages from this channel.",
-                action: "Leave channel",
-              },
-              onLeave,
-            )
-          }
-        >
-          Leave channel
-        </Button>
-      </div>
+      {/* Not in a channel I only view: leaving it answers 403 not_a_member. */}
+      {canLeaveChannel(channel) && (
+        <div className={cn(showArchive && "border-t pt-[18px]")}>
+          <SectionTitle
+            title="Leave channel"
+            description="You can rejoin later if the channel is public."
+          />
+          <Button
+            variant="secondary"
+            className="w-full"
+            disabled={busy}
+            onClick={() =>
+              void run(
+                {
+                  title: `Leave #${channel.name}?`,
+                  description: "You will stop receiving messages from this channel.",
+                  action: "Leave channel",
+                },
+                onLeave,
+              )
+            }
+          >
+            Leave channel
+          </Button>
+        </div>
+      )}
     </div>
   )
 }
@@ -564,7 +570,10 @@ export function ChannelDetailsPanel({
   const teamRole = teams.find((t) => t.id === teamId)?.role ?? null
   const canManage = !!channel && canManageChannel(channel, teamRole)
   const isDm = channel?.kind === "dm"
-  const tabs = isDm ? TABS.filter((t) => t !== "archive") : TABS
+  const tabs: readonly Tab[] =
+    channel && !hasArchiveTab(channel, canManage) ? TABS.filter((t) => t !== "archive") : TABS
+  // Opened on a tab this channel doesn't have (?details=archive): show About instead.
+  const activeTab = tabs.includes(tab) ? tab : "about"
   const dmName =
     state.status === "loaded" && isDm
       ? dmDisplayName(state.members.map((m) => m.user_id), user?.id ?? "", state.memberNames)
@@ -593,12 +602,12 @@ export function ChannelDetailsPanel({
             className="px-2.5"
             tabs={tabs}
             labels={TAB_LABELS}
-            value={tab}
+            value={activeTab}
             onChange={setTab}
           />
           <div className="min-h-0 flex-1 overflow-y-auto p-[18px]">
-            {tab === "about" && isDm && <DmAboutTab channel={channel} title={dmName} />}
-            {tab === "about" && !isDm && (
+            {activeTab === "about" && isDm && <DmAboutTab channel={channel} title={dmName} />}
+            {activeTab === "about" && !isDm && (
               <AboutTab
                 key={`${channel.name}|${channel.topic}`}
                 channel={channel}
@@ -609,7 +618,7 @@ export function ChannelDetailsPanel({
                 }}
               />
             )}
-            {tab === "members" && (
+            {activeTab === "members" && (
               <MembersTab
                 channel={channel}
                 teamId={teamId}
@@ -622,10 +631,10 @@ export function ChannelDetailsPanel({
                 onRemove={settings.removeMember}
               />
             )}
-            {tab === "notifications" && channel.my && (
+            {activeTab === "notifications" && channel.my && (
               <NotificationsTab my={channel.my} onUpdate={settings.updateNotifications} />
             )}
-            {tab === "archive" && (
+            {activeTab === "archive" && (
               <ArchiveTab
                 channel={channel}
                 canManage={canManage}
