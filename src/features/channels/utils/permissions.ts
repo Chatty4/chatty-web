@@ -15,6 +15,17 @@ export function canManageChannel(
 }
 
 /**
+ * Add people to a channel (api-core.md, POST /channels/{id}/members): any member of a public or
+ * private channel that isn't archived. Not tied to managing it: a team owner or admin who isn't
+ * in the channel gets 403 not_a_member, and a plain member may add people.
+ */
+export function canAddChannelMembers(
+  channel: Pick<ChannelDetail, "kind" | "my" | "archived">,
+): boolean {
+  return channel.kind !== "dm" && channel.my !== null && !channel.archived
+}
+
+/**
  * Leave a channel I'm in (api-core.md, POST /channels/{id}/leave). Not one I only view
  * (403 not_a_member), not a DM (hidden instead) and not the default channel.
  */

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import type { ChannelDetail, MyChannelSettings } from "../types"
 import {
+  canAddChannelMembers,
   canLeaveChannel,
   canManageChannel,
   hasArchiveTab,
@@ -98,5 +99,23 @@ describe("hasNotificationsTab", () => {
   it("shows for a channel I'm in, not for one I only view", () => {
     expect(hasNotificationsTab(createdByMe("member"))).toBe(true)
     expect(hasNotificationsTab({ my: null })).toBe(false)
+  })
+})
+
+describe("canAddChannelMembers", () => {
+  it("lets any member add people, owner or not", () => {
+    expect(canAddChannelMembers(createdByMe("member"))).toBe(true)
+    expect(canAddChannelMembers(createdByMe("owner"))).toBe(true)
+  })
+
+  it("refuses someone who isn't in the channel, even a team admin (403 not_a_member)", () => {
+    const viewing = { ...createdByMe("member"), my: null }
+    expect(canAddChannelMembers(viewing)).toBe(false)
+    expect(canManageChannel(viewing, "admin")).toBe(true) // managing is a separate rule
+  })
+
+  it("refuses archived channels and DMs", () => {
+    expect(canAddChannelMembers({ ...createdByMe("owner"), archived: true })).toBe(false)
+    expect(canAddChannelMembers({ ...createdByMe("member"), kind: "dm" })).toBe(false)
   })
 })
