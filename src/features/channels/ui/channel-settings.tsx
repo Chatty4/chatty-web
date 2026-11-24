@@ -22,6 +22,7 @@ import { useChannels } from "../hooks/channels-context"
 import { useChannelSettings } from "../hooks/use-channel-settings"
 import type { ChannelDetail, ChannelMember, MyChannelSettings, NotifyLevel } from "../types"
 import { describeChannelError } from "../utils/errors"
+import { dmDisplayName } from "../utils/dm-name"
 import { MAX_DM_OTHERS, startDmWithUrl } from "../utils/dm-with"
 import { canManageChannel } from "../utils/permissions"
 
@@ -36,6 +37,26 @@ const TAB_LABELS: Record<Tab, string> = {
 }
 
 // ── About ────────────────────────────────────────────────────────────────────
+
+function formatStarted(iso: string): string {
+  const date = new Date(iso)
+  return `Started ${date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}`
+}
+
+/** A DM has no name or topic to edit (api-core.md, PUT /channels/{id}): who's in it, since when. */
+function DmAboutTab({ channel, title }: { channel: ChannelDetail; title: string }) {
+  return (
+    <SectionTitle
+      title={title}
+      description={
+        <>
+          {formatStarted(channel.created_at)}. Only the people in this conversation can see it. To
+          talk with more or fewer people, start a new conversation.
+        </>
+      }
+    />
+  )
+}
 
 function AboutTab({
   channel,
@@ -537,12 +558,17 @@ export function ChannelDetailsPanel({
   const channel = state.status === "loaded" ? state.channel : null
   const teamRole = teams.find((t) => t.id === teamId)?.role ?? null
   const canManage = !!channel && canManageChannel(channel, teamRole)
-  const tabs = channel?.kind === "dm" ? TABS.filter((t) => t !== "archive") : TABS
+  const isDm = channel?.kind === "dm"
+  const tabs = isDm ? TABS.filter((t) => t !== "archive") : TABS
+  const dmName =
+    state.status === "loaded" && isDm
+      ? dmDisplayName(state.members.map((m) => m.user_id), user?.id ?? "", state.memberNames)
+      : ""
 
   return (
     <SidePanel
-      title="Channel details"
-      subtitle={channel?.name && `#${channel.name}`}
+      title={isDm ? "Conversation details" : "Channel details"}
+      subtitle={isDm ? dmName : channel?.name && `#${channel.name}`}
       closeLabel="Close details"
       onClose={onClose}
     >
@@ -566,7 +592,8 @@ export function ChannelDetailsPanel({
             onChange={setTab}
           />
           <div className="min-h-0 flex-1 overflow-y-auto p-[18px]">
-            {tab === "about" && (
+            {tab === "about" && isDm && <DmAboutTab channel={channel} title={dmName} />}
+            {tab === "about" && !isDm && (
               <AboutTab
                 key={`${channel.name}|${channel.topic}`}
                 channel={channel}
