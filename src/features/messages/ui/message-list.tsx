@@ -4,6 +4,7 @@ import { ArrowDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/features/auth"
 import { useChannels } from "@/features/channels/hooks/channels-context"
+import { JoinChannelBar } from "@/features/channels/ui/join-channel-bar"
 import { usePresence } from "@/features/presence"
 import { TypingIndicator, useSendTyping } from "@/features/typing"
 import { useUnread } from "@/features/unread"
@@ -106,16 +107,15 @@ export function MessageList({
   const loadNewerFailed = channelState?.loadNewerFailed ?? false
   const focus = channelState?.focus
 
-  // A public channel I haven't joined gets its live events through a watch.
+  // A public channel I can read but haven't joined: it gets its live events through a watch,
+  // and offers Join in place of the composer (only members can send).
   const { loading: sidebarLoading, failed: sidebarFailed } = useChannels()
-  useWatchChannel(
-    channelId,
-    shouldWatch({
-      isMember: channel !== null,
-      sidebarLoaded: !sidebarLoading && !sidebarFailed,
-      historyLoaded: !loading && !loadFailed,
-    }),
-  )
+  const viewingOnly = shouldWatch({
+    isMember: channel !== null,
+    sidebarLoaded: !sidebarLoading && !sidebarFailed,
+    historyLoaded: !loading && !loadFailed,
+  })
+  useWatchChannel(channelId, viewingOnly)
 
   // ── Name resolution for authors and <@id> mentions ───────────────────────────
   const userIds = useMemo(
@@ -445,21 +445,27 @@ export function MessageList({
       </Button>
       </div>
 
-      {/* Composer */}
+      {/* Composer, or Join for a channel I only view */}
       {/* Keyed so a draft can never be sent to the channel opened after it. */}
-      <MessageComposer
-        key={channelId}
-        teamId={teamId}
-        members={mentionable}
-        archived={archived}
-        initialDraft={getDraft(channelId)}
-        onDraftChange={(text) => setDraft(channelId, text)}
-        // Only who can write here: someone just watching a public channel sends nothing.
-        onTextChange={isMember && !archived ? sendTyping : undefined}
-        onSend={async (body, attachments) => {
-          if ((await send(channelId, body, attachments)) === "channel_archived") onChannelArchived()
-        }}
-      />
+      {viewingOnly ? (
+        <JoinChannelBar key={channelId} channelId={channelId} />
+      ) : (
+        <MessageComposer
+          key={channelId}
+          teamId={teamId}
+          members={mentionable}
+          archived={archived}
+          initialDraft={getDraft(channelId)}
+          onDraftChange={(text) => setDraft(channelId, text)}
+          // Only who can write here: someone just watching a public channel sends nothing.
+          onTextChange={isMember && !archived ? sendTyping : undefined}
+          onSend={async (body, attachments) => {
+            if ((await send(channelId, body, attachments)) === "channel_archived") {
+              onChannelArchived()
+            }
+          }}
+        />
+      )}
     </div>
   )
 }

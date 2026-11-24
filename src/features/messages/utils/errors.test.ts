@@ -66,6 +66,19 @@ describe("describeSendFailure", () => {
     })
   })
 
+  it("asks to join, not 'no longer a member', when I only view the channel", () => {
+    expect(describeSendFailure(new ApiError(403, "not_a_member", "Forbidden"))).toEqual({
+      message: "Join the channel to send messages.",
+      retryable: false,
+    })
+  })
+
+  it("keeps 'no longer a member' for edits, where I did write the message", () => {
+    expect(describeMessageError(new ApiError(403, "not_a_member", "Forbidden"))).toBe(
+      "You are no longer a member of this channel.",
+    )
+  })
+
   it("asks to attach again when a file can't be sent, without a retry", () => {
     expect(describeSendFailure(new ApiError(400, "invalid_file", "File f1 can't be sent"))).toEqual({
       message: "A file can't be sent. Attach it again.",

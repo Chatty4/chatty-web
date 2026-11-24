@@ -69,6 +69,10 @@ export function describeSendFailure(error: unknown, now = Date.now()): SendFailu
     const retryAt = error.retryAfter ? now + error.retryAfter * 1000 : undefined
     return { message: "Not sent: too many messages.", retryable: true, retryAt }
   }
+  if (messageErrorCode(error) === "not_a_member") {
+    // A public channel I only view: I may never have been a member, so not "no longer".
+    return { message: "Join the channel to send messages.", retryable: false }
+  }
   if (error instanceof ApiError && !isServerUnavailable(error)) {
     return { message: describeMessageError(error), retryable: false }
   }
