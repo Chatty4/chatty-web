@@ -12,6 +12,7 @@ import { FormField } from "@/components/ui/form-field"
 import { Input } from "@/components/ui/input"
 import { DataList, DataRow, RowMain, SectionTitle, SettingsTabs } from "@/components/ui/settings"
 import { SidePanel } from "@/components/ui/side-panel"
+import { useAuth } from "@/features/auth"
 import { useTeams } from "@/features/teams"
 import { getAllTeamMembersRequest } from "@/features/teams/fetchers/team-fetchers"
 import { useConfirm } from "@/hooks/use-confirm"
@@ -21,6 +22,7 @@ import { useChannels } from "../hooks/channels-context"
 import { useChannelSettings } from "../hooks/use-channel-settings"
 import type { ChannelDetail, ChannelMember, MyChannelSettings, NotifyLevel } from "../types"
 import { describeChannelError } from "../utils/errors"
+import { MAX_DM_OTHERS, startDmWithUrl } from "../utils/dm-with"
 import { canManageChannel } from "../utils/permissions"
 
 const TABS = ["about", "members", "notifications", "archive"] as const
@@ -209,6 +211,7 @@ function MembersTab({
   memberNames,
   memberAvatars,
   canManage,
+  myUserId,
   onAdd,
   onRemove,
 }: {
@@ -218,6 +221,7 @@ function MembersTab({
   memberNames: Record<string, string>
   memberAvatars: Record<string, string | null>
   canManage: boolean
+  myUserId: string
   onAdd: (userIds: string[]) => Promise<void>
   onRemove: (userId: string) => Promise<void>
 }) {
@@ -225,7 +229,10 @@ function MembersTab({
   const [busy, setBusy] = useState<string>()
   const [error, setError] = useState<string>()
   const { confirm, confirmProps } = useConfirm()
-  const editable = canManage && !channel.archived
+  const navigate = useNavigate()
+  const isDm = channel.kind === "dm"
+  const editable = canManage && !channel.archived && !isDm
+  const othersInDm = members.filter((m) => m.user_id !== myUserId).length
 
   const handleRemove = async (userId: string) => {
     const name = memberNames[userId] ?? "this member"
@@ -253,6 +260,23 @@ function MembersTab({
       {editable && (
         <div className="flex items-center justify-end gap-2">
           <Button onClick={() => setAdding(true)}>Add members</Button>
+        </div>
+      )}
+      {/* A DM is its exact set of people, so adding someone opens the larger group's DM. */}
+      {isDm && othersInDm < MAX_DM_OTHERS && (
+        <div className="flex flex-col gap-2">
+          <p className="text-xs text-muted-foreground">
+            People can't be added to a direct message. Start a new conversation with everyone
+            here and the people you want to add; this one stays as it is.
+          </p>
+          <Button
+            className="self-end"
+            onClick={() =>
+              navigate(startDmWithUrl(teamId, members.map((m) => m.user_id), myUserId))
+            }
+          >
+            New conversation with…
+          </Button>
         </div>
       )}
       {error && <Alert>{error}</Alert>}
@@ -501,6 +525,7 @@ export function ChannelDetailsPanel({
   initialTab = "about",
   onClose,
 }: ChannelDetailsPanelProps) {
+  const { user } = useAuth()
   const { teams } = useTeams()
   const { reload } = useChannels()
   const navigate = useNavigate()
@@ -559,6 +584,7 @@ export function ChannelDetailsPanel({
                 memberNames={state.memberNames}
                 memberAvatars={state.memberAvatars}
                 canManage={canManage}
+                myUserId={user?.id ?? ""}
                 onAdd={(userIds) => settings.addMembers(userIds, teamId)}
                 onRemove={settings.removeMember}
               />
