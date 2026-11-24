@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from "react"
 
+import { subscribeMembersChanged } from "@/features/channels"
 import {
   getAllChannelMembersRequest,
   getTeamMemberPreviewsRequest,
@@ -19,7 +20,8 @@ type LoadedMembers = { channelId: string; members: MentionCandidate[] }
  * never returned: there are no suggestions until this channel's list has arrived.
  *
  * Nothing on the WebSocket says someone joined, so the list is fetched again when a message
- * comes from someone it doesn't have, and after a reconnect, which may have missed one.
+ * comes from someone it doesn't have, after a reconnect, which may have missed one, and when I
+ * add or remove members from the channel's Members tab.
  */
 export function useChannelMembers(channelId: string, teamId: string): MentionCandidate[] {
   const { subscribe, onReconnect } = useWs()
@@ -77,6 +79,15 @@ export function useChannelMembers(channelId: string, teamId: string): MentionCan
   )
 
   useEffect(() => onReconnect(refresh), [onReconnect])
+
+  // Members I added or removed from the channel's Members tab.
+  useEffect(
+    () =>
+      subscribeMembersChanged((changed) => {
+        if (changed === channelId) refresh()
+      }),
+    [channelId],
+  )
 
   return members ?? NO_MEMBERS
 }

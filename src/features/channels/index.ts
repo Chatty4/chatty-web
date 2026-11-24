@@ -8,6 +8,7 @@ export { ChannelDetailsPanel } from "./ui/channel-settings"
 export type { ChannelDetailsPanelProps, ChannelDetailsTab } from "./ui/channel-settings"
 export { dmDisplayName } from "./utils/dm-name"
 export { describeChannelError } from "./utils/errors"
+export { subscribeMembersChanged } from "./utils/members-changed"
 export type {
   ChannelKind,
   NotifyLevel,

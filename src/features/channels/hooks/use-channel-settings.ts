@@ -12,6 +12,7 @@ import {
   updateMyChannelSettingsRequest,
 } from "../fetchers/channel-fetchers"
 import type { ChannelDetail, ChannelMember, NotifyLevel } from "../types"
+import { notifyMembersChanged } from "../utils/members-changed"
 import { useChannels } from "./channels-context"
 
 export type ChannelSettingsState =
@@ -144,6 +145,7 @@ export function useChannelSettings(channelId: string) {
           memberAvatars: { ...prev.memberAvatars, ...newAvatars },
         }
       })
+      notifyMembersChanged(channelId) // the composer's @mention list
     },
     [channelId],
   )
@@ -156,6 +158,7 @@ export function useChannelSettings(channelId: string) {
           ? { ...prev, members: prev.members.filter((m) => m.user_id !== userId) }
           : prev,
       )
+      notifyMembersChanged(channelId) // the composer's @mention list
     },
     [channelId],
   )
