@@ -24,7 +24,7 @@ import { useConfirm } from "@/hooks/use-confirm"
 
 import { useTeamSettings } from "../hooks/use-team-settings"
 import { describeTeamError } from "../utils/errors"
-import { canManageMember, isTeamManager, offersRemove } from "../utils/permissions"
+import { canDeleteTeam, canManageMember, isTeamManager, offersRemove } from "../utils/permissions"
 import type { Role, TeamMember } from "../types"
 import { TeamIcon } from "./team-icon"
 
@@ -270,25 +270,24 @@ function DangerTab({
       <SectionTitle title="Team actions" description="These changes affect your access." />
       {error && <Alert className="mb-3">{error}</Alert>}
       <div className="flex items-center justify-end gap-2">
-        {myRole !== "owner" && (
-          <Button
-            variant="destructive"
-            disabled={busy}
-            onClick={() =>
-              void run(
-                {
-                  title: "Leave this team?",
-                  description: "You will lose access until someone invites you again.",
-                  action: "Leave team",
-                },
-                onLeave,
-              )
-            }
-          >
-            Leave team
-          </Button>
-        )}
-        {myRole === "owner" && (
+        {/* Owners too: the server refuses only the last owner (409 last_owner, shown above). */}
+        <Button
+          variant="destructive"
+          disabled={busy}
+          onClick={() =>
+            void run(
+              {
+                title: "Leave this team?",
+                description: "You will lose access until someone invites you again.",
+                action: "Leave team",
+              },
+              onLeave,
+            )
+          }
+        >
+          Leave team
+        </Button>
+        {canDeleteTeam(myRole) && (
           <Button
             variant="destructive"
             disabled={busy}
