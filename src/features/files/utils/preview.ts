@@ -4,7 +4,7 @@
 
 const MB = 1024 * 1024
 
-export type PreviewKind = "pdf" | "docx" | "markdown" | "table" | "text" | "image" | "audio"
+export type PreviewKind = "pdf" | "docx" | "markdown" | "table" | "text" | "image"
 
 /** Text-like files are shown up to this size; past it, only their start. */
 export const TEXT_PREVIEW_MAX_BYTES = 1 * MB
@@ -30,14 +30,6 @@ const BY_MIME: Record<string, PreviewKind> = {
   "image/svg+xml": "image",
   "image/bmp": "image",
   "image/avif": "image",
-  "audio/mpeg": "audio",
-  "audio/wav": "audio",
-  "audio/x-wav": "audio",
-  "audio/ogg": "audio",
-  "audio/webm": "audio",
-  "audio/aac": "audio",
-  "audio/mp4": "audio",
-  "audio/flac": "audio",
 }
 
 // Browsers send application/octet-stream for many of these, so the name decides.
@@ -54,17 +46,19 @@ const BY_EXTENSION: Record<string, PreviewKind> = {
   markdown: "markdown",
   csv: "table",
   tsv: "table",
-  mp3: "audio",
-  wav: "audio",
-  ogg: "audio",
-  m4a: "audio",
-  flac: "audio",
   ...Object.fromEntries(TEXT_EXTENSIONS.map((extension) => [extension, "text"])),
 }
 
 function extensionOf(filename: string): string {
   const dot = filename.lastIndexOf(".")
   return dot > 0 ? filename.slice(dot + 1).toLowerCase() : ""
+}
+
+const AUDIO_EXTENSIONS = ["mp3", "wav", "ogg", "oga", "opus", "m4a", "aac", "flac", "weba"]
+
+/** Sound files: a message plays them inline instead of opening a preview. */
+export function isAudioFile(file: { mime: string; filename: string }): boolean {
+  return file.mime.startsWith("audio/") || AUDIO_EXTENSIONS.includes(extensionOf(file.filename))
 }
 
 /**

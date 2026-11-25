@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { previewKind } from "./preview"
+import { isAudioFile, previewKind } from "./preview"
 
 const file = (filename: string, mime = "application/octet-stream") => ({ filename, mime })
 
@@ -14,7 +14,6 @@ describe("previewKind", () => {
     ).toBe("docx")
     expect(previewKind(file("notes", "text/markdown"))).toBe("markdown")
     expect(previewKind(file("data", "text/csv; charset=utf-8"))).toBe("table")
-    expect(previewKind(file("song", "audio/mpeg"))).toBe("audio")
   })
 
   it("falls back to the extension when the browser sent no useful type", () => {
@@ -39,5 +38,15 @@ describe("previewKind", () => {
     expect(previewKind(file("deck.pptx"))).toBeNull()
     expect(previewKind(file("blob"))).toBeNull()
     expect(previewKind(file(".env"))).toBeNull()
+  })
+})
+
+describe("isAudioFile", () => {
+  it("knows sound files by type, or by name when the type says nothing", () => {
+    expect(isAudioFile({ mime: "audio/mpeg", filename: "song" })).toBe(true)
+    expect(isAudioFile({ mime: "audio/x-m4a", filename: "a.m4a" })).toBe(true)
+    expect(isAudioFile({ mime: "application/octet-stream", filename: "Voice.M4A" })).toBe(true)
+    expect(isAudioFile({ mime: "application/pdf", filename: "a.pdf" })).toBe(false)
+    expect(isAudioFile({ mime: "video/mp4", filename: "clip.mp4" })).toBe(false)
   })
 })

@@ -21,5 +21,4 @@ export const VIEWERS: Partial<Record<PreviewKind, Viewer>> = {
   table: lazy(() => import("./table-viewer").then((m) => ({ default: m.TableViewer }))),
   text: lazy(() => import("./text-viewer").then((m) => ({ default: m.TextViewer }))),
   image: lazy(() => import("./image-viewer").then((m) => ({ default: m.ImageViewer }))),
-  audio: lazy(() => import("./audio-viewer").then((m) => ({ default: m.AudioViewer }))),
 }
