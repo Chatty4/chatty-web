@@ -22,7 +22,7 @@ export function MessageAttachments({ message }: { message: LocalMessage }) {
   const reloaded = useRef(new Set<string>())
   const [previewIndex, setPreviewIndex] = useState<number | null>(null)
   const [previewFile, setPreviewFile] = useState<Attachment | null>(null)
-  // Sounds the browser can't play (a codec it lacks, such as Dolby): only their card is left.
+  // Sounds and videos the browser can't play (a codec it lacks, such as Dolby): only their card is left.
   const [unplayable, setUnplayable] = useState<ReadonlySet<string>>(new Set())
 
   if (message.attachments.length === 0) return null
@@ -48,10 +48,22 @@ export function MessageAttachments({ message }: { message: LocalMessage }) {
   }
 
   // An error may be an expired URL, so the first one gets a new URL; a second means it can't play.
-  const onAudioError = (fileId: string) => {
+  const onMediaError = (fileId: string) => {
     if (!reloaded.current.has(fileId)) return onImageError(fileId)
     setUnplayable((ids) => new Set(ids).add(fileId))
   }
+  const playable = (fileId: string) => !!urlOf[fileId] && !unplayable.has(fileId)
+
+  // Under a player, only the name and a download button; a file that can't play keeps its card.
+  const caption = (attachment: Attachment) =>
+    playable(attachment.file_id) ? (
+      <FileLine attachment={attachment} onDownload={() => void download(attachment.file_id)} />
+    ) : (
+      <FileCard
+        attachment={attachment}
+        onDownload={urlOf[attachment.file_id] ? () => void download(attachment.file_id) : undefined}
+      />
+    )
 
   return (
     // Inside the bubble; the bubble's [&>*+*] rule spaces it from the text.
@@ -59,39 +71,33 @@ export function MessageAttachments({ message }: { message: LocalMessage }) {
       <ImageGrid images={images} urls={urlOf} onOpen={setPreviewIndex} onImageError={onImageError} />
       {videos.map((video) => (
         <div key={video.file_id} className="flex w-full max-w-md flex-col gap-1">
-          {urlOf[video.file_id] && (
+          {playable(video.file_id) && (
             <video
               src={urlOf[video.file_id]}
               controls
               preload="metadata"
               aria-label={video.filename}
-              onError={() => onImageError(video.file_id)}
+              onError={() => onMediaError(video.file_id)}
               className="max-h-80 w-full rounded-md bg-black"
             />
           )}
-          <FileCard
-            attachment={video}
-            onDownload={urlOf[video.file_id] ? () => void download(video.file_id) : undefined}
-          />
+          {caption(video)}
         </div>
       ))}
       {audios.map((audio) => (
         // Wide enough for the player's volume slider to open; never wider than the bubble.
         <div key={audio.file_id} className="flex w-80 max-w-full flex-col gap-1">
-          {urlOf[audio.file_id] && !unplayable.has(audio.file_id) && (
+          {playable(audio.file_id) && (
             <audio
               src={urlOf[audio.file_id]}
               controls
               preload="metadata"
               aria-label={audio.filename}
-              onError={() => onAudioError(audio.file_id)}
+              onError={() => onMediaError(audio.file_id)}
               className="w-full"
             />
           )}
-          <FileCard
-            attachment={audio}
-            onDownload={urlOf[audio.file_id] ? () => void download(audio.file_id) : undefined}
-          />
+          {caption(audio)}
         </div>
       ))}
       {files.length > 0 && (
@@ -125,6 +131,29 @@ export function MessageAttachments({ message }: { message: LocalMessage }) {
         onDownload={(fileId) => void download(fileId)}
         onImageError={onImageError}
       />
+    </div>
+  )
+}
+
+type FileLineProps = { attachment: Attachment; onDownload: () => void }
+
+/** A player's file: its name and size in one quiet line, and a download button. */
+function FileLine({ attachment, onDownload }: FileLineProps) {
+  return (
+    <div className="flex w-full min-w-0 items-center gap-1 pl-1 text-xs text-muted-foreground">
+      <span className="min-w-0 truncate" title={attachment.filename}>
+        {attachment.filename}
+      </span>
+      <span className="shrink-0">· {formatFileSize(attachment.size)}</span>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        aria-label={`Download ${attachment.filename}`}
+        className="ml-auto shrink-0"
+        onClick={onDownload}
+      >
+        <Download />
+      </Button>
     </div>
   )
 }
