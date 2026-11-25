@@ -13,7 +13,6 @@ import { UserAvatar } from "@/components/app/user-avatar"
 import { Button } from "@/components/ui/button"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { EmojiPickerButton } from "@/components/ui/emoji-picker"
-import { GifEmbed, isGifMessage } from "@/features/gifs"
 import { useConfirm } from "@/hooks/use-confirm"
 import { toast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
@@ -31,7 +30,7 @@ import {
 } from "../utils/mentions"
 import { MessageEditor } from "./message-editor"
 import { MessageAttachments } from "./message-attachments"
-import { MessageMarkdown } from "./message-markdown"
+import { MessageBody } from "./message-body"
 import { PinnedMark } from "./pinned-mark"
 import { ReactionChips } from "./reaction-chips"
 import { ReplyQuote } from "./reply-quote"
@@ -369,11 +368,7 @@ export const MessageItem = memo(function MessageItem({
               )}
             >
               {quote}
-              {isGifMessage(message.body) ? (
-                <GifEmbed url={message.body} />
-              ) : (
-                message.body && <MessageMarkdown body={message.body} own names={names} />
-              )}
+              <MessageBody body={message.body} own names={names} />
               {isEdited && <span className="ml-1 text-xs text-muted-foreground">(edited)</span>}
               <MessageAttachments message={message} />
             </div>
@@ -452,11 +447,7 @@ export const MessageItem = memo(function MessageItem({
             >
               {quote}
               {/* `own` styles mention chips for a light-blue bubble. */}
-              {isGifMessage(message.body) ? (
-                <GifEmbed url={message.body} />
-              ) : (
-                message.body && <MessageMarkdown body={message.body} own={forMe} names={names} />
-              )}
+              <MessageBody body={message.body} own={forMe} names={names} />
               {isEdited && <span className="ml-1 text-xs text-muted-foreground">(edited)</span>}
               {message.status !== "sent" && <span className="ml-1">{status}</span>}
               <MessageAttachments message={message} />
