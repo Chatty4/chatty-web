@@ -24,6 +24,7 @@ import { jumpToMessage } from "../utils/jump-to-message"
 import { MessageItem } from "./message-item"
 import { MessageComposer } from "./message-composer"
 import { MessageListSkeleton } from "./message-skeleton"
+import { SwipeToReply } from "./swipe-to-reply"
 import { DayDivider } from "./day-divider"
 import { dayKey, formatDayLabel } from "../utils/dates"
 import { extractMentionIds, repliesToUser } from "../utils/mentions"
@@ -396,9 +397,11 @@ export function MessageList({
             const own = !!user && message.author_id === user.id
             const previous = messages[index - 1]
             const newDay = !previous || dayKey(previous.created_at) !== dayKey(message.created_at)
+            const replyable = canReply(message, access)
             return (
             <Fragment key={message.id}>
             {newDay && <DayDivider label={formatDayLabel(message.created_at)} />}
+            <SwipeToReply enabled={replyable} onReply={() => onReply(message)}>
             <MessageItem
               message={message}
               authorName={names[message.author_id] ?? "Unknown member"}
@@ -414,7 +417,7 @@ export function MessageList({
               canDelete={!!actor && canDelete(message, actor, access)}
               canReact={canReact(message, access)}
               onSetReaction={onSetReaction}
-              canReply={canReply(message, access)}
+              canReply={replyable}
               onReply={onReply}
               onOpenQuote={onOpenQuote}
               canPin={canPin(message, access)}
@@ -425,6 +428,7 @@ export function MessageList({
               onDiscard={discard}
               onChannelArchived={onChannelArchived}
             />
+            </SwipeToReply>
             </Fragment>
             )
           })}
