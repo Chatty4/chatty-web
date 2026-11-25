@@ -66,6 +66,23 @@ describe("describeSendFailure", () => {
     })
   })
 
+  it("says when the message it replies to was deleted", () => {
+    expect(describeSendFailure(new ApiError(409, "message_deleted", "Conflict"))).toEqual({
+      message: "The message you replied to was deleted.",
+      retryable: false,
+    })
+  })
+
+  it("says when the message it replies to isn't in the channel", () => {
+    const error = new ApiError(400, "validation_error", "Invalid request", {
+      fields: { reply_to_id: "invalid" },
+    })
+    expect(describeSendFailure(error)).toEqual({
+      message: "The message you replied to isn't available.",
+      retryable: false,
+    })
+  })
+
   it("asks to join, not 'no longer a member', when I only view the channel", () => {
     expect(describeSendFailure(new ApiError(403, "not_a_member", "Forbidden"))).toEqual({
       message: "Join the channel to send messages.",

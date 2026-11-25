@@ -73,6 +73,13 @@ export function describeSendFailure(error: unknown, now = Date.now()): SendFailu
     // A public channel I only view: I may never have been a member, so not "no longer".
     return { message: "Join the channel to send messages.", retryable: false }
   }
+  // On a send, these are about the message it replies to (api-chat.md, reply_to_id).
+  if (messageErrorCode(error) === "message_deleted") {
+    return { message: "The message you replied to was deleted.", retryable: false }
+  }
+  if (error instanceof ApiError && error.fields.reply_to_id) {
+    return { message: "The message you replied to isn't available.", retryable: false }
+  }
   if (error instanceof ApiError && !isServerUnavailable(error)) {
     return { message: describeMessageError(error), retryable: false }
   }
