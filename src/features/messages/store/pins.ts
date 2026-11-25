@@ -5,6 +5,7 @@ import type { ChannelEvent } from "@/lib/ws/types"
 
 import type { LocalMessage, Pin, PinsState } from "../types"
 import { isOlderEdit, type MessageEdit } from "./apply-event"
+import { deleteQuote, editQuote } from "./quotes"
 
 export type PinInfo = { message_id: string; pinned_by: string; pinned_at: string }
 
@@ -43,19 +44,39 @@ export function editPin(pins: PinsState | undefined, edit: MessageEdit): PinsSta
   if (!pins) return pins
   return {
     ...pins,
-    items: pins.items.map((item) =>
-      item.message.id === edit.message_id && !isOlderEdit(item.message.edited_at, edit)
-        ? {
-            ...item,
-            message: {
-              ...item.message,
-              body: edit.body,
-              mentions: edit.mentions,
-              edited_at: edit.edited_at,
-            },
-          }
-        : item,
-    ),
+    items: pins.items.map((item) => {
+      if (item.message.id !== edit.message_id) {
+        // A pinned reply quotes the new text.
+        const message = editQuote(item.message, edit.message_id, edit.body)
+        return message === item.message ? item : { ...item, message }
+      }
+      if (isOlderEdit(item.message.edited_at, edit)) return item
+      return {
+        ...item,
+        message: {
+          ...item.message,
+          body: edit.body,
+          mentions: edit.mentions,
+          edited_at: edit.edited_at,
+        },
+      }
+    }),
+  }
+}
+
+/** A deleted message loses its pin, and pinned replies show their quote of it as deleted. */
+export function deletePinnedMessage(
+  pins: PinsState | undefined,
+  messageId: string,
+): PinsState | undefined {
+  const rest = removePin(pins, messageId)
+  if (!rest) return rest
+  return {
+    ...rest,
+    items: rest.items.map((item) => {
+      const message = deleteQuote(item.message, messageId)
+      return message === item.message ? item : { ...item, message }
+    }),
   }
 }
 
@@ -67,7 +88,7 @@ function changePins(pins: PinsState | undefined, event: ChannelEvent, messages: 
       return removePin(pins, (event.payload as { message_id: string }).message_id)
     case "message.deleted":
       // A deleted message loses its pin without a separate pin.removed.
-      return removePin(pins, (event.payload as { message_id: string }).message_id)
+      return deletePinnedMessage(pins, (event.payload as { message_id: string }).message_id)
     case "message.edited":
       return editPin(pins, event.payload as MessageEdit)
     default:

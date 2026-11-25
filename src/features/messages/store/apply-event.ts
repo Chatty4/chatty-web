@@ -3,6 +3,7 @@
 
 import type { ChannelEvent } from "@/lib/ws/types"
 import type { ApiMessage, LocalMessage, Reaction } from "../types"
+import { deleteQuote, editQuote } from "./quotes"
 
 // ── Payload shapes (internal to this module) ──────────────────────────────────
 
@@ -21,27 +22,40 @@ export function isOlderEdit(shownEditedAt: string | null, edit: MessageEdit): bo
 /**
  * Applies an edit from a message.edited event or a PUT response. Both can arrive for
  * the same edit in either order, so this is idempotent: deleted messages and edits
- * older than the one already shown are ignored.
+ * older than the one already shown are ignored. Replies to the message quote the new text.
  */
 export function applyEdit(messages: LocalMessage[], edit: MessageEdit): LocalMessage[] {
   return messages.map((m) => {
-    if (m.id !== edit.message_id || m.deleted_at !== null) return m
-    if (isOlderEdit(m.edited_at, edit)) return m
+    if (m.id !== edit.message_id) return editQuote(m, edit.message_id, edit.body)
+    if (m.deleted_at !== null || isOlderEdit(m.edited_at, edit)) return m
     return { ...m, body: edit.body, mentions: edit.mentions, edited_at: edit.edited_at }
   })
 }
 
-/** Turns a message into the deleted placeholder. Idempotent: a second delete is a no-op. */
+/**
+ * Turns a message into the deleted placeholder, and the quotes of its replies into "deleted".
+ * Idempotent: a second delete is a no-op.
+ */
 export function applyDelete(
   messages: LocalMessage[],
   messageId: string,
   deletedAt: string,
 ): LocalMessage[] {
-  return messages.map((m) =>
-    m.id === messageId && m.deleted_at === null
-      ? { ...m, body: "", deleted_at: deletedAt, file_ids: [], attachments: [], mentions: [], reactions: [], pinned: false }
-      : m,
-  )
+  return messages.map((m) => {
+    if (m.id !== messageId) return deleteQuote(m, messageId)
+    if (m.deleted_at !== null) return m
+    return {
+      ...m,
+      body: "",
+      deleted_at: deletedAt,
+      file_ids: [],
+      attachments: [],
+      reply_to: null,
+      mentions: [],
+      reactions: [],
+      pinned: false,
+    }
+  })
 }
 
 /** Sets the pin mark. Safe to apply twice; a deleted message can't be pinned. */

@@ -204,3 +204,53 @@ describe("pins", () => {
     expect(unpinned[0]!.pinned).toBe(false)
   })
 })
+
+describe("quotes of replies", () => {
+  const quoted = localMessage(1, { author_id: OTHER, body: "is v1.4 ready?" })
+  const reply = localMessage(2, {
+    author_id: ME,
+    body: "yes",
+    reply_to: { id: "msg-1", seq: 1, author_id: OTHER, body: "is v1.4 ready?", deleted: false },
+  })
+
+  it("message.edited updates the quote in a loaded reply", () => {
+    const [, result] = applyEvent(
+      [quoted, reply],
+      edited(3, "msg-1", "is v1.5 ready?", "2026-10-05T15:00:00Z"),
+      ME,
+    )
+    expect(result!.reply_to?.body).toBe("is v1.5 ready?")
+    expect(result!.body).toBe("yes")
+  })
+
+  it("message.deleted marks the quote deleted and clears its text", () => {
+    const [, result] = applyEvent([quoted, reply], deleted(3, "msg-1"), ME)
+    expect(result!.reply_to).toMatchObject({ id: "msg-1", body: "", deleted: true })
+  })
+
+  it("updates the quote even when the quoted message isn't loaded", () => {
+    const [result] = applyEvent([reply], deleted(3, "msg-1"), ME)
+    expect(result!.reply_to?.deleted).toBe(true)
+  })
+
+  it("a deleted reply has no quote", () => {
+    const [result] = applyDelete([reply], "msg-2", "2026-10-05T15:00:00Z")
+    expect(result!.reply_to).toBeNull()
+  })
+
+  it("my own edit's REST answer updates the quotes too", () => {
+    const [, result] = applyEdit([quoted, reply], {
+      message_id: "msg-1",
+      body: "fixed",
+      mentions: [],
+      edited_at: "2026-10-05T15:00:00Z",
+    })
+    expect(result!.reply_to?.body).toBe("fixed")
+  })
+
+  it("keeps messages that don't quote it as they were", () => {
+    const other = localMessage(3)
+    const [, , result] = applyEvent([quoted, reply, other], deleted(4, "msg-1"), ME)
+    expect(result).toBe(other)
+  })
+})
