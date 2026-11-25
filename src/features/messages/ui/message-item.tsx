@@ -62,6 +62,8 @@ export type MessageItemProps = {
   authorOnline: boolean
   /** The message mentions me: its bubble is highlighted. */
   mentionsMe: boolean
+  /** The message replies to one of mine: highlighted like a mention. */
+  repliesToMe: boolean
   /** userId → display name, used to show and edit `<@id>` mentions. */
   names: Record<string, string>
   /** Who an edit can newly mention: the channel's members, not me. */
@@ -108,6 +110,7 @@ export const MessageItem = memo(function MessageItem({
   authorAvatarFileId,
   authorOnline,
   mentionsMe,
+  repliesToMe,
   names,
   mentionable,
   grouped,
@@ -144,6 +147,7 @@ export const MessageItem = memo(function MessageItem({
   const isEdited = message.edited_at !== null && !isDeleted
   const hasFiles = message.attachments.length > 0
   const isPinned = message.pinned && !isDeleted
+  const forMe = mentionsMe || repliesToMe
   // Close the editor if the message gets deleted (e.g. from another tab) while open.
   const showEditor = editing && !isDeleted
 
@@ -391,7 +395,13 @@ export const MessageItem = memo(function MessageItem({
         ROW_FOCUS_CLASS,
         grouped ? "mt-0" : "mt-3",
       )}
-      aria-label={mentionsMe ? `${authorName} mentioned you` : undefined}
+      aria-label={
+        mentionsMe
+          ? `${authorName} mentioned you`
+          : repliesToMe
+            ? `${authorName} replied to you`
+            : undefined
+      }
       tabIndex={0}
       data-message-id={message.id}
     >
@@ -433,8 +443,9 @@ export const MessageItem = memo(function MessageItem({
             <div
               className={cn(
                 "rounded-lg px-3 py-1.5 text-sm leading-relaxed break-words text-foreground",
-                // A mention of me gets the light-blue of my own bubbles, with a thin edge.
-                mentionsMe ? "bg-accent ring-1 ring-primary/30" : "bg-surface-hover",
+                // A mention of me, or a reply to me, gets the light-blue of my own bubbles,
+                // with a thin edge.
+                forMe ? "bg-accent ring-1 ring-primary/30" : "bg-surface-hover",
                 MARKDOWN_BLOCK_CLASS,
                 !grouped && "rounded-tl-sm",
               )}
@@ -444,7 +455,7 @@ export const MessageItem = memo(function MessageItem({
               {isGifMessage(message.body) ? (
                 <GifEmbed url={message.body} />
               ) : (
-                message.body && <MessageMarkdown body={message.body} own={mentionsMe} names={names} />
+                message.body && <MessageMarkdown body={message.body} own={forMe} names={names} />
               )}
               {isEdited && <span className="ml-1 text-xs text-muted-foreground">(edited)</span>}
               {message.status !== "sent" && <span className="ml-1">{status}</span>}

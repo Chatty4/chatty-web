@@ -4,6 +4,7 @@
 // reconnect or a team switch, which fixes any drift.
 
 import type { ApiMessage } from "@/features/messages"
+import { repliesToUser } from "@/features/messages/utils/mentions"
 import type { ChannelEvent } from "@/lib/ws/types"
 
 import type { ChannelUnread, UnreadCounts } from "../types"
@@ -19,7 +20,7 @@ type Entry = UnreadCounts & {
 /** channel_id → counts */
 export type UnreadState = Record<string, Entry>
 
-type MessageCreatedPayload = { message: Pick<ApiMessage, "author_id" | "mentions"> }
+type MessageCreatedPayload = { message: Pick<ApiMessage, "author_id" | "mentions" | "reply_to"> }
 
 export const EMPTY_COUNTS: UnreadCounts = { unread: 0, mentions: 0 }
 
@@ -51,7 +52,8 @@ export function setChannelCounts(state: UnreadState, row: ChannelUnread): Unread
 }
 
 /**
- * A live `message.created` from someone else adds one, and one mention if it mentions me.
+ * A live `message.created` from someone else adds one, and one mention if it mentions me or
+ * replies to one of my messages (once when it does both, as the server counts).
  * Channels of another team aren't in the state and are skipped.
  */
 export function countNewMessage(
@@ -68,7 +70,7 @@ export function countNewMessage(
     return { ...state, [event.channel_id]: { ...current, countedSeq: event.seq } }
   }
 
-  const mentionsMe = message.mentions.includes(myUserId)
+  const mentionsMe = message.mentions.includes(myUserId) || repliesToUser(message, myUserId)
   return {
     ...state,
     [event.channel_id]: {

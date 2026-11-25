@@ -26,7 +26,7 @@ import { MessageComposer } from "./message-composer"
 import { MessageListSkeleton } from "./message-skeleton"
 import { DayDivider } from "./day-divider"
 import { dayKey, formatDayLabel } from "../utils/dates"
-import { extractMentionIds } from "../utils/mentions"
+import { extractMentionIds, repliesToUser } from "../utils/mentions"
 import { countNewMessages, messageKey } from "../utils/new-messages"
 import { shouldWatch } from "../utils/watch"
 import {
@@ -405,6 +405,7 @@ export function MessageList({
               authorAvatarFileId={memberPreviews[message.author_id]?.avatar_file_id ?? null}
               authorOnline={isOnline(message.author_id)}
               mentionsMe={!!user && message.mentions.includes(user.id)}
+              repliesToMe={!!user && repliesToUser(message, user.id)}
               names={names}
               mentionable={mentionable}
               grouped={isGrouped(index)}

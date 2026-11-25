@@ -1,6 +1,23 @@
 import { describe, expect, it } from "vitest"
 
-import { encodeMentions, findMentionQuery } from "./mentions"
+import { ME, OTHER, localMessage } from "../store/test-fixtures"
+import { encodeMentions, findMentionQuery, repliesToUser } from "./mentions"
+
+describe("repliesToUser", () => {
+  const replyTo = (authorId: string) =>
+    localMessage(2, {
+      reply_to: { id: "msg-1", seq: 1, author_id: authorId, body: "hi", deleted: false },
+    })
+
+  it("is true for a reply to one of the user's messages", () => {
+    expect(repliesToUser(replyTo(ME), ME)).toBe(true)
+  })
+
+  it("is false for a reply to someone else, and for a message that isn't a reply", () => {
+    expect(repliesToUser(replyTo(OTHER), ME)).toBe(false)
+    expect(repliesToUser(localMessage(2), ME)).toBe(false)
+  })
+})
 
 const ANA = { id: "11111111-1111-1111-1111-111111111111", display_name: "Ana" }
 const ANA_MARIA = { id: "22222222-2222-2222-2222-222222222222", display_name: "Ana Maria" }
