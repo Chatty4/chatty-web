@@ -14,4 +14,5 @@ export type {
   LocalMessage,
   MessageStatus,
   Reaction,
+  ReplyPreview,
 } from "./types"

@@ -31,6 +31,19 @@ export type GetAttachmentUrlsResponse = {
   attachments: AttachmentUrl[]
 }
 
+/**
+ * The message a reply quotes, as it is now. An empty `body` that isn't `deleted` is a message
+ * with only files (api-chat.md, the message object).
+ */
+export type ReplyPreview = {
+  id: string
+  seq: number
+  author_id: string
+  /** The first 200 characters. */
+  body: string
+  deleted: boolean
+}
+
 /** The message object returned by the REST API (no local-only fields). */
 export type ApiMessage = {
   id: string
@@ -41,6 +54,8 @@ export type ApiMessage = {
   body: string
   file_ids: string[]
   attachments: Attachment[]
+  /** The message this one replies to, or null. */
+  reply_to: ReplyPreview | null
   mentions: string[]
   reactions: Reaction[]
   pinned: boolean

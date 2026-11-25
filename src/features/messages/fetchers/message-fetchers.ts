@@ -33,11 +33,13 @@ export function sendMessageApi(
   body: string,
   clientMsgId: string,
   fileIds: string[] = [],
+  replyToId: string | null = null,
 ): Promise<SendMessageResponse> {
   return chatApi.post<SendMessageResponse>(`/channels/${channelId}/messages`, {
     body,
     client_msg_id: clientMsgId,
     file_ids: fileIds,
+    reply_to_id: replyToId,
   })
 }
 
