@@ -1,6 +1,8 @@
 // Mentions are stored in message bodies as `<@user_id>` (chatty-infra/docs/api-chat.md#message-object).
 // The composer and editor work with readable `@Display Name` text and convert at the edges.
 
+import type { ApiMessage } from "../types"
+
 export type MentionCandidate = { id: string; display_name: string }
 
 export type MessagePart = { type: "text"; value: string } | { type: "mention"; userId: string }
@@ -13,6 +15,14 @@ const NOT_IN_WORD = "(?<![\\p{L}\\p{N}_.+-])"
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
+/**
+ * The message replies to one of the user's messages. It counts like a mention: highlighted,
+ * and in the mention badge (api-chat.md, GET /unread).
+ */
+export function repliesToUser(message: Pick<ApiMessage, "reply_to">, userId: string): boolean {
+  return message.reply_to?.author_id === userId
 }
 
 /** User ids mentioned in a stored body, in order, without duplicates. */

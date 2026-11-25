@@ -41,7 +41,7 @@ import {
 } from "./store/channel-reducer"
 import { createEventSequencer, type EventSequencer } from "./store/event-sequencer"
 import { planSync, selectCursors } from "./store/sequence"
-import type { ApiMessage, Attachment, ChannelState } from "./types"
+import type { ApiMessage, Attachment, ChannelState, ReplyPreview } from "./types"
 import { describePinError, describeSendFailure, messageErrorCode } from "./utils/errors"
 
 // ── Provider ──────────────────────────────────────────────────────────────────
@@ -216,7 +216,12 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
     }
   }, [doDispatch])
 
-  const send = useCallback(async (channelId: string, body: string, attachments: Attachment[] = []) => {
+  const send = useCallback(async (
+    channelId: string,
+    body: string,
+    attachments: Attachment[] = [],
+    replyTo: ReplyPreview | null = null,
+  ) => {
     // After a jump the list shows older messages: go back to the newest before adding mine.
     if (stateRef.current[channelId]?.hasMoreAfter) await reloadChannel(channelId)
     const userId = userIdRef.current ?? ""
@@ -232,6 +237,8 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
         body,
         file_ids: attachments.map((a) => a.file_id),
         attachments,
+        // The quote shows at once; the server's answer replaces it with the current one.
+        reply_to: replyTo,
         mentions: [],
         reactions: [],
         pinned: false,
@@ -248,6 +255,7 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
         body,
         clientMsgId,
         attachments.map((a) => a.file_id),
+        replyTo?.id,
       )
       doDispatch({ type: "OPTIMISTIC_CONFIRM", channelId, clientMsgId, confirmed })
     } catch (err) {
@@ -263,7 +271,13 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
     if (!msg) return
     doDispatch({ type: "OPTIMISTIC_RETRY", channelId, clientMsgId })
     try {
-      const confirmed = await sendMessageApi(channelId, msg.body, clientMsgId, msg.file_ids)
+      const confirmed = await sendMessageApi(
+        channelId,
+        msg.body,
+        clientMsgId,
+        msg.file_ids,
+        msg.reply_to?.id,
+      )
       doDispatch({ type: "OPTIMISTIC_CONFIRM", channelId, clientMsgId, confirmed })
     } catch (err) {
       doDispatch({ type: "OPTIMISTIC_FAIL", channelId, clientMsgId, failure: describeSendFailure(err) })
@@ -361,8 +375,20 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
     else draftsRef.current.delete(channelId)
   }, [])
 
+  // Kept per channel like drafts, but the composer shows it, so a change re-renders.
+  const replyTargetsRef = useRef(new Map<string, ReplyPreview>())
+  const getReplyTarget = useCallback(
+    (channelId: string) => replyTargetsRef.current.get(channelId) ?? null,
+    [],
+  )
+  const setReplyTarget = useCallback((channelId: string, target: ReplyPreview | null) => {
+    if (target) replyTargetsRef.current.set(channelId, target)
+    else replyTargetsRef.current.delete(channelId)
+    bump()
+  }, [bump])
+
   return (
-    <MessagesContext.Provider value={{ getChannel, loadChannel, loadMoreHistory, jumpTo, loadNewer, returnToPresent: reloadChannel, send, retry, discard, edit, remove, setReaction, setPinned, loadPins, getDraft, setDraft }}>
+    <MessagesContext.Provider value={{ getChannel, loadChannel, loadMoreHistory, jumpTo, loadNewer, returnToPresent: reloadChannel, send, retry, discard, edit, remove, setReaction, setPinned, loadPins, getDraft, setDraft, getReplyTarget, setReplyTarget }}>
       {children}
     </MessagesContext.Provider>
   )

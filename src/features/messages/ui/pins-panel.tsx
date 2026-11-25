@@ -10,6 +10,7 @@ import { namesOf, useMemberPreviews } from "../hooks/use-member-names"
 import { usePinToggle } from "../hooks/use-pin-toggle"
 import { usePins } from "../hooks/use-pins"
 import { extractMentionIds } from "../utils/mentions"
+import { quotedUserIds } from "../utils/reply"
 import { PinCard } from "./pin-card"
 
 export type PinsPanelProps = {
@@ -57,6 +58,7 @@ export function PinsPanel({
           pin.message.author_id,
           pin.pinned_by,
           ...extractMentionIds(pin.message.body),
+          ...quotedUserIds(pin.message),
         ]),
       ),
     ],

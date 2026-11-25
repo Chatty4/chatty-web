@@ -26,7 +26,8 @@ server {
     # connect-src: the API and WebSocket ('self' covers ws:/wss: to this host), plus jsDelivr,
     # where the emoji picker (frimousse) loads its emoji data from.
     # MinIO (D-16): uploads go straight to it, and attachment images and avatars come from its
-    # presigned URLs. blob: is an avatar downloaded through GET /files/{id}.
+    # presigned URLs. blob: is an avatar downloaded through GET /files/{id}. File previews fetch the
+    # file from MinIO and show it from blob: URLs; the PDF viewer's worker is one of our own assets.
     # media-src: videos play from MinIO, and a picked video's thumbnail is a local blob: URL.
     # GIPHY: the GIF picker searches api.giphy.com, and GIFs load from its media hosts.
     set $csp "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: ${MINIO_PUBLIC_URL} https://*.giphy.com; media-src 'self' blob: ${MINIO_PUBLIC_URL}; connect-src 'self' https://cdn.jsdelivr.net ${MINIO_PUBLIC_URL} https://api.giphy.com; frame-ancestors 'none'";

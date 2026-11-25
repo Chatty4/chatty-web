@@ -9,6 +9,7 @@ import { usePresence } from "@/features/presence"
 import { TypingIndicator, useSendTyping } from "@/features/typing"
 import { useUnread } from "@/features/unread"
 import { useTabVisible } from "@/hooks/use-tab-visible"
+import { toast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
 
 import { useMessages } from "../context"
@@ -23,9 +24,10 @@ import { jumpToMessage } from "../utils/jump-to-message"
 import { MessageItem } from "./message-item"
 import { MessageComposer } from "./message-composer"
 import { MessageListSkeleton } from "./message-skeleton"
+import { SwipeToReply } from "./swipe-to-reply"
 import { DayDivider } from "./day-divider"
 import { dayKey, formatDayLabel } from "../utils/dates"
-import { extractMentionIds } from "../utils/mentions"
+import { extractMentionIds, repliesToUser } from "../utils/mentions"
 import { countNewMessages, messageKey } from "../utils/new-messages"
 import { shouldWatch } from "../utils/watch"
 import {
@@ -33,10 +35,13 @@ import {
   canEdit,
   canPin,
   canReact,
+  canReply,
   type Actor,
   type ChannelAccess,
   type TeamRole,
 } from "../utils/permissions"
+import { quotedUserIds, toReplyPreview } from "../utils/reply"
+import type { LocalMessage } from "../types"
 import type { SidebarChannel } from "@/features/channels/types"
 
 /** Start fetching older messages this far before the user reaches the top. */
@@ -75,6 +80,7 @@ export function MessageList({
     loadChannel,
     loadMoreHistory,
     loadNewer,
+    jumpTo,
     returnToPresent,
     send,
     retry,
@@ -85,6 +91,8 @@ export function MessageList({
     setPinned,
     getDraft,
     setDraft,
+    getReplyTarget,
+    setReplyTarget,
   } = useMessages()
 
   const channelState = getChannel(channelId)
@@ -119,7 +127,11 @@ export function MessageList({
 
   // ── Name resolution for authors and <@id> mentions ───────────────────────────
   const userIds = useMemo(
-    () => [...new Set(messages.flatMap((m) => [m.author_id, ...extractMentionIds(m.body)]))],
+    () => [
+      ...new Set(
+        messages.flatMap((m) => [m.author_id, ...extractMentionIds(m.body), ...quotedUserIds(m)]),
+      ),
+    ],
     [messages],
   )
   const memberPreviews = useMemberPreviews(teamId, userIds)
@@ -306,6 +318,20 @@ export function MessageList({
     (messageId: string) => remove(channelId, messageId),
     [channelId, remove],
   )
+  const onReply = useCallback(
+    (message: LocalMessage) => setReplyTarget(channelId, toReplyPreview(message)),
+    [channelId, setReplyTarget],
+  )
+  const cancelReply = useCallback(() => setReplyTarget(channelId, null), [channelId, setReplyTarget])
+  const onOpenQuote = useCallback(
+    (messageId: string, seq: number) => {
+      void jumpTo(channelId, messageId, seq).then((found) => {
+        if (!found) toast.error("Couldn't load this message. Try again.")
+      })
+    },
+    [channelId, jumpTo],
+  )
+  const replyTo = getReplyTarget(channelId)
 
   const archived = channel?.archived ?? false
 
@@ -371,15 +397,18 @@ export function MessageList({
             const own = !!user && message.author_id === user.id
             const previous = messages[index - 1]
             const newDay = !previous || dayKey(previous.created_at) !== dayKey(message.created_at)
+            const replyable = canReply(message, access)
             return (
             <Fragment key={message.id}>
             {newDay && <DayDivider label={formatDayLabel(message.created_at)} />}
+            <SwipeToReply enabled={replyable} onReply={() => onReply(message)}>
             <MessageItem
               message={message}
               authorName={names[message.author_id] ?? "Unknown member"}
               authorAvatarFileId={memberPreviews[message.author_id]?.avatar_file_id ?? null}
               authorOnline={isOnline(message.author_id)}
               mentionsMe={!!user && message.mentions.includes(user.id)}
+              repliesToMe={!!user && repliesToUser(message, user.id)}
               names={names}
               mentionable={mentionable}
               grouped={isGrouped(index)}
@@ -388,6 +417,9 @@ export function MessageList({
               canDelete={!!actor && canDelete(message, actor, access)}
               canReact={canReact(message, access)}
               onSetReaction={onSetReaction}
+              canReply={replyable}
+              onReply={onReply}
+              onOpenQuote={onOpenQuote}
               canPin={canPin(message, access)}
               onSetPinned={onSetPinned}
               onEdit={onEdit}
@@ -396,6 +428,7 @@ export function MessageList({
               onDiscard={discard}
               onChannelArchived={onChannelArchived}
             />
+            </SwipeToReply>
             </Fragment>
             )
           })}
@@ -459,8 +492,13 @@ export function MessageList({
           onDraftChange={(text) => setDraft(channelId, text)}
           // Only who can write here: someone just watching a public channel sends nothing.
           onTextChange={isMember && !archived ? sendTyping : undefined}
+          replyTo={replyTo}
+          names={names}
+          onCancelReply={cancelReply}
           onSend={async (body, attachments) => {
-            if ((await send(channelId, body, attachments)) === "channel_archived") {
+            // The reply goes with this message; a failed send keeps it on the message for Retry.
+            setReplyTarget(channelId, null)
+            if ((await send(channelId, body, attachments, replyTo)) === "channel_archived") {
               onChannelArchived()
             }
           }}

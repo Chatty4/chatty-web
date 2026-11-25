@@ -9,13 +9,14 @@ import { toast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
 
 import { MAX_MESSAGE_FILES, MAX_MESSAGE_LENGTH as MAX_LENGTH } from "../constants"
-import type { Attachment } from "../types"
+import type { Attachment, ReplyPreview } from "../types"
 import {
   encodeMentions,
   extractMentionIds,
   findMentionQuery,
   type MentionCandidate,
 } from "../utils/mentions"
+import { ReplyBar } from "./reply-bar"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -33,6 +34,12 @@ export type MessageComposerProps = {
   onTextChange?: (hasText: boolean) => void
   /** Called when the user submits a message, with its files in the order they were picked. */
   onSend: (body: string, attachments: Attachment[]) => Promise<void>
+  /** The message this one replies to, shown above the box. */
+  replyTo?: ReplyPreview | null
+  /** userId → display name, for the reply's author and mentions in its text. */
+  names?: Record<string, string>
+  /** ✕ or Esc on a reply. */
+  onCancelReply?: () => void
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -45,6 +52,9 @@ export function MessageComposer({
   onDraftChange,
   onTextChange,
   onSend,
+  replyTo = null,
+  names = {},
+  onCancelReply,
 }: MessageComposerProps) {
   const [value, setStoredValue] = useState(initialDraft)
   const [activeIndex, setActiveIndex] = useState(0)
@@ -63,6 +73,12 @@ export function MessageComposer({
     el.focus({ preventScroll: true })
     el.setSelectionRange(el.value.length, el.value.length)
   }, [])
+
+  // Choosing Reply on a message moves the cursor here, to write the reply.
+  const replyId = replyTo?.id
+  useEffect(() => {
+    if (replyId) textareaRef.current?.focus({ preventScroll: true })
+  }, [replyId])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { uploads, add: addUploads, remove: removeUpload, clear: clearUploads } =
     useFileUploads("attachment", teamId)
@@ -173,6 +189,11 @@ export function MessageComposer({
         return
       }
     }
+    if (e.key === "Escape" && replyTo && onCancelReply) {
+      e.preventDefault()
+      onCancelReply()
+      return
+    }
     // Ignore Enter while an IME composition is in progress (e.g. Japanese input).
     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault()
@@ -246,6 +267,9 @@ export function MessageComposer({
           <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center rounded-md bg-surface/90 text-sm font-medium text-primary">
             Drop files to attach
           </div>
+        )}
+        {replyTo && !archived && onCancelReply && (
+          <ReplyBar quote={replyTo} names={names} onCancel={onCancelReply} />
         )}
         {uploads.length > 0 && (
           <ul aria-label="Attached files" className="flex flex-wrap gap-2 px-3 pt-3">

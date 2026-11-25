@@ -34,7 +34,11 @@ channel you open without joining updates live too. Logging in needs chatty-core 
 chatty-chat. `/status` calls each backend's `/health` through the proxy, to check that the wiring works.
 
 Messages can carry up to 10 files (📎, Ctrl+V or drag and drop): they upload while you write, straight to
-MinIO (`src/features/files/`), and show as an image grid with a full-screen preview, or as file cards. The
+MinIO (`src/features/files/`), and show as an image grid with a full-screen preview, or as file cards. A file
+card opens a preview of PDFs (react-pdf), Word documents (docx-preview), CSV/TSV tables (papaparse), Markdown,
+text, SVG and audio: the page fetches the file from its presigned URL and draws it itself, so the bucket stays
+private. Each viewer loads only when first opened (`src/features/files/ui/viewers/`). Excel and PowerPoint
+files download. The
 account settings page uploads a profile photo and team settings a team icon; avatars show on messages, pins
 and member lists. Uploads and downloads need MinIO running, from `chatty-infra`.
 
@@ -66,7 +70,8 @@ npm run test:watch  # Vitest, on every change
 
 Tests sit next to the code as `*.test.ts`. They cover the logic without a browser: the message, unread,
 presence and typing stores, reconnect helpers, permissions, when to reload the sidebar or watch a channel,
-the file checks, the image grid layout, the DM order, which links count as GIFs, and other pure functions.
+the file checks, which files have a preview, the image grid layout, the DM order, which links count as GIFs,
+and other pure functions.
 
 CI (`.github/workflows/ci.yml`) runs `npm ci`, `lint`, `typecheck`, `test` and `build` on Node 24, on every pull
 request and on pushes to `dev` and `main`.
@@ -82,7 +87,7 @@ Open http://localhost:8080. Nginx serves the built app and forwards the API path
 `http://chat:8001` on the infra network. Override them with `-e CORE_API_UPSTREAM=...` and
 `-e CHAT_API_UPSTREAM=...`. Nginx starts even if a backend isn't running; its paths then return 502.
 `-e MINIO_PUBLIC_URL=...` (default `http://127.0.0.1:9000`) must be chatty-core's `MINIO_PUBLIC_URL`: the CSP
-allows uploads to it and images from it.
+allows uploads to it, images and media from it, and fetching files from it for previews.
 
 The config is `nginx/default.conf.template`:
 
@@ -90,8 +95,8 @@ The config is `nginx/default.conf.template`:
   `Content-Security-Policy`. A location with its own `add_header` drops the server-level ones, so `/assets/`
   and `/` repeat them: change all three copies together.
 - **The CSP** is in `$csp`: only our own scripts, styles (inline too) and images, `connect-src` for the API, the
-  WebSocket, jsDelivr (the emoji data), MinIO (uploads) and GIPHY's API, images also from MinIO, GIPHY's media
-  hosts and `blob:` (avatars), and
+  WebSocket, jsDelivr (the emoji data), MinIO (uploads, files for previews) and GIPHY's API, images also from
+  MinIO, GIPHY's media hosts and `blob:` (avatars, previewed pictures), and
   no framing. Adding a script, font or API from another origin
   means adding it there.
 - **The access log** writes the path without the query string, because the WebSocket sends the access token

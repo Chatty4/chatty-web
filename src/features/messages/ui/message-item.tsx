@@ -4,6 +4,7 @@ import {
   Pencil,
   Pin,
   PinOff,
+  Reply,
   SmilePlus,
   Trash2,
 } from "lucide-react"
@@ -12,7 +13,6 @@ import { UserAvatar } from "@/components/app/user-avatar"
 import { Button } from "@/components/ui/button"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { EmojiPickerButton } from "@/components/ui/emoji-picker"
-import { GifEmbed, isGifMessage } from "@/features/gifs"
 import { useConfirm } from "@/hooks/use-confirm"
 import { toast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
@@ -30,9 +30,10 @@ import {
 } from "../utils/mentions"
 import { MessageEditor } from "./message-editor"
 import { MessageAttachments } from "./message-attachments"
-import { MessageMarkdown } from "./message-markdown"
+import { MessageBody } from "./message-body"
 import { PinnedMark } from "./pinned-mark"
 import { ReactionChips } from "./reaction-chips"
+import { ReplyQuote } from "./reply-quote"
 import { SendFailureNote } from "./send-failure"
 
 /** jumpToMessage sets data-flash on the row for a moment. */
@@ -60,6 +61,8 @@ export type MessageItemProps = {
   authorOnline: boolean
   /** The message mentions me: its bubble is highlighted. */
   mentionsMe: boolean
+  /** The message replies to one of mine: highlighted like a mention. */
+  repliesToMe: boolean
   /** userId → display name, used to show and edit `<@id>` mentions. */
   names: Record<string, string>
   /** Who an edit can newly mention: the channel's members, not me. */
@@ -76,6 +79,12 @@ export type MessageItemProps = {
   canReact: boolean
   /** Adds or removes my reaction. Rejects with ApiError on failure. */
   onSetReaction: (messageId: string, emoji: string, on: boolean) => Promise<void>
+  /** From canReply: a sent message in a channel I can write in. */
+  canReply: boolean
+  /** Starts a reply to this message in the composer. */
+  onReply: (message: LocalMessage) => void
+  /** Shows the message a reply quotes (a click on the quote). */
+  onOpenQuote: (messageId: string, seq: number) => void
   /** From canPin: a sent message in a channel I can write in. */
   canPin: boolean
   /** Pins or unpins. Rejects with ApiError on failure. */
@@ -100,6 +109,7 @@ export const MessageItem = memo(function MessageItem({
   authorAvatarFileId,
   authorOnline,
   mentionsMe,
+  repliesToMe,
   names,
   mentionable,
   grouped,
@@ -108,6 +118,9 @@ export const MessageItem = memo(function MessageItem({
   canDelete,
   canReact,
   onSetReaction,
+  canReply,
+  onReply,
+  onOpenQuote,
   canPin,
   onSetPinned,
   onEdit,
@@ -133,6 +146,7 @@ export const MessageItem = memo(function MessageItem({
   const isEdited = message.edited_at !== null && !isDeleted
   const hasFiles = message.attachments.length > 0
   const isPinned = message.pinned && !isDeleted
+  const forMe = mentionsMe || repliesToMe
   // Close the editor if the message gets deleted (e.g. from another tab) while open.
   const showEditor = editing && !isDeleted
 
@@ -185,6 +199,15 @@ export const MessageItem = memo(function MessageItem({
     const code = await onRetry(message.channel_id, message.client_msg_id)
     if (code === "channel_archived") onChannelArchived()
   }
+
+  const replyTo = message.reply_to
+  const quote = replyTo && (
+    <ReplyQuote
+      quote={replyTo}
+      names={names}
+      onOpen={() => onOpenQuote(replyTo.id, replyTo.seq)}
+    />
+  )
 
   const time = (
     <time className="text-xs text-muted-foreground" dateTime={message.created_at}>
@@ -251,6 +274,11 @@ export const MessageItem = memo(function MessageItem({
           onOpenChange={setPickingReaction}
           onSelect={(emoji) => void changeReaction(emoji, true)}
         />
+      )}
+      {canReply && (
+        <Button variant="ghost" size="icon-sm" aria-label="Reply" onClick={() => onReply(message)}>
+          <Reply />
+        </Button>
       )}
       {canEdit && (
         <Button
@@ -339,11 +367,8 @@ export const MessageItem = memo(function MessageItem({
                 message.status === "failed" && "ring-1 ring-destructive/50",
               )}
             >
-              {isGifMessage(message.body) ? (
-                <GifEmbed url={message.body} />
-              ) : (
-                message.body && <MessageMarkdown body={message.body} own names={names} />
-              )}
+              {quote}
+              <MessageBody body={message.body} own names={names} />
               {isEdited && <span className="ml-1 text-xs text-muted-foreground">(edited)</span>}
               <MessageAttachments message={message} />
             </div>
@@ -365,7 +390,13 @@ export const MessageItem = memo(function MessageItem({
         ROW_FOCUS_CLASS,
         grouped ? "mt-0" : "mt-3",
       )}
-      aria-label={mentionsMe ? `${authorName} mentioned you` : undefined}
+      aria-label={
+        mentionsMe
+          ? `${authorName} mentioned you`
+          : repliesToMe
+            ? `${authorName} replied to you`
+            : undefined
+      }
       tabIndex={0}
       data-message-id={message.id}
     >
@@ -407,18 +438,16 @@ export const MessageItem = memo(function MessageItem({
             <div
               className={cn(
                 "rounded-lg px-3 py-1.5 text-sm leading-relaxed break-words text-foreground",
-                // A mention of me gets the light-blue of my own bubbles, with a thin edge.
-                mentionsMe ? "bg-accent ring-1 ring-primary/30" : "bg-surface-hover",
+                // A mention of me, or a reply to me, gets the light-blue of my own bubbles,
+                // with a thin edge.
+                forMe ? "bg-accent ring-1 ring-primary/30" : "bg-surface-hover",
                 MARKDOWN_BLOCK_CLASS,
                 !grouped && "rounded-tl-sm",
               )}
             >
+              {quote}
               {/* `own` styles mention chips for a light-blue bubble. */}
-              {isGifMessage(message.body) ? (
-                <GifEmbed url={message.body} />
-              ) : (
-                message.body && <MessageMarkdown body={message.body} own={mentionsMe} names={names} />
-              )}
+              <MessageBody body={message.body} own={forMe} names={names} />
               {isEdited && <span className="ml-1 text-xs text-muted-foreground">(edited)</span>}
               {message.status !== "sent" && <span className="ml-1">{status}</span>}
               <MessageAttachments message={message} />

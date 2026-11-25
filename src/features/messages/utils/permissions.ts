@@ -33,6 +33,11 @@ export function canReact(message: LocalMessage, channel: ChannelAccess | null): 
   return !!channel && !channel.archived && isActionable(message)
 }
 
+/** A reply is a new message: anyone who can write can reply to any sent message. */
+export function canReply(message: LocalMessage, channel: ChannelAccess | null): boolean {
+  return !!channel && !channel.archived && isActionable(message)
+}
+
 /** Anyone who can write can pin any message, and unpin any pin (D-05). */
 export function canPin(message: LocalMessage, channel: ChannelAccess | null): boolean {
   return !!channel && !channel.archived && isActionable(message)

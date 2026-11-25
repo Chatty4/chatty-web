@@ -15,17 +15,25 @@ import {
 const ME = "user-me"
 const OTHER = "user-other"
 
+/** `repliesTo`: the author of the message it replies to. */
 function created(
   channelId: string,
   seq: number,
-  { author = OTHER, mentions = [] as string[] } = {},
+  { author = OTHER, mentions = [] as string[], repliesTo = null as string | null } = {},
 ): ChannelEvent {
+  const reply_to = repliesTo && {
+    id: "msg-0",
+    seq: 0,
+    author_id: repliesTo,
+    body: "hi",
+    deleted: false,
+  }
   return {
     type: "message.created",
     channel_id: channelId,
     seq,
     created_at: "2026-10-05T14:00:00Z",
-    payload: { message: { author_id: author, mentions } },
+    payload: { message: { author_id: author, mentions, reply_to } },
   }
 }
 
@@ -76,6 +84,21 @@ describe("countNewMessage", () => {
   it("adds a mention when the message mentions me", () => {
     const state = countNewMessage(loaded(), created("a", 1, { mentions: [ME] }), ME)
     expect(selectCounts(state, "a")).toEqual({ unread: 1, mentions: 1 })
+  })
+
+  it("adds a mention when the message replies to one of mine", () => {
+    const state = countNewMessage(loaded(), created("a", 1, { repliesTo: ME }), ME)
+    expect(selectCounts(state, "a")).toEqual({ unread: 1, mentions: 1 })
+  })
+
+  it("adds one mention for a reply to me that also mentions me", () => {
+    const state = countNewMessage(loaded(), created("a", 1, { repliesTo: ME, mentions: [ME] }), ME)
+    expect(selectCounts(state, "a")).toEqual({ unread: 1, mentions: 1 })
+  })
+
+  it("doesn't count a reply to someone else as a mention", () => {
+    const state = countNewMessage(loaded(), created("a", 1, { repliesTo: OTHER }), ME)
+    expect(selectCounts(state, "a")).toEqual({ unread: 1, mentions: 0 })
   })
 
   it("doesn't count my own messages", () => {

@@ -17,6 +17,7 @@ export function apiMessage(seq: number, overrides: Partial<ApiMessage> = {}): Ap
     body: `message ${seq}`,
     file_ids: [],
     attachments: [],
+    reply_to: null,
     mentions: [],
     reactions: [],
     pinned: false,

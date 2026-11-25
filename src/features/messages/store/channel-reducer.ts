@@ -4,7 +4,14 @@
 import type { ChannelEvent } from "@/lib/ws/types"
 import type { ApiMessage, ChannelState, LocalMessage, Pin, SendFailure } from "../types"
 import { applyDelete, applyEdit, applyEvent, setPinned, type MessageEdit } from "./apply-event"
-import { addPin, applyEventToPins, editPin, removePin, type PinInfo } from "./pins"
+import {
+  addPin,
+  applyEventToPins,
+  deletePinnedMessage,
+  editPin,
+  removePin,
+  type PinInfo,
+} from "./pins"
 
 export type MessagesState = Record<string, ChannelState>
 
@@ -423,7 +430,7 @@ export function messagesReducer(state: MessagesState, action: MessagesAction): M
         [action.channelId]: {
           ...ch,
           messages: applyDelete(ch.messages, action.messageId, action.deletedAt),
-          pins: removePin(ch.pins, action.messageId),
+          pins: deletePinnedMessage(ch.pins, action.messageId),
         },
       }
     }

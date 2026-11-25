@@ -1,6 +1,6 @@
 import { createContext, useContext } from "react"
 
-import type { Attachment, ChannelState } from "./types"
+import type { Attachment, ChannelState, ReplyPreview } from "./types"
 
 export type MessagesContextValue = {
   getChannel: (channelId: string) => ChannelState | undefined
@@ -15,8 +15,16 @@ export type MessagesContextValue = {
   loadNewer: (channelId: string) => Promise<void>
   /** Leaves a jumped-to window and shows the newest messages again. */
   returnToPresent: (channelId: string) => Promise<void>
-  /** Never rejects: a failure shows on the message. Resolves with the error code, if any. */
-  send: (channelId: string, body: string, attachments?: Attachment[]) => Promise<string | undefined>
+  /**
+   * Never rejects: a failure shows on the message. Resolves with the error code, if any.
+   * `replyTo` is the message it replies to.
+   */
+  send: (
+    channelId: string,
+    body: string,
+    attachments?: Attachment[],
+    replyTo?: ReplyPreview | null,
+  ) => Promise<string | undefined>
   retry: (channelId: string, clientMsgId: string) => Promise<string | undefined>
   /** Removes a message that failed to send. */
   discard: (channelId: string, clientMsgId: string) => void
@@ -36,6 +44,10 @@ export type MessagesContextValue = {
   /** The unsent text of a channel's composer, kept while another channel is open. */
   getDraft: (channelId: string) => string
   setDraft: (channelId: string, text: string) => void
+  /** The message the channel's composer replies to, kept while another channel is open. */
+  getReplyTarget: (channelId: string) => ReplyPreview | null
+  /** Null cancels the reply. */
+  setReplyTarget: (channelId: string, target: ReplyPreview | null) => void
 }
 
 export const MessagesContext = createContext<MessagesContextValue | null>(null)

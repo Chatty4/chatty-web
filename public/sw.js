@@ -20,6 +20,13 @@ function previewText(preview) {
 // A new ?user= installs a new worker; take over now instead of after every tab is closed.
 self.addEventListener("install", () => self.skipWaiting())
 
+// A mention wins over a reply when the message is both.
+function title(data) {
+  if (data.mentioned) return "You were mentioned"
+  if (data.replied) return "New reply to your message"
+  return "New message"
+}
+
 self.addEventListener("push", (event) => {
   let data = {}
   try {
@@ -28,7 +35,7 @@ self.addEventListener("push", (event) => {
     // not our payload: still show something, browsers penalize a push without a notification
   }
   event.waitUntil(
-    self.registration.showNotification(data.mentioned ? "You were mentioned" : "New message", {
+    self.registration.showNotification(title(data), {
       body: previewText(data.preview) || "Open Chatty to read it.",
       icon: "/favicon.svg",
       // One notification per channel: a newer message replaces the older one.

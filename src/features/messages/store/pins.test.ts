@@ -248,3 +248,38 @@ describe("my own edit and delete", () => {
     expect(pinnedIds(deletedState)).toEqual([])
   })
 })
+
+describe("pinned replies", () => {
+  const pinnedReply: Pin = {
+    pinned_by: OTHER,
+    pinned_at: "2026-10-05T14:00:00Z",
+    message: apiMessage(2, {
+      pinned: true,
+      reply_to: { id: "msg-1", seq: 1, author_id: OTHER, body: "is v1.4 ready?", deleted: false },
+    }),
+  }
+
+  it("quote the new text after message.edited", () => {
+    const next = reduce(
+      state(loaded([pinnedReply])),
+      apply(edited(3, "msg-1", "is v1.5 ready?", "2026-10-05T15:00:00Z")),
+    )
+    expect(pinsOf(next).items[0]!.message.reply_to?.body).toBe("is v1.5 ready?")
+  })
+
+  it("show the quote as deleted after message.deleted, and stay pinned", () => {
+    const next = reduce(state(loaded([pinnedReply])), apply(deleted(3, "msg-1")))
+    expect(pinnedIds(next)).toEqual(["msg-2"])
+    expect(pinsOf(next).items[0]!.message.reply_to).toMatchObject({ body: "", deleted: true })
+  })
+
+  it("show the quote as deleted after my own delete's REST answer", () => {
+    const next = reduce(state(loaded([pinnedReply])), {
+      type: "MESSAGE_DELETED",
+      channelId: CHANNEL,
+      messageId: "msg-1",
+      deletedAt: "2026-10-05T15:01:00Z",
+    })
+    expect(pinsOf(next).items[0]!.message.reply_to?.deleted).toBe(true)
+  })
+})
