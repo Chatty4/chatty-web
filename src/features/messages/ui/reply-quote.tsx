@@ -20,6 +20,7 @@ export function ReplyQuote({ quote, names, onOpen }: ReplyQuoteProps) {
   )
   const content = (
     <>
+      <span className="sr-only">In reply to </span>
       <strong className="block truncate font-semibold text-foreground">{authorName}</strong>
       <span
         className={cn(
@@ -37,7 +38,7 @@ export function ReplyQuote({ quote, names, onOpen }: ReplyQuoteProps) {
     <button
       type="button"
       className={cn(className, "outline-none focus-visible:ring-2 focus-visible:ring-ring")}
-      aria-label={`Replying to ${authorName}: ${text}. Show the message`}
+      title="Show the message"
       onClick={onOpen}
     >
       {content}
