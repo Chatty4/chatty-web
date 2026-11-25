@@ -9,6 +9,7 @@ import type { Pin } from "../types"
 import { formatTimeAgo } from "../utils/dates"
 import { AttachmentsPreview } from "./attachments-preview"
 import { MessageMarkdown } from "./message-markdown"
+import { ReplyQuote } from "./reply-quote"
 
 const dateFormat = new Intl.DateTimeFormat("en", {
   month: "short",
@@ -73,6 +74,7 @@ export function PinCard({
 
       {/* inert: a link in the text shouldn't compete with clicking the card */}
       <div inert className="my-[9px] flex flex-col gap-2">
+        {message.reply_to && <ReplyQuote quote={message.reply_to} names={names} />}
         {message.body && (
           <div className="line-clamp-3 text-sm [overflow-wrap:anywhere] [&>*+*]:mt-1">
             {isGifMessage(message.body) ? (

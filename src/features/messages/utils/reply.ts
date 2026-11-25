@@ -5,7 +5,13 @@ import { isGifMessage } from "@/features/gifs"
 
 import { REPLY_PREVIEW_CHARS } from "../constants"
 import type { ApiMessage, ReplyPreview } from "../types"
-import { decodeMentions } from "./mentions"
+import { decodeMentions, extractMentionIds } from "./mentions"
+
+/** Whose names a message's quote shows: the quoted author and who its text mentions. */
+export function quotedUserIds(message: ApiMessage): string[] {
+  const quote = message.reply_to
+  return quote ? [quote.author_id, ...extractMentionIds(quote.body)] : []
+}
 
 /** The quote of a loaded message, as the server builds it: for a reply's optimistic copy. */
 export function toReplyPreview(message: ApiMessage): ReplyPreview {

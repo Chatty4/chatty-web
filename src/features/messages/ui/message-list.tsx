@@ -9,6 +9,7 @@ import { usePresence } from "@/features/presence"
 import { TypingIndicator, useSendTyping } from "@/features/typing"
 import { useUnread } from "@/features/unread"
 import { useTabVisible } from "@/hooks/use-tab-visible"
+import { toast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
 
 import { useMessages } from "../context"
@@ -38,7 +39,7 @@ import {
   type ChannelAccess,
   type TeamRole,
 } from "../utils/permissions"
-import { toReplyPreview } from "../utils/reply"
+import { quotedUserIds, toReplyPreview } from "../utils/reply"
 import type { LocalMessage } from "../types"
 import type { SidebarChannel } from "@/features/channels/types"
 
@@ -78,6 +79,7 @@ export function MessageList({
     loadChannel,
     loadMoreHistory,
     loadNewer,
+    jumpTo,
     returnToPresent,
     send,
     retry,
@@ -124,7 +126,11 @@ export function MessageList({
 
   // ── Name resolution for authors and <@id> mentions ───────────────────────────
   const userIds = useMemo(
-    () => [...new Set(messages.flatMap((m) => [m.author_id, ...extractMentionIds(m.body)]))],
+    () => [
+      ...new Set(
+        messages.flatMap((m) => [m.author_id, ...extractMentionIds(m.body), ...quotedUserIds(m)]),
+      ),
+    ],
     [messages],
   )
   const memberPreviews = useMemberPreviews(teamId, userIds)
@@ -316,6 +322,14 @@ export function MessageList({
     [channelId, setReplyTarget],
   )
   const cancelReply = useCallback(() => setReplyTarget(channelId, null), [channelId, setReplyTarget])
+  const onOpenQuote = useCallback(
+    (messageId: string, seq: number) => {
+      void jumpTo(channelId, messageId, seq).then((found) => {
+        if (!found) toast.error("Couldn't load this message. Try again.")
+      })
+    },
+    [channelId, jumpTo],
+  )
   const replyTo = getReplyTarget(channelId)
 
   const archived = channel?.archived ?? false
@@ -401,6 +415,7 @@ export function MessageList({
               onSetReaction={onSetReaction}
               canReply={canReply(message, access)}
               onReply={onReply}
+              onOpenQuote={onOpenQuote}
               canPin={canPin(message, access)}
               onSetPinned={onSetPinned}
               onEdit={onEdit}

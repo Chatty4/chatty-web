@@ -34,6 +34,7 @@ import { MessageAttachments } from "./message-attachments"
 import { MessageMarkdown } from "./message-markdown"
 import { PinnedMark } from "./pinned-mark"
 import { ReactionChips } from "./reaction-chips"
+import { ReplyQuote } from "./reply-quote"
 import { SendFailureNote } from "./send-failure"
 
 /** jumpToMessage sets data-flash on the row for a moment. */
@@ -81,6 +82,8 @@ export type MessageItemProps = {
   canReply: boolean
   /** Starts a reply to this message in the composer. */
   onReply: (message: LocalMessage) => void
+  /** Shows the message a reply quotes (a click on the quote). */
+  onOpenQuote: (messageId: string, seq: number) => void
   /** From canPin: a sent message in a channel I can write in. */
   canPin: boolean
   /** Pins or unpins. Rejects with ApiError on failure. */
@@ -115,6 +118,7 @@ export const MessageItem = memo(function MessageItem({
   onSetReaction,
   canReply,
   onReply,
+  onOpenQuote,
   canPin,
   onSetPinned,
   onEdit,
@@ -192,6 +196,15 @@ export const MessageItem = memo(function MessageItem({
     const code = await onRetry(message.channel_id, message.client_msg_id)
     if (code === "channel_archived") onChannelArchived()
   }
+
+  const replyTo = message.reply_to
+  const quote = replyTo && (
+    <ReplyQuote
+      quote={replyTo}
+      names={names}
+      onOpen={() => onOpenQuote(replyTo.id, replyTo.seq)}
+    />
+  )
 
   const time = (
     <time className="text-xs text-muted-foreground" dateTime={message.created_at}>
@@ -351,6 +364,7 @@ export const MessageItem = memo(function MessageItem({
                 message.status === "failed" && "ring-1 ring-destructive/50",
               )}
             >
+              {quote}
               {isGifMessage(message.body) ? (
                 <GifEmbed url={message.body} />
               ) : (
@@ -425,6 +439,7 @@ export const MessageItem = memo(function MessageItem({
                 !grouped && "rounded-tl-sm",
               )}
             >
+              {quote}
               {/* `own` styles mention chips for a light-blue bubble. */}
               {isGifMessage(message.body) ? (
                 <GifEmbed url={message.body} />
