@@ -33,10 +33,13 @@ import {
   canEdit,
   canPin,
   canReact,
+  canReply,
   type Actor,
   type ChannelAccess,
   type TeamRole,
 } from "../utils/permissions"
+import { toReplyPreview } from "../utils/reply"
+import type { LocalMessage } from "../types"
 import type { SidebarChannel } from "@/features/channels/types"
 
 /** Start fetching older messages this far before the user reaches the top. */
@@ -85,6 +88,8 @@ export function MessageList({
     setPinned,
     getDraft,
     setDraft,
+    getReplyTarget,
+    setReplyTarget,
   } = useMessages()
 
   const channelState = getChannel(channelId)
@@ -306,6 +311,12 @@ export function MessageList({
     (messageId: string) => remove(channelId, messageId),
     [channelId, remove],
   )
+  const onReply = useCallback(
+    (message: LocalMessage) => setReplyTarget(channelId, toReplyPreview(message)),
+    [channelId, setReplyTarget],
+  )
+  const cancelReply = useCallback(() => setReplyTarget(channelId, null), [channelId, setReplyTarget])
+  const replyTo = getReplyTarget(channelId)
 
   const archived = channel?.archived ?? false
 
@@ -388,6 +399,8 @@ export function MessageList({
               canDelete={!!actor && canDelete(message, actor, access)}
               canReact={canReact(message, access)}
               onSetReaction={onSetReaction}
+              canReply={canReply(message, access)}
+              onReply={onReply}
               canPin={canPin(message, access)}
               onSetPinned={onSetPinned}
               onEdit={onEdit}
@@ -459,8 +472,13 @@ export function MessageList({
           onDraftChange={(text) => setDraft(channelId, text)}
           // Only who can write here: someone just watching a public channel sends nothing.
           onTextChange={isMember && !archived ? sendTyping : undefined}
+          replyTo={replyTo}
+          names={names}
+          onCancelReply={cancelReply}
           onSend={async (body, attachments) => {
-            if ((await send(channelId, body, attachments)) === "channel_archived") {
+            // The reply goes with this message; a failed send keeps it on the message for Retry.
+            setReplyTarget(channelId, null)
+            if ((await send(channelId, body, attachments, replyTo)) === "channel_archived") {
               onChannelArchived()
             }
           }}

@@ -375,8 +375,20 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
     else draftsRef.current.delete(channelId)
   }, [])
 
+  // Kept per channel like drafts, but the composer shows it, so a change re-renders.
+  const replyTargetsRef = useRef(new Map<string, ReplyPreview>())
+  const getReplyTarget = useCallback(
+    (channelId: string) => replyTargetsRef.current.get(channelId) ?? null,
+    [],
+  )
+  const setReplyTarget = useCallback((channelId: string, target: ReplyPreview | null) => {
+    if (target) replyTargetsRef.current.set(channelId, target)
+    else replyTargetsRef.current.delete(channelId)
+    bump()
+  }, [bump])
+
   return (
-    <MessagesContext.Provider value={{ getChannel, loadChannel, loadMoreHistory, jumpTo, loadNewer, returnToPresent: reloadChannel, send, retry, discard, edit, remove, setReaction, setPinned, loadPins, getDraft, setDraft }}>
+    <MessagesContext.Provider value={{ getChannel, loadChannel, loadMoreHistory, jumpTo, loadNewer, returnToPresent: reloadChannel, send, retry, discard, edit, remove, setReaction, setPinned, loadPins, getDraft, setDraft, getReplyTarget, setReplyTarget }}>
       {children}
     </MessagesContext.Provider>
   )

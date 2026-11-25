@@ -6,6 +6,7 @@ import {
   canEdit,
   canPin,
   canReact,
+  canReply,
   type Actor,
   type ChannelAccess,
 } from "./permissions"
@@ -36,6 +37,22 @@ describe("canReact", () => {
     expect(canReact(deleted, open)).toBe(false)
     expect(canReact(pendingMessage("c1"), open)).toBe(false)
     expect(canReact({ ...pendingMessage("c1"), status: "failed" }, open)).toBe(false)
+  })
+})
+
+describe("canReply", () => {
+  it("allows anyone who can write to reply to anyone's message, in DMs too", () => {
+    expect(canReply(mine, open)).toBe(true)
+    expect(canReply(theirs, open)).toBe(true)
+    expect(canReply(theirs, dm)).toBe(true)
+  })
+
+  it("is off in archived channels, for non-members and on messages not on the server", () => {
+    expect(canReply(theirs, archived)).toBe(false)
+    expect(canReply(theirs, null)).toBe(false)
+    expect(canReply(deleted, open)).toBe(false)
+    expect(canReply(pendingMessage("c1"), open)).toBe(false)
+    expect(canReply({ ...pendingMessage("c1"), status: "failed" }, open)).toBe(false)
   })
 })
 

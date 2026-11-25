@@ -4,6 +4,7 @@ import {
   Pencil,
   Pin,
   PinOff,
+  Reply,
   SmilePlus,
   Trash2,
 } from "lucide-react"
@@ -76,6 +77,10 @@ export type MessageItemProps = {
   canReact: boolean
   /** Adds or removes my reaction. Rejects with ApiError on failure. */
   onSetReaction: (messageId: string, emoji: string, on: boolean) => Promise<void>
+  /** From canReply: a sent message in a channel I can write in. */
+  canReply: boolean
+  /** Starts a reply to this message in the composer. */
+  onReply: (message: LocalMessage) => void
   /** From canPin: a sent message in a channel I can write in. */
   canPin: boolean
   /** Pins or unpins. Rejects with ApiError on failure. */
@@ -108,6 +113,8 @@ export const MessageItem = memo(function MessageItem({
   canDelete,
   canReact,
   onSetReaction,
+  canReply,
+  onReply,
   canPin,
   onSetPinned,
   onEdit,
@@ -251,6 +258,11 @@ export const MessageItem = memo(function MessageItem({
           onOpenChange={setPickingReaction}
           onSelect={(emoji) => void changeReaction(emoji, true)}
         />
+      )}
+      {canReply && (
+        <Button variant="ghost" size="icon-sm" aria-label="Reply" onClick={() => onReply(message)}>
+          <Reply />
+        </Button>
       )}
       {canEdit && (
         <Button
