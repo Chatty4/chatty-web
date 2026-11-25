@@ -16,6 +16,7 @@ export function canPreview(file: { mime: string; filename: string }): boolean {
 
 export const VIEWERS: Partial<Record<PreviewKind, Viewer>> = {
   pdf: lazy(() => import("./pdf-viewer").then((m) => ({ default: m.PdfViewer }))),
+  docx: lazy(() => import("./docx-viewer").then((m) => ({ default: m.DocxViewer }))),
   markdown: lazy(() => import("./markdown-viewer").then((m) => ({ default: m.MarkdownViewer }))),
   text: lazy(() => import("./text-viewer").then((m) => ({ default: m.TextViewer }))),
   image: lazy(() => import("./image-viewer").then((m) => ({ default: m.ImageViewer }))),
