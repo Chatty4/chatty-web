@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 
 import { MAX_MESSAGE_LENGTH } from "../constants"
+import { useEmoticons } from "../hooks/use-emoticons"
 
 type MessageEditorProps = {
   /** Text shown when the editor opens (mentions already decoded to @names). */
@@ -36,6 +37,7 @@ export function MessageEditor({
   const [error, setError] = useState<string>()
   const ref = useRef<HTMLTextAreaElement>(null)
   const messageId = useId()
+  const emoticons = useEmoticons(ref)
 
   useEffect(() => {
     const el = ref.current
@@ -44,7 +46,8 @@ export function MessageEditor({
     el.setSelectionRange(el.value.length, el.value.length)
   }, [])
 
-  const trimmed = value.trim()
+  // An emoticon right before Enter has no space after it to swap it while typing.
+  const trimmed = emoticons.finish(value).trim()
   const length = measure(trimmed)
   const validation =
     !trimmed && !allowEmpty
@@ -56,7 +59,8 @@ export function MessageEditor({
 
   const save = async () => {
     if (saving || validation) return
-    if (trimmed === initialValue.trim()) {
+    // Nothing typed: an old message ending in :) isn't changed just by opening it.
+    if (value.trim() === initialValue.trim()) {
       onCancel()
       return
     }
@@ -71,6 +75,14 @@ export function MessageEditor({
   }
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Backspace" && e.currentTarget.selectionStart === e.currentTarget.selectionEnd) {
+      const restored = emoticons.undo(value, e.currentTarget.selectionStart)
+      if (restored) {
+        e.preventDefault()
+        setValue(restored.value)
+        return
+      }
+    }
     if (e.key === "Escape") {
       e.preventDefault()
       onCancel()
@@ -95,7 +107,8 @@ export function MessageEditor({
         aria-describedby={shownError ? messageId : undefined}
         className="max-h-60 border-primary"
         onChange={(e) => {
-          setValue(e.target.value)
+          const typed = emoticons.onType(value, e.target.value, e.target.selectionStart)
+          setValue(typed.value)
           setError(undefined)
         }}
         onKeyDown={handleKeyDown}
