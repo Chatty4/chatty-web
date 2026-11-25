@@ -76,7 +76,8 @@ export function MessageAttachments({ message }: { message: LocalMessage }) {
         </div>
       ))}
       {audios.map((audio) => (
-        <div key={audio.file_id} className="flex w-full max-w-md flex-col gap-1">
+        // Wide enough for the player's volume slider to open; never wider than the bubble.
+        <div key={audio.file_id} className="flex w-80 max-w-full flex-col gap-1">
           {urlOf[audio.file_id] && !unplayable.has(audio.file_id) && (
             <audio
               src={urlOf[audio.file_id]}
