@@ -9,6 +9,9 @@ export type PreviewKind = "pdf" | "docx" | "markdown" | "table" | "text" | "imag
 /** Text-like files are shown up to this size; past it, only their start. */
 export const TEXT_PREVIEW_MAX_BYTES = 1 * MB
 
+/** The pages a PDF preview draws; a longer document is downloaded to read the rest. */
+export const PDF_PREVIEW_MAX_PAGES = 50
+
 const BY_MIME: Record<string, PreviewKind> = {
   "application/pdf": "pdf",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
