@@ -1,7 +1,8 @@
 import { useRef, useState } from "react"
 import { Download, FileText } from "lucide-react"
 
-import { formatFileSize } from "@/features/files"
+import { Button } from "@/components/ui/button"
+import { canPreview, FilePreviewDialog, formatFileSize } from "@/features/files"
 
 import { useAttachmentUrls } from "../hooks/use-attachment-urls"
 import type { Attachment, LocalMessage } from "../types"
@@ -11,7 +12,7 @@ import { ImageLightbox } from "./image-lightbox"
 
 /**
  * A message's files: its images as a grid that opens a preview, its videos as players, then the
- * other files as cards.
+ * other files as cards that open a preview (PDF, Markdown, text, …) or download.
  */
 export function MessageAttachments({ message }: { message: LocalMessage }) {
   // A pending message has no id on the server yet: its files show without links.
@@ -20,6 +21,7 @@ export function MessageAttachments({ message }: { message: LocalMessage }) {
   // An image that failed to load gets one new URL (it may have expired), not a loop.
   const reloaded = useRef(new Set<string>())
   const [previewIndex, setPreviewIndex] = useState<number | null>(null)
+  const [previewFile, setPreviewFile] = useState<Attachment | null>(null)
 
   if (message.attachments.length === 0) return null
 
@@ -64,16 +66,26 @@ export function MessageAttachments({ message }: { message: LocalMessage }) {
       ))}
       {files.length > 0 && (
         <ul aria-label="Files" className="flex flex-col items-start gap-1.5">
-          {files.map((file) => (
-            <li key={file.file_id}>
-              <FileCard
-                attachment={file}
-                onDownload={urlOf[file.file_id] ? () => void download(file.file_id) : undefined}
-              />
-            </li>
-          ))}
+          {files.map((file) => {
+            const ready = !!urlOf[file.file_id]
+            return (
+              <li key={file.file_id}>
+                <FileCard
+                  attachment={file}
+                  onOpen={ready && canPreview(file) ? () => setPreviewFile(file) : undefined}
+                  onDownload={ready ? () => void download(file.file_id) : undefined}
+                />
+              </li>
+            )
+          })}
         </ul>
       )}
+      <FilePreviewDialog
+        file={previewFile}
+        getUrl={freshUrl}
+        onDownload={(fileId) => void download(fileId)}
+        onClose={() => setPreviewFile(null)}
+      />
       <ImageLightbox
         images={images}
         index={previewIndex}
@@ -87,21 +99,45 @@ export function MessageAttachments({ message }: { message: LocalMessage }) {
   )
 }
 
-function FileCard({ attachment, onDownload }: { attachment: Attachment; onDownload?: () => void }) {
+type FileCardProps = {
+  attachment: Attachment
+  /** Shows the file in a preview; without it, the card downloads the file. */
+  onOpen?: () => void
+  onDownload?: () => void
+}
+
+/** A file of a message: its name and size. Opens a preview when there is one, else downloads. */
+function FileCard({ attachment, onOpen, onDownload }: FileCardProps) {
+  const action = onOpen ?? onDownload
   return (
-    <button
-      type="button"
-      disabled={!onDownload}
-      onClick={onDownload}
-      aria-label={`Download ${attachment.filename}`}
-      className="flex w-56 items-center gap-2 rounded-md border bg-surface px-2 py-1.5 text-left text-sm transition-colors enabled:hover:bg-surface-hover disabled:cursor-default"
-    >
-      <FileText className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
-      <span className="min-w-0 flex-1">
-        <span className="block truncate font-medium">{attachment.filename}</span>
-        <span className="block text-xs text-muted-foreground">{formatFileSize(attachment.size)}</span>
-      </span>
-      {onDownload && <Download className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />}
-    </button>
+    <div className="flex w-56 items-center rounded-md border bg-surface text-sm">
+      <button
+        type="button"
+        disabled={!action}
+        onClick={action}
+        aria-label={`${onOpen ? "Open" : "Download"} ${attachment.filename}`}
+        className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors enabled:hover:bg-surface-hover disabled:cursor-default"
+      >
+        <FileText className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-medium">{attachment.filename}</span>
+          <span className="block text-xs text-muted-foreground">{formatFileSize(attachment.size)}</span>
+        </span>
+        {!onOpen && onDownload && (
+          <Download className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+        )}
+      </button>
+      {onOpen && onDownload && (
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label={`Download ${attachment.filename}`}
+          className="mr-1 shrink-0"
+          onClick={onDownload}
+        >
+          <Download />
+        </Button>
+      )}
+    </div>
   )
 }
