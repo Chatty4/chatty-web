@@ -9,6 +9,7 @@ import { ChannelsProvider } from "@/features/channels"
 import { MessagesProvider } from "@/features/messages"
 import { PresenceProvider } from "@/features/presence"
 import { resavePushSubscription } from "@/features/push"
+import { ReadsProvider } from "@/features/reads"
 import { TeamsProvider } from "@/features/teams"
 import { TypingProvider } from "@/features/typing"
 import { UnreadProvider } from "@/features/unread"
@@ -57,6 +58,7 @@ export function AppLayout() {
         <UnreadProvider>
         <PresenceProvider>
         <TypingProvider>
+        <ReadsProvider>
           <div className="flex h-full bg-surface">
             <TeamRail />
             <Sidebar open={drawerOpen} onClose={closeDrawer} />
@@ -79,6 +81,7 @@ export function AppLayout() {
               )}
             </main>
           </div>
+        </ReadsProvider>
         </TypingProvider>
         </PresenceProvider>
         </UnreadProvider>
