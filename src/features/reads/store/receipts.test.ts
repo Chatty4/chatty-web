@@ -64,6 +64,10 @@ describe("receiptFor", () => {
     expect(receipt).toEqual({ status: "all", seen: 2, total: 2 })
   })
 
+  it("gives the same object for the same counts, so rows keep their memo", () => {
+    expect(receiptFor({ me: 10, ana: 10 }, mine)).toBe(receiptFor({ me: 12, bob: 11 }, mine))
+  })
+
   it("stays sent when I am alone in the channel", () => {
     expect(receiptFor({ me: 10 }, mine)).toEqual({ status: "sent", seen: 0, total: 0 })
   })

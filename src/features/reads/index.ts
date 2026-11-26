@@ -1,4 +1,6 @@
 export { ReadsProvider } from "./ui/reads-provider"
+export { ReadTicks } from "./ui/read-ticks"
+export { SeenByDialog } from "./ui/seen-by-dialog"
 export { useReads } from "./hooks/reads-context"
 export { useChannelReads } from "./hooks/use-channel-reads"
 export { hasReadReceipts, receiptFor, receiptLabel, seenBy, showsReceipt } from "./store/receipts"

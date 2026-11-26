@@ -49,15 +49,27 @@ export function seenBy(
   return { seen, notSeen }
 }
 
-/** The message's status. Alone in the channel, nobody can see it, so it stays "sent". */
+// One object per (seen, total), so a memoized message row only re-renders when its ticks change.
+const receipts = new Map<string, Receipt>()
+
+/**
+ * The message's status, the same object for the same counts. Alone in the channel, nobody can
+ * see it, so it stays "sent".
+ */
 export function receiptFor(
   positions: Positions,
   message: Pick<ReceiptMessage, "author_id" | "seq">,
 ): Receipt {
   const { seen, notSeen } = seenBy(positions, message)
   const total = seen.length + notSeen.length
-  const status = seen.length === 0 ? "sent" : notSeen.length === 0 ? "all" : "some"
-  return { status, seen: seen.length, total }
+  const key = `${seen.length}/${total}`
+  let receipt = receipts.get(key)
+  if (!receipt) {
+    const status = seen.length === 0 ? "sent" : notSeen.length === 0 ? "all" : "some"
+    receipt = { status, seen: seen.length, total }
+    receipts.set(key, receipt)
+  }
+  return receipt
 }
 
 /** What a screen reader says for the ticks: "Sent", "Seen by 2 of 5", "Seen by everyone". */

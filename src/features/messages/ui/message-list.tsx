@@ -6,6 +6,13 @@ import { useAuth } from "@/features/auth"
 import { useChannels } from "@/features/channels/hooks/channels-context"
 import { JoinChannelBar } from "@/features/channels/ui/join-channel-bar"
 import { usePresence } from "@/features/presence"
+import {
+  receiptFor,
+  SeenByDialog,
+  showsReceipt,
+  useChannelReads,
+  type Receipt,
+} from "@/features/reads"
 import { TypingIndicator, useSendTyping } from "@/features/typing"
 import { useUnread } from "@/features/unread"
 import { useTabVisible } from "@/hooks/use-tab-visible"
@@ -126,14 +133,20 @@ export function MessageList({
   })
   useWatchChannel(channelId, viewingOnly)
 
-  // ── Name resolution for authors and <@id> mentions ───────────────────────────
+  // ── Read receipts (D-19): private channels and DMs only ──────────────────────
+  const readPositions = useChannelReads(channelId, channel?.kind)
+  // The message whose seen-by list is open. Kept with its channel, so switching closes it.
+  const [info, setInfo] = useState<{ channelId: string; messageId: string } | null>(null)
+
+  // ── Name resolution for authors, <@id> mentions and the seen-by list ─────────
   const userIds = useMemo(
     () => [
-      ...new Set(
-        messages.flatMap((m) => [m.author_id, ...extractMentionIds(m.body), ...quotedUserIds(m)]),
-      ),
+      ...new Set([
+        ...messages.flatMap((m) => [m.author_id, ...extractMentionIds(m.body), ...quotedUserIds(m)]),
+        ...Object.keys(readPositions ?? {}),
+      ]),
     ],
-    [messages],
+    [messages, readPositions],
   )
   const memberPreviews = useMemberPreviews(teamId, userIds)
   const memberNames = useMemo(() => namesOf(memberPreviews), [memberPreviews])
@@ -343,6 +356,29 @@ export function MessageList({
     ? { kind: channel.kind, archived: channel.archived, myRole: channel.my.role }
     : null
 
+  // ── Ticks and the seen-by list ───────────────────────────────────────────────
+  // No ticks until GET /reads answered: none rather than wrong ones.
+  const receipts = useMemo(() => {
+    const byId = new Map<string, Receipt>()
+    if (!readPositions) return byId
+    for (const message of messages) {
+      if (showsReceipt(message, user?.id, channel?.kind)) {
+        byId.set(message.id, receiptFor(readPositions, message))
+      }
+    }
+    return byId
+  }, [messages, readPositions, user?.id, channel?.kind])
+
+  const onShowInfo = useCallback(
+    (messageId: string) => setInfo({ channelId, messageId }),
+    [channelId],
+  )
+  // Closes by itself when the message is deleted or loses its ticks meanwhile.
+  const infoMessage =
+    info?.channelId === channelId && receipts.has(info.messageId)
+      ? messages.find((m) => m.id === info.messageId)
+      : undefined
+
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
@@ -429,6 +465,8 @@ export function MessageList({
               onRetry={retry}
               onDiscard={discard}
               onChannelArchived={onChannelArchived}
+              receipt={receipts.get(message.id) ?? null}
+              onShowInfo={onShowInfo}
             />
             </SwipeToReply>
             </Fragment>
@@ -479,6 +517,15 @@ export function MessageList({
         {newCount > 0 && <span>{newCount} new</span>}
       </Button>
       </div>
+
+      {infoMessage && (
+        <SeenByDialog
+          positions={readPositions}
+          message={infoMessage}
+          previews={memberPreviews}
+          onClose={() => setInfo(null)}
+        />
+      )}
 
       {/* Composer, or Join for a channel I only view */}
       {/* Keyed so a draft can never be sent to the channel opened after it. */}
