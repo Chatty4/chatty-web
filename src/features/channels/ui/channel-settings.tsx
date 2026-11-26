@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useState } from "react"
+import { type FormEvent, type ReactNode, useEffect, useState } from "react"
 import { Switch } from "@base-ui/react/switch"
 import { BellOff } from "lucide-react"
 import { useNavigate } from "react-router"
@@ -32,12 +32,13 @@ import {
   hasNotificationsTab,
 } from "../utils/permissions"
 
-const TABS = ["about", "members", "notifications", "archive"] as const
+const TABS = ["about", "members", "files", "notifications", "archive"] as const
 type Tab = (typeof TABS)[number]
 
 const TAB_LABELS: Record<Tab, string> = {
   about: "About",
   members: "Members",
+  files: "Files",
   notifications: "Notifications",
   archive: "Archive",
 }
@@ -556,14 +557,17 @@ export type ChannelDetailsPanelProps = {
   teamId: string
   /** Tab shown when the panel opens; defaults to About. */
   initialTab?: ChannelDetailsTab
+  /** The Files tab's content; the page passes it in, so channels never imports search. */
+  files?: ReactNode
   onClose: () => void
 }
 
-/** Right-hand details panel on the channel view: about, members, notifications, archive. */
+/** Right-hand details panel on the channel view: about, members, files, notifications, archive. */
 export function ChannelDetailsPanel({
   channelId,
   teamId,
   initialTab = "about",
+  files,
   onClose,
 }: ChannelDetailsPanelProps) {
   const { user } = useAuth()
@@ -582,6 +586,7 @@ export function ChannelDetailsPanel({
   const tabs: readonly Tab[] = channel
     ? TABS.filter(
         (t) =>
+          (t !== "files" || !!files) &&
           (t !== "archive" || hasArchiveTab(channel, canManage)) &&
           (t !== "notifications" || hasNotificationsTab(channel)),
       )
@@ -645,6 +650,7 @@ export function ChannelDetailsPanel({
                 onRemove={settings.removeMember}
               />
             )}
+            {activeTab === "files" && files}
             {activeTab === "notifications" && channel.my && (
               <NotificationsTab my={channel.my} onUpdate={settings.updateNotifications} />
             )}

@@ -5,6 +5,7 @@ import { useNavigate } from "react-router"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select } from "@/components/ui/select"
+import { SettingsTabs } from "@/components/ui/settings"
 import { SidePanel } from "@/components/ui/side-panel"
 import { useAuth } from "@/features/auth"
 import { dmDisplayName, useChannels } from "@/features/channels"
@@ -15,12 +16,13 @@ import { extractMentionIds } from "@/features/messages/utils/mentions"
 import { toast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
 
-import { searchMessages, type SearchFilters } from "../fetchers/search-fetchers"
-import type { SearchResult } from "../types"
+import { searchAttachments, searchMessages, type SearchFilters } from "../fetchers/search-fetchers"
+import type { AttachmentSearchResult, SearchResult } from "../types"
 import { dateRangeError, toDateRange, type DateFilter, type DatePreset } from "../utils/date-range"
 import { describeSearchError } from "../utils/errors"
 import { parseHighlight, showMentions } from "../utils/highlight"
 import { AuthorPicker, type Author } from "./author-picker"
+import { FileResult } from "./file-result"
 
 const MIN_LENGTH = 2
 const MAX_LENGTH = 200
@@ -33,6 +35,13 @@ const dateFormat = new Intl.DateTimeFormat("en", {
 })
 
 type Status = "idle" | "loading" | "loaded" | "error"
+
+const KINDS = ["messages", "files"] as const
+type Kind = (typeof KINDS)[number]
+const KIND_LABELS: Record<Kind, string> = { messages: "Messages", files: "Files" }
+
+type Result = SearchResult | AttachmentSearchResult
+const isFile = (result: Result): result is AttachmentSearchResult => "attachment" in result
 
 type Filters = { channelId: string; author: Author | null; date: DateFilter }
 
@@ -53,35 +62,43 @@ export type SearchPanelProps = {
   onClose: () => void
 }
 
-/** Full-text search in the team's messages, with filters. Click a result to jump to it. */
+/**
+ * Full-text search in the team's messages or files, with filters. Click a message to jump to it;
+ * Files lists the newest files until words are typed.
+ */
 export function SearchPanel({ teamId, channelId, onClose }: SearchPanelProps) {
   const navigate = useNavigate()
   const { user } = useAuth()
   const { jumpTo } = useMessages()
   const { channels, dms, memberNames: dmNames } = useChannels()
 
+  const [kind, setKind] = useState<Kind>("messages")
   const [input, setInput] = useState("")
   const [query, setQuery] = useState("")
   const [filters, setFilters] = useState<Filters>(NO_FILTERS)
-  const [results, setResults] = useState<SearchResult[]>([])
+  const [results, setResults] = useState<Result[]>([])
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [status, setStatus] = useState<Status>("idle")
   const [searchError, setSearchError] = useState("")
   const [inputError, setInputError] = useState<string | null>(null)
   // Only the newest request may write: an older answer arriving late is ignored.
   const requestRef = useRef<AbortController | null>(null)
-  // "More results" must send the q and filters its cursor was made for.
-  const activeRef = useRef<{ q: string; params: SearchFilters } | null>(null)
+  // "More results" must send the kind, q and filters its cursor was made for.
+  const activeRef = useRef<{ kind: Kind; q: string; params: SearchFilters } | null>(null)
 
-  const run = async (q: string, params: SearchFilters, cursor?: string) => {
+  const run = async (runKind: Kind, q: string, params: SearchFilters, cursor?: string) => {
     requestRef.current?.abort()
     const controller = new AbortController()
     requestRef.current = controller
-    activeRef.current = { q, params }
+    activeRef.current = { kind: runKind, q, params }
     setStatus("loading")
     try {
-      const page = await searchMessages(teamId, q, params, cursor, controller.signal)
-      setResults((previous) => (cursor ? [...previous, ...page.results] : page.results))
+      const page =
+        runKind === "files"
+          ? await searchAttachments(teamId, q || undefined, params, cursor, controller.signal)
+          : await searchMessages(teamId, q, params, cursor, controller.signal)
+      const found: Result[] = page.results
+      setResults((previous) => (cursor ? [...previous, ...found] : found))
       setNextCursor(page.next_cursor)
       setStatus("loaded")
     } catch (error) {
@@ -94,28 +111,41 @@ export function SearchPanel({ teamId, channelId, onClose }: SearchPanelProps) {
 
   const dateError = dateRangeError(filters.date)
 
-  const search = (q: string, next: Filters) => {
+  // Messages need words; files without words are the newest ones.
+  const search = (searchKind: Kind, q: string, next: Filters) => {
     if (dateRangeError(next.date)) return
     setNextCursor(null)
-    void run(q, toParams(next))
+    if (searchKind === "messages" && !q) {
+      requestRef.current?.abort()
+      setResults([])
+      setStatus("idle")
+      return
+    }
+    void run(searchKind, q, toParams(next))
   }
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
     const q = input.trim()
-    if (q.length < MIN_LENGTH) {
+    if (q.length < MIN_LENGTH && (q || kind === "messages")) {
       setInputError(`Type at least ${MIN_LENGTH} characters.`)
       return
     }
     setInputError(null)
     setQuery(q)
-    search(q, filters)
+    search(kind, q, filters)
   }
 
   // A filter change searches again right away, once there is something to search for.
   const changeFilters = (next: Filters) => {
     setFilters(next)
-    if (query) search(query, next)
+    search(kind, query, next)
+  }
+
+  const changeKind = (next: Kind) => {
+    setKind(next)
+    setResults([])
+    search(next, query, filters)
   }
   const setDate = (date: Partial<DateFilter>) =>
     changeFilters({ ...filters, date: { ...filters.date, ...date } })
@@ -144,7 +174,7 @@ export function SearchPanel({ teamId, channelId, onClose }: SearchPanelProps) {
     [channels],
   )
 
-  const open = async ({ message }: SearchResult) => {
+  const open = async ({ message }: Result) => {
     // Keeps the panel open in the other channel, so the user can try the next result.
     if (message.channel_id !== channelId) {
       navigate(`/teams/${teamId}/channels/${message.channel_id}?search`)
@@ -166,16 +196,45 @@ export function SearchPanel({ teamId, channelId, onClose }: SearchPanelProps) {
 
   const filtered = hasFilters(filters)
 
+  /** Who wrote it, where, and when: one line above a message or file result. */
+  const resultHeader = ({ message }: Result) => (
+    <>
+      <span className="truncate">
+        <strong className="font-semibold text-foreground">
+          {message.author_id === user?.id ? "You" : (names[message.author_id] ?? "Unknown member")}
+        </strong>{" "}
+        in {channelLabel(message.channel_id)}
+      </span>
+      <time dateTime={message.created_at} className="shrink-0">
+        {dateFormat.format(new Date(message.created_at))}
+      </time>
+    </>
+  )
+
   return (
-    <SidePanel title="Search" subtitle="Messages in this team" closeLabel="Close search" onClose={onClose}>
+    <SidePanel
+      title="Search"
+      subtitle={kind === "files" ? "Files in this team" : "Messages in this team"}
+      closeLabel="Close search"
+      onClose={onClose}
+    >
+      <SettingsTabs
+        compact
+        label="What to search"
+        className="px-2.5"
+        tabs={KINDS}
+        labels={KIND_LABELS}
+        value={kind}
+        onChange={changeKind}
+      />
       <div className="flex shrink-0 flex-col gap-3 border-b p-[18px]">
         <form onSubmit={submit} className="flex gap-2" role="search">
           <Input
             autoFocus
             value={input}
             maxLength={MAX_LENGTH}
-            placeholder="Search messages"
-            aria-label="Search messages"
+            placeholder={kind === "files" ? "Search files: names, colors, objects, text" : "Search messages"}
+            aria-label={kind === "files" ? "Search files" : "Search messages"}
             aria-invalid={!!inputError}
             aria-describedby={inputError ? "search-error" : undefined}
             onChange={(event) => {
@@ -306,7 +365,7 @@ export function SearchPanel({ teamId, channelId, onClose }: SearchPanelProps) {
         {status === "error" && results.length === 0 && (
           <div className="flex min-h-[150px] flex-col items-center justify-center gap-2 text-center">
             <strong className="font-semibold">{searchError}</strong>
-            <Button variant="secondary" size="sm" onClick={() => search(query, filters)}>
+            <Button variant="secondary" size="sm" onClick={() => search(kind, query, filters)}>
               Try again
             </Button>
           </div>
@@ -314,8 +373,13 @@ export function SearchPanel({ teamId, channelId, onClose }: SearchPanelProps) {
 
         {status === "loaded" && results.length === 0 && (
           <div className="flex min-h-[150px] flex-col items-center justify-center gap-2 text-center text-muted-foreground">
-            <strong className="text-foreground">No results</strong>
-            <span>{filtered ? "Try other words, or fewer filters." : "Try other words."}</span>
+            <strong className="text-foreground">
+              {kind === "files" && !query ? "No files yet" : "No results"}
+            </strong>
+            <span>
+              {filtered ? "Try other words, or fewer filters." : "Try other words."}
+              {kind === "files" && " New files can take a minute to become searchable."}
+            </span>
             {filtered && (
               <Button variant="secondary" size="sm" onClick={() => changeFilters(NO_FILTERS)}>
                 Clear filters
@@ -331,6 +395,16 @@ export function SearchPanel({ teamId, channelId, onClose }: SearchPanelProps) {
             aria-busy={status === "loading"}
           >
             {results.map((result) => {
+              if (isFile(result)) {
+                return (
+                  <FileResult
+                    key={result.attachment.file_id}
+                    result={result}
+                    header={resultHeader(result)}
+                    onGoToMessage={() => void open(result)}
+                  />
+                )
+              }
               const own = result.message.author_id === user?.id
               return (
                 <li
@@ -346,15 +420,7 @@ export function SearchPanel({ teamId, channelId, onClose }: SearchPanelProps) {
                   )}
                 >
                   <div className="flex items-baseline justify-between gap-2 text-xs text-muted-foreground">
-                    <span className="truncate">
-                      <strong className="font-semibold text-foreground">
-                        {own ? "You" : (names[result.message.author_id] ?? "Unknown member")}
-                      </strong>{" "}
-                      in {channelLabel(result.message.channel_id)}
-                    </span>
-                    <time dateTime={result.message.created_at} className="shrink-0">
-                      {dateFormat.format(new Date(result.message.created_at))}
-                    </time>
+                    {resultHeader(result)}
                   </div>
                   {isGifMessage(result.message.body) ? (
                     <GifEmbed url={result.message.body} className="mt-1 h-20" />
@@ -385,7 +451,7 @@ export function SearchPanel({ teamId, channelId, onClose }: SearchPanelProps) {
               disabled={status === "loading"}
               onClick={() => {
                 const active = activeRef.current
-                if (active) void run(active.q, active.params, nextCursor)
+                if (active) void run(active.kind, active.q, active.params, nextCursor)
               }}
             >
               {status === "loading" ? "Loading…" : "More results"}

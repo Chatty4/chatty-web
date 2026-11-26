@@ -11,6 +11,8 @@ type SettingsTabsProps<T extends string> = {
   onChange: (tab: T) => void
   /** Smaller tabs for narrow side panels. */
   compact?: boolean
+  /** What screen readers call the tab list. */
+  label?: string
   className?: string
 }
 
@@ -20,12 +22,13 @@ export function SettingsTabs<T extends string>({
   value,
   onChange,
   compact = false,
+  label = "Settings sections",
   className,
 }: SettingsTabsProps<T>) {
   return (
     <div
       role="tablist"
-      aria-label="Settings sections"
+      aria-label={label}
       className={cn(
         "flex shrink-0 gap-[3px] overflow-x-auto overflow-y-hidden shadow-[inset_0_-1px_0_var(--color-border)]",
         className,
