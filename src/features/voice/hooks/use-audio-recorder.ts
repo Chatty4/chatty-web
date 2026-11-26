@@ -8,6 +8,7 @@ import {
   MAX_RECORDING_MS,
   MIN_RECORDING_MS,
   pickRecordingMime,
+  RECORDING_BITS_PER_SECOND,
   toRecordingFile,
 } from "../utils/recording"
 
@@ -68,7 +69,10 @@ export function useAudioRecorder(options: RecorderOptions) {
 
     const mime = pickRecordingMime((type) => MediaRecorder.isTypeSupported(type))
     try {
-      recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined)
+      recorder = new MediaRecorder(stream, {
+        ...(mime && { mimeType: mime }),
+        audioBitsPerSecond: RECORDING_BITS_PER_SECOND,
+      })
     } catch (error) {
       release(stream)
       setStatus("idle")

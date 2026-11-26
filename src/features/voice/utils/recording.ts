@@ -1,15 +1,18 @@
 // Voice messages: recorded with the browser's MediaRecorder and sent as an audio attachment
 // through the usual upload (api-core.md, Files). No library: every current browser records.
 
-/**
- * Formats tried in order: Opus in WebM (Chrome, Edge, Firefox), Opus in Ogg, AAC in MP4 (Safari).
- * All are compressed, about 2–3 KB per second of speech.
- */
+/** Formats tried in order: Opus in WebM (Chrome, Edge, Firefox), Opus in Ogg, AAC in MP4 (Safari). */
 export const RECORDING_MIMES = [
   "audio/webm;codecs=opus",
   "audio/ogg;codecs=opus",
   "audio/mp4",
 ] as const
+
+/**
+ * Plenty for speech; browsers default to 128 kbps, which is music quality. About 4 KB per second,
+ * so the longest recording is about 1.2 MB.
+ */
+export const RECORDING_BITS_PER_SECOND = 32_000
 
 /** A recording stops by itself here; it is kept and attached. */
 export const MAX_RECORDING_MS = 5 * 60_000
