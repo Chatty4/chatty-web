@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from "react"
-import { AtSign, Paperclip, Send } from "lucide-react"
+import { AtSign, Mic, Paperclip, Send } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { EmojiPickerButton } from "@/components/ui/emoji-picker"
 import { UploadChip, useFileUploads } from "@/features/files"
 import { GifPickerButton } from "@/features/gifs"
+import { isRecordingSupported, RecordingBar, useAudioRecorder } from "@/features/voice"
 import { toast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
 
@@ -128,12 +129,22 @@ export function MessageComposer({
     requestAnimationFrame(() => textareaRef.current?.focus())
   }
 
-  const pickFiles = (files: FileList | null) => {
+  const pickFiles = (files: ArrayLike<File> | null) => {
     if (!files || files.length === 0 || archived) return
     const room = MAX_MESSAGE_FILES - uploads.length
     if (files.length > room) toast.error(`A message can have at most ${MAX_MESSAGE_FILES} files.`)
     addUploads(Array.from(files).slice(0, Math.max(room, 0)))
   }
+
+  // A voice message is attached like any other file, so text can go with it.
+  const [canRecord] = useState(isRecordingSupported)
+  const recorder = useAudioRecorder({
+    onRecorded: (file) => {
+      pickFiles([file])
+      requestAnimationFrame(() => textareaRef.current?.focus())
+    },
+    onError: (message) => toast.error(message),
+  })
 
   // A file dragged over the composer: it shows where to drop it.
   const [dragging, setDragging] = useState(false)
@@ -322,72 +333,92 @@ export function MessageComposer({
           }}
         />
 
-        <div className="flex items-center justify-between px-2 pb-2 pt-1">
-          {/* Formatting / extras toolbar */}
-          <div className="flex items-center gap-0.5">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Attach file"
-              disabled={archived || uploads.length >= MAX_MESSAGE_FILES}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <Paperclip />
-            </Button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              hidden
-              onChange={(e) => {
-                pickFiles(e.target.files)
-                e.target.value = "" // so the same file can be picked again
-              }}
-            />
-            <EmojiPickerButton
-              disabled={archived}
-              returnFocusRef={textareaRef}
-              onSelect={insertAtCursor}
-            />
-            {/* A GIF goes out at once as its own message; what's typed stays in the box. */}
-            <GifPickerButton
-              disabled={archived}
-              returnFocusRef={textareaRef}
-              onSelect={(url) => void onSend(url, [])}
-            />
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Mention someone"
-              disabled={archived}
-              onClick={() => insertAtCursor("@")}
-            >
-              <AtSign />
-            </Button>
-          </div>
+        {recorder.status !== "idle" ? (
+          <RecordingBar
+            status={recorder.status}
+            elapsedMs={recorder.elapsedMs}
+            onStop={recorder.stop}
+            onCancel={recorder.cancel}
+          />
+        ) : (
+          <div className="flex items-center justify-between px-2 pb-2 pt-1">
+            {/* Formatting / extras toolbar */}
+            <div className="flex items-center gap-0.5">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Attach file"
+                disabled={archived || uploads.length >= MAX_MESSAGE_FILES}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Paperclip />
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                hidden
+                onChange={(e) => {
+                  pickFiles(e.target.files)
+                  e.target.value = "" // so the same file can be picked again
+                }}
+              />
+              <EmojiPickerButton
+                disabled={archived}
+                returnFocusRef={textareaRef}
+                onSelect={insertAtCursor}
+              />
+              {/* A GIF goes out at once as its own message; what's typed stays in the box. */}
+              <GifPickerButton
+                disabled={archived}
+                returnFocusRef={textareaRef}
+                onSelect={(url) => void onSend(url, [])}
+              />
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Mention someone"
+                disabled={archived}
+                onClick={() => insertAtCursor("@")}
+              >
+                <AtSign />
+              </Button>
+              {canRecord && (
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Record a voice message"
+                  disabled={archived || uploads.length >= MAX_MESSAGE_FILES}
+                  onClick={() => void recorder.start()}
+                >
+                  <Mic />
+                </Button>
+              )}
+            </div>
 
-          {/* Send side */}
-          <div className="flex items-center gap-2">
-            {nearLimit && (
-              <span className="text-xs text-muted-foreground">
-                {charCount}/{MAX_LENGTH}
-              </span>
-            )}
-            {!nearLimit && (
-              <span className="hidden text-xs text-faint-foreground sm:block">
-                Enter to send
-              </span>
-            )}
-            <Button
-              size="icon-sm"
-              aria-label="Send message"
-              disabled={!canSend}
-              onClick={send}
-            >
-              <Send />
-            </Button>
+            {/* Send side */}
+            <div className="flex items-center gap-2">
+              {nearLimit && (
+                <span className="text-xs text-muted-foreground">
+                  {charCount}/{MAX_LENGTH}
+                </span>
+              )}
+              {!nearLimit && (
+                <span className="hidden text-xs text-faint-foreground sm:block">
+                  Enter to send
+                </span>
+              )}
+              <Button
+                size="icon-sm"
+                aria-label="Send message"
+                disabled={!canSend}
+                onClick={send}
+              >
+                <Send />
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   )
