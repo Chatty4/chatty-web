@@ -7,6 +7,7 @@ import { canPreview, FilePreviewDialog, formatFileSize, isAudioFile } from "@/fe
 import { useAttachmentUrls } from "../hooks/use-attachment-urls"
 import type { Attachment, LocalMessage } from "../types"
 import { isInlineImage, isInlineVideo } from "../utils/attachments"
+import { revealUnknownDuration } from "../utils/media"
 import { ImageGrid } from "./image-grid"
 import { ImageLightbox } from "./image-lightbox"
 
@@ -77,6 +78,7 @@ export function MessageAttachments({ message }: { message: LocalMessage }) {
               controls
               preload="metadata"
               aria-label={video.filename}
+              onLoadedMetadata={(e) => revealUnknownDuration(e.currentTarget)}
               onError={() => onMediaError(video.file_id)}
               className="max-h-80 w-full rounded-md bg-black"
             />
@@ -93,6 +95,7 @@ export function MessageAttachments({ message }: { message: LocalMessage }) {
               controls
               preload="metadata"
               aria-label={audio.filename}
+              onLoadedMetadata={(e) => revealUnknownDuration(e.currentTarget)}
               onError={() => onMediaError(audio.file_id)}
               className="w-full"
             />

@@ -48,6 +48,14 @@ files download. The
 account settings page uploads a profile photo and team settings a team icon; avatars show on messages, pins
 and member lists. Uploads and downloads need MinIO running, from `chatty-infra`.
 
+The 🎙 button records a voice message (`src/features/voice/`) with the browser's own `MediaRecorder`, no
+library: Opus in WebM on Chrome, Edge and Firefox, AAC in MP4 on Safari, at 32 kbps (about 4 KB a second).
+Done attaches it to the message like any other file, so text can go with it; Esc or the bin discards it.
+A recording stops by itself after 5 minutes and is kept, and one under half a second is dropped. The
+microphone is released as soon as a recording ends or the conversation closes. It needs a secure origin
+(`localhost`, `127.0.0.1` or https) and the user's permission. Browsers write such WebM files without a
+length, so the message's player looks it up when it loads (`src/features/messages/utils/media.ts`).
+
 DMs are ordered by their newest message, and the ✕ on a DM hides it until it gets a new message (D-04).
 Opening a conversation puts the cursor in the message box.
 
@@ -199,7 +207,7 @@ src/
     ui/                 generic components (Button, Input, FormField, ...; shadcn ones too)
     app/                the app shell: team rail, sidebar, header, user menu, ...
   features/<name>/      auth, channels, files, gifs, invites, messages, presence, profile, push, reads,
-                        teams, typing, unread, ws
+                        teams, typing, unread, voice, ws
     fetchers/           API calls
     hooks/              state and logic
     store/              messages, presence, reads, typing, unread: the pure state changes, tested without a

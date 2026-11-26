@@ -1,4 +1,4 @@
-import { AlertCircle, FileText, X } from "lucide-react"
+import { AlertCircle, FileText, Mic, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -23,6 +23,8 @@ export function UploadChip({ upload, onRemove }: { upload: FileUpload; onRemove:
         <video src={upload.preview} muted preload="metadata" className="size-9 shrink-0 rounded-sm bg-black object-cover" />
       ) : upload.preview ? (
         <img src={upload.preview} alt="" className="size-9 shrink-0 rounded-sm object-cover" />
+      ) : upload.file.type.startsWith("audio/") ? (
+        <Mic className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
       ) : (
         <FileText className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
       )}
