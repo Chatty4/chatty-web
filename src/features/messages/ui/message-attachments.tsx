@@ -101,11 +101,12 @@ export function MessageAttachments({ message }: { message: LocalMessage }) {
         </div>
       ))}
       {files.length > 0 && (
-        <ul aria-label="Files" className="flex flex-col items-start gap-1.5">
+        // max-w-full down to the card: in a narrow chat a card shrinks with the bubble, not past it.
+        <ul aria-label="Files" className="flex max-w-full flex-col items-start gap-1.5">
           {files.map((file) => {
             const ready = !!urlOf[file.file_id]
             return (
-              <li key={file.file_id}>
+              <li key={file.file_id} className="max-w-full">
                 <FileCard
                   attachment={file}
                   onOpen={ready && canPreview(file) ? () => setPreviewFile(file) : undefined}
@@ -169,7 +170,7 @@ type FileCardProps = {
 function FileCard({ attachment, onOpen, onDownload }: FileCardProps) {
   const action = onOpen ?? onDownload
   return (
-    <div className="flex w-56 items-center rounded-md border bg-surface text-sm">
+    <div className="flex w-56 max-w-full items-center rounded-md border bg-surface text-sm">
       <button
         type="button"
         disabled={!action}
