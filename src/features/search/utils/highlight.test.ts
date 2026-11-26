@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { parseHighlight, showMentions } from "./highlight"
+import { matchedWords, parseHighlight, showMentions } from "./highlight"
 
 describe("parseHighlight", () => {
   it("splits marked words from the text around them", () => {
@@ -30,6 +30,23 @@ describe("parseHighlight", () => {
       false,
       true,
     ])
+  })
+})
+
+describe("matchedWords", () => {
+  it("keeps only the marked words, without the labels or text around them", () => {
+    expect(matchedWords("chat icon jpg, white, <mark>red</mark>, blue, icon")).toEqual(["red"])
+  })
+
+  it("lists a word once, in the order it first appears", () => {
+    expect(matchedWords("<mark>Red</mark> car, <mark>blue</mark>, <mark>red</mark>")).toEqual([
+      "Red",
+      "blue",
+    ])
+  })
+
+  it("is empty without a search (the newest files have no highlight)", () => {
+    expect(matchedWords("")).toEqual([])
   })
 })
 

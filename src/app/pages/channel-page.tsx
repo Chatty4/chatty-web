@@ -9,10 +9,10 @@ import {
   type SidebarChannel,
 } from "@/features/channels"
 import { ChannelIntro, MessageList, PinsPanel } from "@/features/messages"
-import { SearchPanel } from "@/features/search"
+import { ChannelFiles, SearchPanel } from "@/features/search"
 import { useTeams } from "@/features/teams"
 
-const DETAILS_TABS: ChannelDetailsTab[] = ["about", "members", "notifications", "archive"]
+const DETAILS_TABS: ChannelDetailsTab[] = ["about", "members", "files", "notifications", "archive"]
 
 export function ChannelPage() {
   const { teamId = "", channelId = "" } = useParams()
@@ -81,6 +81,9 @@ export function ChannelPage() {
           channelId={channelId}
           teamId={teamId}
           initialTab={detailsTab}
+          files={
+            <ChannelFiles teamId={teamId} channelId={channelId} onClose={() => setDetails(null)} />
+          }
           onClose={() => setDetails(null)}
         />
       )}
