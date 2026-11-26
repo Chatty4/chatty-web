@@ -34,6 +34,7 @@
     --color-surface-subtle: var(--surface-subtle);
     --color-surface-hover: var(--surface-hover);
     --color-online: var(--online);
+    --color-read-receipt: var(--read-receipt);
     --color-overlay: var(--overlay);
     --color-shadow: var(--shadow);
     --radius-sm: calc(var(--radius) * 0.75);
@@ -88,6 +89,8 @@
     --input: var(--border-strong);
     --ring: var(--primary);
     --online: oklch(0.62 0.13 155);
+    /* The ticks of a message seen by everyone; brighter than primary so they stand out from grey. */
+    --read-receipt: oklch(0.6 0.16 235);
     --overlay: oklch(0.15 0.01 260 / 0.4);
     --shadow: oklch(0.2 0.02 260 / 0.1);
     --radius: 0.5rem;
@@ -111,6 +114,7 @@
     --border: oklch(0.31 0.016 260);
     --border-strong: oklch(0.4 0.02 260);
     --online: oklch(0.7 0.12 155);
+    --read-receipt: oklch(0.78 0.14 230);
     --overlay: oklch(0.05 0.01 260 / 0.7);
     --shadow: oklch(0.05 0.01 260 / 0.35);
 }

@@ -29,7 +29,8 @@ npm run dev
 ```
 
 Open http://localhost:5173. You can register, log in, create and join teams, use channels and DMs, and send,
-edit and delete messages, with reactions, pins, unread badges, presence dots and a typing indicator. A public
+edit and delete messages, with reactions, pins, unread badges, read receipts in private channels and DMs,
+presence dots and a typing indicator. A public
 channel you open without joining updates live too. Logging in needs chatty-core running, and messages need
 chatty-chat. `/status` calls each backend's `/health` through the proxy, to check that the wiring works.
 
@@ -74,7 +75,7 @@ npm run test:watch  # Vitest, on every change
 ```
 
 Tests sit next to the code as `*.test.ts`. They cover the logic without a browser: the message, unread,
-presence and typing stores, reconnect helpers, permissions, when to reload the sidebar or watch a channel,
+presence, typing and read-receipt stores, reconnect helpers, permissions, when to reload the sidebar or watch a channel,
 the file checks, which files have a preview, emoticons, the image grid layout, the DM order, which links count
 as GIFs, and other pure functions.
 
@@ -141,6 +142,12 @@ The app shell opens one WebSocket per tab (`src/features/ws/ws-provider.tsx`), w
   ended with `unwatch` when you leave it (`src/features/messages/hooks/use-watch-channel.ts`). The gateway
   ignores more than one `watch` per second per socket, so one sent sooner waits for its turn, and only the
   newest waiting one is sent (`src/lib/ws/watch-throttle.ts`).
+- Read receipts (D-19), in private channels and DMs only (`src/features/reads/`): my own sent messages show
+  ✓ when nobody else has seen them, a grey ✓✓ when some have, and a blue ✓✓ when everyone has; "Message
+  info" lists who has seen it and who hasn't. The positions come from `GET /channels/{channel_id}/reads`
+  when the channel opens, after every reconnect and after I change its members, and `read` messages keep
+  them live in between. A position only goes up, so a late answer or message never undoes a newer one.
+  Public channels have none, and no ticks show until the positions have loaded.
 - No message says you were added to a channel or sent a new DM. The sidebar reloads after every reconnect, and
   when an event or unread count arrives for a channel it doesn't list, at most once a minute per channel
   (`src/features/channels/utils/unknown-channels.ts`).
@@ -191,11 +198,12 @@ src/
   components/
     ui/                 generic components (Button, Input, FormField, ...; shadcn ones too)
     app/                the app shell: team rail, sidebar, header, user menu, ...
-  features/<name>/      auth, channels, files, gifs, invites, messages, presence, profile, push, teams,
-                        typing, unread, ws
+  features/<name>/      auth, channels, files, gifs, invites, messages, presence, profile, push, reads,
+                        teams, typing, unread, ws
     fetchers/           API calls
     hooks/              state and logic
-    store/              messages, presence, typing, unread: the pure state changes, tested without a browser
+    store/              messages, presence, reads, typing, unread: the pure state changes, tested without a
+                        browser
     ui/                 the feature's components
     utils/              pure helpers (validation, error messages, ...)
     types.ts            the feature's types (from the contracts)

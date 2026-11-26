@@ -80,6 +80,14 @@ export type UnreadMessage = {
   mentions: number
 }
 
+/** A member's read position moved, in a private channel or DM (events.md#ws-read). */
+export type ReadMessage = {
+  type: "read"
+  channel_id: string
+  user_id: string
+  last_read_seq: number
+}
+
 export type ChannelUpdatedMessage = {
   type: "channel.updated"
   channel_id: string
@@ -99,5 +107,6 @@ export type InboundWsMessage =
   | ServerTypingMessage
   | PresenceMessage
   | UnreadMessage
+  | ReadMessage
   | ChannelUpdatedMessage
   | ServerErrorMessage

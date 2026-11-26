@@ -1,6 +1,7 @@
 import { memo, useState } from "react"
 import {
   Copy,
+  Info,
   Pencil,
   Pin,
   PinOff,
@@ -13,6 +14,7 @@ import { UserAvatar } from "@/components/app/user-avatar"
 import { Button } from "@/components/ui/button"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { EmojiPickerButton } from "@/components/ui/emoji-picker"
+import { ReadTicks, type Receipt } from "@/features/reads"
 import { useConfirm } from "@/hooks/use-confirm"
 import { toast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
@@ -99,6 +101,10 @@ export type MessageItemProps = {
   onDiscard: (channelId: string, clientMsgId: string) => void
   /** Called when the server says the channel is archived, so the view can go read-only. */
   onChannelArchived: () => void
+  /** Who has seen my message (D-19): ticks on my own sent messages in private channels and DMs. */
+  receipt: Receipt | null
+  /** Opens the "Seen by / Not seen yet" list; offered with a receipt. */
+  onShowInfo: (messageId: string) => void
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -128,6 +134,8 @@ export const MessageItem = memo(function MessageItem({
   onRetry,
   onDiscard,
   onChannelArchived,
+  receipt,
+  onShowInfo,
 }: MessageItemProps) {
   const [editing, setEditing] = useState(false)
   // The picker's popover is outside this row, so hover can't keep the toolbar open.
@@ -316,6 +324,16 @@ export const MessageItem = memo(function MessageItem({
           <Copy />
         </Button>
       )}
+      {receipt && (
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Message info"
+          onClick={() => onShowInfo(message.id)}
+        >
+          <Info />
+        </Button>
+      )}
     </div>
   )
 
@@ -370,6 +388,7 @@ export const MessageItem = memo(function MessageItem({
               {quote}
               <MessageBody body={message.body} own names={names} />
               {isEdited && <span className="ml-1 text-xs text-muted-foreground">(edited)</span>}
+              {receipt && <ReadTicks receipt={receipt} className="ml-1" />}
               <MessageAttachments message={message} />
             </div>
             {toolbar}
