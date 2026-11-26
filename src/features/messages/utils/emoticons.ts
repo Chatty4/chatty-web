@@ -1,38 +1,23 @@
 // Text faces typed in a message, such as :) or <3, become the emoji they stand for.
 
-/** Each emoticon and its emoji. Letters are matched as written: :P and :p are both listed. */
-export const EMOTICONS: Readonly<Record<string, string>> = {
-  ":)": "🙂",
-  ":-)": "🙂",
-  ":(": "🙁",
-  ":-(": "🙁",
-  ":D": "😃",
-  ":-D": "😃",
-  "xD": "😆",
-  "XD": "😆",
-  ";)": "😉",
-  ";-)": "😉",
-  ":P": "😛",
-  ":-P": "😛",
-  ":p": "😛",
-  ":-p": "😛",
-  ":O": "😮",
-  ":-O": "😮",
-  ":o": "😮",
-  ":-o": "😮",
-  ":|": "😐",
-  ":-|": "😐",
-  ":/": "😕",
-  ":-/": "😕",
-  ":'(": "😢",
-  ":*": "😘",
-  ":-*": "😘",
-  ">:(": "😠",
-  "B-)": "😎",
-  "8-)": "😎",
-  "<3": "❤️",
-  "</3": "💔",
-}
+import { emoticon } from "emoticon"
+
+// Spellings that are also ordinary text: list markers such as 8) or x), and "8D" (as in 8D audio).
+const BLOCKED_EMOTICONS = new Set(["8)", "8]", "8D", "B)", "B]", "x)", "x]", "X)", "X]"])
+// Whole entries left out: "man" is :3 and x3 ("times three"), "no_mouth" is :- (a colon in text).
+const BLOCKED_NAMES = new Set(["man", "no_mouth"])
+
+/**
+ * Each emoticon and its emoji, from the `emoticon` package (wooorm/emoticon) without the blocked
+ * ones. Letters are matched as written: :P and :p are separate entries.
+ */
+export const EMOTICONS: Readonly<Record<string, string>> = Object.fromEntries(
+  emoticon
+    .filter((entry) => !BLOCKED_NAMES.has(entry.name))
+    .flatMap((entry) =>
+      entry.emoticons.filter((text) => !BLOCKED_EMOTICONS.has(text)).map((text) => [text, entry.emoji]),
+    ),
+)
 
 export type FoundEmoticon = { start: number; end: number; emoticon: string; emoji: string }
 
