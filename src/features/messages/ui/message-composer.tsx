@@ -9,6 +9,7 @@ import { toast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
 
 import { MAX_MESSAGE_FILES, MAX_MESSAGE_LENGTH as MAX_LENGTH } from "../constants"
+import { useEmoticons } from "../hooks/use-emoticons"
 import type { Attachment, ReplyPreview } from "../types"
 import {
   encodeMentions,
@@ -64,6 +65,7 @@ export function MessageComposer({
   // Who was chosen from the list: the text alone can't tell two people with one name apart.
   const [picks, setPicks] = useState<MentionCandidate[]>([])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const emoticons = useEmoticons(textareaRef)
 
   // Opening a conversation puts the cursor here, after any saved draft, so typing just works.
   // The composer is keyed by channel, so this runs once per conversation.
@@ -117,10 +119,12 @@ export function MessageComposer({
 
   const send = () => {
     if (!canSend) return
+    // An emoticon right before Enter has no space after it to swap it while typing.
+    const body = encodeMentions(emoticons.finish(value).trim(), members, picks)
     setValue("")
     setPicks([])
     clearUploads()
-    void onSend(encoded, attachments)
+    void onSend(body, attachments)
     requestAnimationFrame(() => textareaRef.current?.focus())
   }
 
@@ -186,6 +190,15 @@ export function MessageComposer({
       if (e.key === "Escape") {
         e.preventDefault()
         setDismissedAt(mention?.start ?? null)
+        return
+      }
+    }
+    if (e.key === "Backspace" && e.currentTarget.selectionStart === e.currentTarget.selectionEnd) {
+      const restored = emoticons.undo(value, e.currentTarget.selectionStart)
+      if (restored) {
+        e.preventDefault()
+        setValue(restored.value)
+        setCaret(restored.caret)
         return
       }
     }
@@ -290,11 +303,12 @@ export function MessageComposer({
           aria-label="Write a message"
           placeholder={archived ? "This channel has been archived." : "Write a message…"}
           onChange={(e) => {
-            setValue(e.target.value)
-            setCaret(e.target.selectionStart)
+            const typed = emoticons.onType(value, e.target.value, e.target.selectionStart)
+            setValue(typed.value)
+            setCaret(typed.caret)
             setActiveIndex(0)
             // Typing a new @, or removing this one, brings suggestions back.
-            if (findMentionQuery(e.target.value, e.target.selectionStart)?.start !== dismissedAt) {
+            if (findMentionQuery(typed.value, typed.caret)?.start !== dismissedAt) {
               setDismissedAt(null)
             }
           }}

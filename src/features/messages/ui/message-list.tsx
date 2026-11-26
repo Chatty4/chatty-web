@@ -16,6 +16,7 @@ import { useMessages } from "../context"
 import { useChannelMembers } from "../hooks/use-channel-members"
 import { namesOf, useMemberPreviews } from "../hooks/use-member-names"
 import { useScrollAnchor } from "../hooks/use-scroll-anchor"
+import { useStayAtBottom } from "../hooks/use-stay-at-bottom"
 import { useWatchChannel } from "../hooks/use-watch-channel"
 import { useWhenVisible } from "../hooks/use-when-visible"
 import { HistoryBottom } from "./history-bottom"
@@ -205,6 +206,7 @@ export function MessageList({
   useEffect(() => {
     atBottomRef.current = atBottom
   }, [atBottom])
+  useStayAtBottom(listRef, atBottomRef)
   const keepTypingInView = useCallback(() => {
     const el = listRef.current
     if (el && atBottomRef.current) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })

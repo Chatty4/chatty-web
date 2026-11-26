@@ -33,6 +33,11 @@ edit and delete messages, with reactions, pins, unread badges, presence dots and
 channel you open without joining updates live too. Logging in needs chatty-core running, and messages need
 chatty-chat. `/status` calls each backend's `/health` through the proxy, to check that the wiring works.
 
+Emoticons typed in a message, such as `:)`, `:D` or `<3`, become emoji when a space, a new line or sending
+finishes them. The list comes from the `emoticon` package, minus spellings that are also ordinary text,
+such as the list markers `8)` and `x)` (`src/features/messages/utils/emoticons.ts`). Backspace right after
+brings the text back, and code in backticks is left alone.
+
 Messages can carry up to 10 files (📎, Ctrl+V or drag and drop): they upload while you write, straight to
 MinIO (`src/features/files/`), and show as an image grid with a full-screen preview, or as file cards. A file
 card opens a preview of PDFs (react-pdf), Word documents (docx-preview), CSV/TSV tables (papaparse), Markdown,
@@ -70,8 +75,8 @@ npm run test:watch  # Vitest, on every change
 
 Tests sit next to the code as `*.test.ts`. They cover the logic without a browser: the message, unread,
 presence and typing stores, reconnect helpers, permissions, when to reload the sidebar or watch a channel,
-the file checks, which files have a preview, the image grid layout, the DM order, which links count as GIFs,
-and other pure functions.
+the file checks, which files have a preview, emoticons, the image grid layout, the DM order, which links count
+as GIFs, and other pure functions.
 
 CI (`.github/workflows/ci.yml`) runs `npm ci`, `lint`, `typecheck`, `test` and `build` on Node 24, on every pull
 request and on pushes to `dev` and `main`.
