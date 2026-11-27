@@ -69,6 +69,12 @@ microphone is released as soon as a recording ends or the conversation closes. I
 (`localhost`, `127.0.0.1` or https) and the user's permission. Browsers write such WebM files without a
 length, so the message's player looks it up when it loads (`src/features/messages/utils/media.ts`).
 
+Forward (the ↪ on a message) sends a copy of any message you can see, also from a public channel you only
+view, to up to 5 channels or DMs of the same team (D-20, `src/features/forward/`). An optional comment goes
+first, as a normal message, in each one. Every message keeps its own `client_msg_id`, so Retry on a failed
+destination sends only what it still misses and never twice. A forwarded message shows only "Forwarded":
+never who wrote it, where or when.
+
 DMs are ordered by their newest message, and the ✕ on a DM hides it until it gets a new message (D-04).
 Opening a conversation puts the cursor in the message box.
 
