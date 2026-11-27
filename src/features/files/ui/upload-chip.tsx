@@ -33,9 +33,11 @@ export function UploadChip({ upload, onRemove }: { upload: FileUpload; onRemove:
         <p className={cn("truncate text-xs", failed ? "text-destructive" : "text-muted-foreground")}>
           {failed
             ? upload.error
-            : upload.status === "uploading"
-              ? `Uploading… ${Math.round(upload.progress * 100)}%`
-              : formatFileSize(upload.file.size)}
+            : upload.status === "compressing"
+              ? "Compressing…"
+              : upload.status === "uploading"
+                ? `Uploading… ${Math.round(upload.progress * 100)}%`
+                : formatFileSize(upload.file.size)}
         </p>
       </div>
       <Button variant="ghost" size="icon-sm" aria-label={`Remove ${upload.file.name}`} onClick={onRemove}>
