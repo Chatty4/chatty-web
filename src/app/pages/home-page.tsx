@@ -5,7 +5,7 @@ import { Link, Navigate } from "react-router"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { useAuth } from "@/features/auth"
 import { JoinInviteForm } from "@/features/invites/ui/join-invite-form"
-import { pickHomeTeam, readLastTeam, useTeams } from "@/features/teams"
+import { pickHomeTeam, readLastTeam, useIsHome, useTeams } from "@/features/teams"
 
 function StartCard({
   icon,
@@ -30,13 +30,17 @@ function StartCard({
   )
 }
 
-/** Root route: opens the last used team, so only someone with no teams stays here. */
+/**
+ * Root route: opens the last used team, so only someone with no teams stays here. The logo
+ * links to `/?home`, which stays here for everyone.
+ */
 export function HomePage() {
   const { user } = useAuth()
   const { teams, loading, failed, reload } = useTeams()
+  const isHome = useIsHome()
   const homeTeam = pickHomeTeam(teams, readLastTeam())
 
-  if (homeTeam) return <Navigate to={`/teams/${homeTeam.id}`} replace />
+  if (homeTeam && !isHome) return <Navigate to={`/teams/${homeTeam.id}`} replace />
   if (loading) return null
 
   if (failed) {
