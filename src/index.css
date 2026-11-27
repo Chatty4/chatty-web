@@ -42,6 +42,33 @@
     --radius-lg: var(--radius);
     --radius-xl: calc(var(--radius) * 1.5);
     --animate-typing-dot: typing-dot 1.2s ease-in-out infinite;
+    /* The Home sidebar's sample conversation: one 14s loop, staggered by animation-delay. */
+    --animate-demo-message: demo-message 14s ease-out infinite both;
+    --animate-demo-typing: demo-typing 14s ease-out infinite both;
+
+    @keyframes demo-message {
+        0% {
+            opacity: 0;
+            transform: translateY(6px);
+        }
+        3%, 55% {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        60%, 100% {
+            opacity: 0;
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes demo-typing {
+        0%, 9%, 100% {
+            opacity: 0;
+        }
+        2%, 8% {
+            opacity: 1;
+        }
+    }
 
     @keyframes typing-dot {
         0%, 60%, 100% {

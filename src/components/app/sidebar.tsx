@@ -12,6 +12,7 @@ import { UnreadBadge, useUnread } from "@/features/unread"
 import { toast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
 
+import { HomeChatDemo } from "./home-chat-demo"
 import { UserAvatar } from "./user-avatar"
 import { UserMenu } from "./user-menu"
 
@@ -101,7 +102,8 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         )}
       >
         {/* Header — team selector */}
-        <div className="flex h-16 shrink-0 items-center px-3">
+        {/* On desktop Home the page header already says "Home", so this row goes. */}
+        <div className={cn("flex h-16 shrink-0 items-center px-3", isHome && "md:hidden")}>
           <Menu.Root>
             <Menu.Trigger
               className={cn(
@@ -153,11 +155,6 @@ export function Sidebar({ open, onClose }: SidebarProps) {
               </Menu.Positioner>
             </Menu.Portal>
           </Menu.Root>
-          {isHome && (
-            <h2 className="hidden min-w-0 flex-1 truncate px-2 py-[9px] text-sm font-semibold text-foreground md:block">
-              Home
-            </h2>
-          )}
           <Button
             variant="ghost"
             size="icon"
@@ -171,9 +168,10 @@ export function Sidebar({ open, onClose }: SidebarProps) {
 
         {/* Everything below belongs to a team, so its links only exist with one. */}
         {!teamId ? (
-          <div className="flex-1 px-5 pt-2">
+          <div className="flex-1">
+            {isHome && <HomeChatDemo />}
             {!teamsLoading && !teamsFailed && (
-              <p className="text-[13px] text-faint-foreground">
+              <p className={cn("px-5 pt-2 text-[13px] text-faint-foreground", isHome && "md:hidden")}>
                 {teams.length > 0
                   ? "Pick a team to see its channels and direct messages."
                   : "Channels and direct messages show up here once you're in a team."}
