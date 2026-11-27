@@ -2,12 +2,17 @@ import { useRef, useState } from "react"
 import { Download, FileText } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { canPreview, FilePreviewDialog, formatFileSize, isAudioFile } from "@/features/files"
+import {
+  canPreview,
+  FilePreviewDialog,
+  formatFileSize,
+  isAudioFile,
+  revealUnknownDuration,
+} from "@/features/files"
 
 import { useAttachmentUrls } from "../hooks/use-attachment-urls"
 import type { Attachment, LocalMessage } from "../types"
 import { isInlineImage, isInlineVideo } from "../utils/attachments"
-import { revealUnknownDuration } from "../utils/media"
 import { ImageGrid } from "./image-grid"
 import { ImageLightbox } from "./image-lightbox"
 

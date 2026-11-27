@@ -1,6 +1,23 @@
 import { describe, expect, it } from "vitest"
 
-import { revealUnknownDuration } from "./media"
+import { mediaKind, revealUnknownDuration } from "./media"
+
+describe("mediaKind", () => {
+  it("knows the videos every browser plays", () => {
+    expect(mediaKind({ mime: "video/mp4", filename: "demo.mp4" })).toBe("video")
+    expect(mediaKind({ mime: "video/webm;codecs=vp9", filename: "clip.webm" })).toBe("video")
+  })
+
+  it("knows sound by type or by name", () => {
+    expect(mediaKind({ mime: "audio/webm", filename: "voice-message.webm" })).toBe("audio")
+    expect(mediaKind({ mime: "application/octet-stream", filename: "song.mp3" })).toBe("audio")
+  })
+
+  it("leaves other files, and videos browsers can't play, to the other previews", () => {
+    expect(mediaKind({ mime: "application/pdf", filename: "report.pdf" })).toBeNull()
+    expect(mediaKind({ mime: "video/quicktime", filename: "clip.mov" })).toBeNull()
+  })
+})
 
 /** Just enough of an <audio> element: a duration, a position and durationchange listeners. */
 function fakeMedia(duration: number) {
