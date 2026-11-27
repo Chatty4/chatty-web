@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { describeChannelError, dmDisplayName, useChannels } from "@/features/channels"
 import { useAuth } from "@/features/auth"
 import { usePresence } from "@/features/presence"
-import { TeamIcon, useActiveTeamId, useTeams } from "@/features/teams"
+import { TeamIcon, useActiveTeamId, useIsHome, useTeams } from "@/features/teams"
 import { UnreadBadge, useUnread } from "@/features/unread"
 import { toast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
@@ -45,6 +45,7 @@ type SidebarProps = {
 /** The workspace column: team name header, search, channels, DMs, and user menu. */
 export function Sidebar({ open, onClose }: SidebarProps) {
   const teamId = useActiveTeamId()
+  const isHome = useIsHome()
   const activeChannelId = useActiveChannelId()
   const { channels, dms, hiddenDms, memberNames, memberAvatars, failed, reload, hideDm, showDm } = useChannels()
   const { user } = useAuth()
@@ -102,7 +103,13 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         {/* Header — team selector */}
         <div className="flex h-16 shrink-0 items-center px-3">
           <Menu.Root>
-            <Menu.Trigger className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-sm px-2 py-[9px] text-sm font-semibold text-foreground outline-none transition-colors hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring data-[popup-open]:bg-surface-hover">
+            <Menu.Trigger
+              className={cn(
+                "flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-sm px-2 py-[9px] text-sm font-semibold text-foreground outline-none transition-colors hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring data-[popup-open]:bg-surface-hover",
+                // On desktop Home the menu would only repeat the rail's create button.
+                isHome && "md:hidden",
+              )}
+            >
               {activeTeam && (
                 <TeamIcon
                   name={activeTeam.name}
@@ -110,16 +117,17 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                   className="size-7 rounded-sm bg-primary text-[12px] font-semibold text-primary-foreground"
                 />
               )}
-              <span className="truncate">{activeTeam?.name ?? "No team"}</span>
+              <span className="truncate">{isHome ? "Home" : (activeTeam?.name ?? "No team")}</span>
               <ChevronDown className="ml-auto size-[15px] shrink-0 text-muted-foreground" aria-hidden="true" />
             </Menu.Trigger>
             <Menu.Portal>
               <Menu.Positioner side="bottom" align="start" sideOffset={6} className="z-50 outline-none">
                 <Menu.Popup className="w-[220px] rounded-md border bg-popover p-1 shadow-[0_8px_24px_var(--shadow)] outline-none">
+                  {/* Switching teams is the rail's job; it's hidden on small screens, so only they list teams here. */}
                   {teams.map((team) => (
                     <Menu.Item
                       key={team.id}
-                      className={cn(menuItemClass, team.id === teamId && "font-medium text-primary")}
+                      className={cn(menuItemClass, "md:hidden", team.id === teamId && "font-medium text-primary")}
                       onClick={() => go(`/teams/${team.id}`)}
                     >
                       <TeamIcon
@@ -130,7 +138,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                       <span className="truncate">{team.name}</span>
                     </Menu.Item>
                   ))}
-                  <Menu.Separator className="my-1 h-px bg-border" />
+                  {teams.length > 0 && <Menu.Separator className="my-1 h-px bg-border md:hidden" />}
                   <Menu.Item className={menuItemClass} onClick={() => go("/teams/new")}>
                     <Plus className="text-muted-foreground" />
                     Create team
@@ -145,6 +153,11 @@ export function Sidebar({ open, onClose }: SidebarProps) {
               </Menu.Positioner>
             </Menu.Portal>
           </Menu.Root>
+          {isHome && (
+            <h2 className="hidden min-w-0 flex-1 truncate px-2 py-[9px] text-sm font-semibold text-foreground md:block">
+              Home
+            </h2>
+          )}
           <Button
             variant="ghost"
             size="icon"
@@ -161,7 +174,9 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           <div className="flex-1 px-5 pt-2">
             {!teamsLoading && !teamsFailed && (
               <p className="text-[13px] text-faint-foreground">
-                Channels and direct messages show up here once you're in a team.
+                {teams.length > 0
+                  ? "Pick a team to see its channels and direct messages."
+                  : "Channels and direct messages show up here once you're in a team."}
               </p>
             )}
           </div>
