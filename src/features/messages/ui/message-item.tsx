@@ -279,8 +279,10 @@ export const MessageItem = memo(function MessageItem({
         own ? "right-full mr-1.5" : "left-full ml-1.5",
         // A bubble with files is tall: sit level with its first row, not its middle.
         hasFiles ? "top-0.5 translate-y-0" : "top-1/2",
-        // A wide bubble leaves no room beside it on a phone, so sit on its top edge there.
-        "max-sm:inset-auto max-sm:top-0 max-sm:right-0 max-sm:mx-0",
+        // A wide bubble leaves no room beside it on a phone, so sit on its top edge there,
+        // growing towards the middle of the screen so a short bubble doesn't push it off.
+        "max-sm:inset-auto max-sm:top-0 max-sm:mx-0",
+        own ? "max-sm:right-0" : "max-sm:left-0",
       )}
     >
       {canReact && (
