@@ -14,8 +14,8 @@ export function useActiveTeamId(): string {
   const { teams } = useTeams()
 
   useEffect(() => {
-    if (teamId) rememberLastTeam(teamId)
-  }, [teamId])
+    if (teamId && teams.some((team) => team.id === teamId)) rememberLastTeam(teamId)
+  }, [teamId, teams])
 
   return teamId ?? pickHomeTeam(teams, readLastTeam())?.id ?? ""
 }

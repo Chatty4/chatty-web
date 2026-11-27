@@ -4,6 +4,7 @@ import { AppLayout, type RouteHandle } from "@/app/layouts/app-layout"
 import { AuthLayout } from "@/app/layouts/auth-layout"
 import { GuestOnly } from "@/app/layouts/guest-only"
 import { RequireAuth } from "@/app/layouts/require-auth"
+import { RequireTeam } from "@/app/layouts/require-team"
 import { LoginPage, RegisterPage } from "@/app/pages/auth-pages"
 import {
   BrowseChannelsPage,
@@ -54,6 +55,7 @@ export const router = createBrowserRouter([
           },
           {
             path: "teams/:teamId",
+            Component: RequireTeam,
             children: [
               { index: true, Component: TeamHomePage },
               {
