@@ -1,4 +1,5 @@
-// Uploads that run while the user writes: one entry per picked file, with its progress.
+// Uploads that run while the user writes: one entry per picked file, with its progress. Photos
+// are compressed first (utils/compress.ts); what is sent, and shown, is the compressed file.
 
 import { useCallback, useEffect, useRef, useState } from "react"
 
@@ -6,15 +7,18 @@ import { uuid } from "@/lib/uuid"
 
 import { uploadFile } from "../fetchers/file-fetchers"
 import type { FilePurpose, UploadedFile } from "../types"
+import { shouldCompress } from "../utils/compress"
+import { compressImage } from "../utils/compress-image"
 import { describeUploadError } from "../utils/errors"
 import { checkFile, IMAGE_MIMES, VIDEO_MIMES } from "../utils/limits"
 
 export type FileUpload = {
   key: string
+  /** What is sent: the compressed photo once compressing is done, else the picked file. */
   file: File
   /** 0..1 */
   progress: number
-  status: "uploading" | "ready" | "failed"
+  status: "compressing" | "uploading" | "ready" | "failed"
   error?: string
   /** Set once the file is ready. */
   uploaded?: UploadedFile
@@ -48,41 +52,48 @@ export function useFileUploads(purpose: FilePurpose, teamId: string | null) {
     setUploads((list) => list.map((u) => (u.key === key ? { ...u, ...change } : u)))
 
   const start = useCallback(
-    (file: File) => {
+    async (picked: File) => {
       const key = uuid()
-      const preview = [...IMAGE_MIMES, ...VIDEO_MIMES].includes(file.type) ? URL.createObjectURL(file) : undefined
+      const preview = [...IMAGE_MIMES, ...VIDEO_MIMES].includes(picked.type) ? URL.createObjectURL(picked) : undefined
       if (preview) previews.current.set(key, preview)
 
-      const refused = checkFile(file, purpose)
-      if (refused) {
-        setUploads((list) => [
-          ...list,
-          { key, file, preview, progress: 0, status: "failed", error: refused },
-        ])
-        return
-      }
-
+      // Removing the chip aborts this, while compressing or uploading.
       const controller = new AbortController()
       controllers.current.set(key, controller)
-      setUploads((list) => [...list, { key, file, preview, progress: 0, status: "uploading" }])
+      const compressing = shouldCompress(picked)
+      setUploads((list) => [
+        ...list,
+        { key, file: picked, preview, progress: 0, status: compressing ? "compressing" : "uploading" },
+      ])
 
-      uploadFile(file, purpose, {
-        teamId,
-        signal: controller.signal,
-        onProgress: (progress) => update(key, { progress }),
-      })
-        .then((uploaded) => update(key, { status: "ready", progress: 1, uploaded }))
-        .catch((error: unknown) => {
-          if (controller.signal.aborted) return
-          update(key, { status: "failed", error: describeUploadError(error) })
+      try {
+        // Before the checks: a large photo that shrinks under the limit is fine.
+        const file = compressing ? await compressImage(picked, purpose) : picked
+        if (controller.signal.aborted) return
+
+        const refused = checkFile(file, purpose)
+        if (refused) return update(key, { file, status: "failed", error: refused })
+        update(key, { file, status: "uploading" })
+
+        const uploaded = await uploadFile(file, purpose, {
+          teamId,
+          signal: controller.signal,
+          onProgress: (progress) => update(key, { progress }),
         })
-        .finally(() => controllers.current.delete(key))
+        update(key, { status: "ready", progress: 1, uploaded })
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          update(key, { status: "failed", error: describeUploadError(error) })
+        }
+      } finally {
+        controllers.current.delete(key)
+      }
     },
     [purpose, teamId],
   )
 
   const add = useCallback((files: Iterable<File>) => {
-    for (const file of files) start(file)
+    for (const file of files) void start(file)
   }, [start])
 
   // shortcut: a removed file that was already uploaded is left to chatty-core's cleanup job

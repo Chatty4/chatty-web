@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { toast } from "@/lib/toast"
 
 import { uploadFile } from "../fetchers/file-fetchers"
+import { compressImage } from "../utils/compress-image"
 import { describeUploadError } from "../utils/errors"
 import { checkFile, IMAGE_MIMES } from "../utils/limits"
 
@@ -33,12 +34,18 @@ export function ImageUploadRow({
   savedMessage,
 }: ImageUploadRowProps) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const [compressing, setCompressing] = useState(false)
   // 0..1 while uploading, null otherwise.
   const [progress, setProgress] = useState<number | null>(null)
   const [removing, setRemoving] = useState(false)
-  const busy = progress !== null || removing
+  const busy = compressing || progress !== null || removing
 
-  const upload = async (file: File) => {
+  const upload = async (picked: File) => {
+    // Shrunk to 512 px first, so a large phone photo fits under the 2 MB limit.
+    setCompressing(true)
+    const file = await compressImage(picked, purpose)
+    setCompressing(false)
+
     const refused = checkFile(file, purpose)
     if (refused) return toast.error(refused)
     setProgress(0)
@@ -70,9 +77,11 @@ export function ImageUploadRow({
       <div className="flex min-w-0 flex-1 flex-col">
         <strong className="text-sm font-medium">{title}</strong>
         <span className="text-[12px] text-muted-foreground">
-          {progress !== null
-            ? `Uploading… ${Math.round(progress * 100)}%`
-            : "PNG, JPEG, WebP or GIF, up to 2 MB."}
+          {compressing
+            ? "Compressing…"
+            : progress !== null
+              ? `Uploading… ${Math.round(progress * 100)}%`
+              : "PNG, JPEG, WebP or GIF, up to 2 MB."}
         </span>
       </div>
       {fileId && (

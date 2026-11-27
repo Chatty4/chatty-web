@@ -50,6 +50,17 @@ PowerPoint files download. The
 account settings page uploads a profile photo and team settings a team icon; avatars show on messages, pins
 and member lists. Uploads and downloads need MinIO running, from `chatty-infra`.
 
+Photos are compressed in the browser before they upload (`src/features/files/utils/compress.ts`), the usual
+way: resized so the long side is at most 2560 px for attachments and 512 px for avatars and team icons (never
+upscaled), re-encoded as WebP at quality 0.82, and stripped of their metadata (location, camera, date) by
+drawing only the pixels, after applying the EXIF orientation. It runs in a Web Worker
+(`src/features/files/workers/compress.worker.ts`), so the composer stays responsive; the chip shows
+"Compressing…" and then the size actually sent. Only JPEG, PNG and WebP of 300 KB or more are compressed:
+GIFs (the animation would be lost), SVGs, other types and small files go as they are, and so does the
+original whenever the new file isn't smaller. A browser that can't write WebP (Safari may hand back a PNG)
+gets JPEG instead, with transparency turned white. Where workers or `OffscreenCanvas` are missing, or
+anything fails or takes over 20 s, the original is sent. chatty-core still checks every file.
+
 The 🎙 button records a voice message (`src/features/voice/`) with the browser's own `MediaRecorder`, no
 library: Opus in WebM on Chrome, Edge and Firefox, AAC in MP4 on Safari, at 32 kbps (about 4 KB a second).
 Done attaches it to the message like any other file, so text can go with it; Esc or the bin discards it.
