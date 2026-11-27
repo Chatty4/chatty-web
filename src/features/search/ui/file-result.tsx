@@ -1,8 +1,8 @@
 import { useRef, useState, type ReactNode } from "react"
-import { Download, FileText, MessageSquare } from "lucide-react"
+import { Download, MessageSquare } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { canPreview, FilePreviewDialog, formatFileSize } from "@/features/files"
+import { canPreview, FileIcon, FilePreviewDialog, formatFileSize } from "@/features/files"
 import { useAttachmentUrls } from "@/features/messages/hooks/use-attachment-urls"
 import { useWhenVisible } from "@/features/messages/hooks/use-when-visible"
 import { ImageLightbox } from "@/features/messages/ui/image-lightbox"
@@ -26,7 +26,8 @@ export type FileResultProps = {
 
 /**
  * One file in a list: a thumbnail for images (loaded when the row comes into view), else an icon.
- * A click opens it as in the chat: images full screen, PDF/Word/text… in the preview, others download.
+ * A click opens it: images full screen; sound, video, PDF, Word, text… in the preview; the rest
+ * download.
  */
 export function FileResult({ result, header, onGoToMessage }: FileResultProps) {
   const { attachment, message, highlight } = result
@@ -88,7 +89,7 @@ export function FileResult({ result, header, onGoToMessage }: FileResultProps) {
           />
         ) : (
           <span className="flex size-12 shrink-0 items-center justify-center rounded-sm bg-muted">
-            {!image && <FileText className="size-5 text-muted-foreground" aria-hidden="true" />}
+            {!image && <FileIcon file={attachment} className="size-5 text-muted-foreground" />}
           </span>
         )}
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
