@@ -42,9 +42,11 @@ brings the text back, and code in backticks is left alone.
 Messages can carry up to 10 files (📎, Ctrl+V or drag and drop): they upload while you write, straight to
 MinIO (`src/features/files/`), and show as an image grid with a full-screen preview, or as file cards. A file
 card opens a preview of PDFs (react-pdf), Word documents (docx-preview), CSV/TSV tables (papaparse), Markdown,
-text, SVG and audio: the page fetches the file from its presigned URL and draws it itself, so the bucket stays
-private. Each viewer loads only when first opened (`src/features/files/ui/viewers/`). Excel and PowerPoint
-files download. The
+text and SVG: the page fetches the file from its presigned URL and draws it itself, so the bucket stays
+private. Each viewer loads only when first opened (`src/features/files/ui/viewers/`). Sound and video play
+inline in messages; opened from a channel's Files tab or a file search, they play in the same preview window,
+streamed from the URL rather than downloaded first (`src/features/files/ui/media-preview.tsx`). Excel and
+PowerPoint files download. The
 account settings page uploads a profile photo and team settings a team icon; avatars show on messages, pins
 and member lists. Uploads and downloads need MinIO running, from `chatty-infra`.
 
