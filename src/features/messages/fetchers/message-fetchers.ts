@@ -43,6 +43,21 @@ export function sendMessageApi(
   })
 }
 
+/**
+ * POST /channels/{id}/messages with forward_of: a copy of the message, marked forwarded (D-20).
+ * Like a send, a retry with the same clientMsgId returns the forward it already made.
+ */
+export function forwardMessageApi(
+  channelId: string,
+  messageId: string,
+  clientMsgId: string,
+): Promise<SendMessageResponse> {
+  return chatApi.post<SendMessageResponse>(`/channels/${channelId}/messages`, {
+    client_msg_id: clientMsgId,
+    forward_of: messageId,
+  })
+}
+
 /** GET /messages/{id}/attachments — download URLs for the message's files (D-02). */
 export function getAttachmentUrlsApi(messageId: string): Promise<GetAttachmentUrlsResponse> {
   return chatApi.get<GetAttachmentUrlsResponse>(`/messages/${messageId}/attachments`)

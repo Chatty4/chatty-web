@@ -59,6 +59,8 @@ export type ApiMessage = {
   mentions: string[]
   reactions: Reaction[]
   pinned: boolean
+  /** Forwarded from another message (D-20). Never says from where. */
+  forwarded: boolean
   edited_at: string | null
   deleted_at: string | null
   created_at: string

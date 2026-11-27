@@ -242,6 +242,7 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
         mentions: [],
         reactions: [],
         pinned: false,
+        forwarded: false,
         edited_at: null,
         deleted_at: null,
         created_at: new Date().toISOString(),

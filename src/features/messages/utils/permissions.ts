@@ -38,6 +38,14 @@ export function canReply(message: LocalMessage, channel: ChannelAccess | null): 
   return !!channel && !channel.archived && isActionable(message)
 }
 
+/**
+ * Anyone who can see a sent message can forward it (D-20), also from a public channel they only
+ * view or an archived one: the forward is written in the destination, not here.
+ */
+export function canForward(message: LocalMessage): boolean {
+  return isActionable(message)
+}
+
 /** Anyone who can write can pin any message, and unpin any pin (D-05). */
 export function canPin(message: LocalMessage, channel: ChannelAccess | null): boolean {
   return !!channel && !channel.archived && isActionable(message)
