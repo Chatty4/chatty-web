@@ -2,7 +2,7 @@ import { MessageCircle, Plus } from "lucide-react"
 import { Link } from "react-router"
 
 import { cn } from "@/lib/utils"
-import { TeamIcon, useActiveTeamId, useTeams } from "@/features/teams"
+import { TeamIcon, useActiveTeamId, useIsHome, useTeams } from "@/features/teams"
 
 const tileBase =
   "grid size-[34px] shrink-0 place-items-center rounded-md text-[12px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -11,6 +11,7 @@ const tileBase =
 export function TeamRail() {
   const { teams } = useTeams()
   const activeTeamId = useActiveTeamId()
+  const isHome = useIsHome()
 
   return (
     <aside
@@ -19,9 +20,15 @@ export function TeamRail() {
     >
       {/* Brand mark */}
       <Link
-        to="/"
+        to="/?home"
         aria-label="Chatty home"
-        className={cn(tileBase, "bg-accent text-primary hover:text-primary focus-visible:text-primary")}
+        aria-current={isHome ? "page" : undefined}
+        className={cn(
+          tileBase,
+          isHome
+            ? "bg-primary text-primary-foreground hover:bg-primary-hover"
+            : "bg-accent text-primary hover:text-primary focus-visible:text-primary",
+        )}
       >
         <MessageCircle className="size-5" strokeWidth={2.2} />
       </Link>
