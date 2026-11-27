@@ -30,6 +30,7 @@ import {
   extractMentionIds,
   type MentionCandidate,
 } from "../utils/mentions"
+import { ForwardedMark } from "./forwarded-mark"
 import { MessageEditor } from "./message-editor"
 import { MessageAttachments } from "./message-attachments"
 import { MessageBody } from "./message-body"
@@ -385,6 +386,7 @@ export const MessageItem = memo(function MessageItem({
                 message.status === "failed" && "ring-1 ring-destructive/50",
               )}
             >
+              {message.forwarded && <ForwardedMark />}
               {quote}
               <MessageBody body={message.body} own names={names} />
               {isEdited && <span className="ml-1 text-xs text-muted-foreground">(edited)</span>}
@@ -464,6 +466,7 @@ export const MessageItem = memo(function MessageItem({
                 !grouped && "rounded-tl-sm",
               )}
             >
+              {message.forwarded && <ForwardedMark />}
               {quote}
               {/* `own` styles mention chips for a light-blue bubble. */}
               <MessageBody body={message.body} own={forMe} names={names} />
