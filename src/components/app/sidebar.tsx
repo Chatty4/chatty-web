@@ -12,7 +12,6 @@ import { UnreadBadge, useUnread } from "@/features/unread"
 import { toast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
 
-import { HomeChatDemo } from "./home-chat-demo"
 import { UserAvatar } from "./user-avatar"
 import { UserMenu } from "./user-menu"
 
@@ -99,19 +98,13 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         className={cn(
           "fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col border-r bg-background transition-transform md:static md:z-auto md:translate-x-0",
           open ? "translate-x-0 shadow-[0_12px_30px_var(--shadow)]" : "-translate-x-full",
+          isHome && "md:hidden", // desktop Home: the welcome page needs no sidebar
         )}
       >
         {/* Header — team selector */}
-        {/* On desktop Home the page header already says "Home", so this row goes. */}
-        <div className={cn("flex h-16 shrink-0 items-center px-3", isHome && "md:hidden")}>
+        <div className="flex h-16 shrink-0 items-center px-3">
           <Menu.Root>
-            <Menu.Trigger
-              className={cn(
-                "flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-sm px-2 py-[9px] text-sm font-semibold text-foreground outline-none transition-colors hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring data-[popup-open]:bg-surface-hover",
-                // On desktop Home the menu would only repeat the rail's create button.
-                isHome && "md:hidden",
-              )}
-            >
+            <Menu.Trigger className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-sm px-2 py-[9px] text-sm font-semibold text-foreground outline-none transition-colors hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring data-[popup-open]:bg-surface-hover">
               {activeTeam && (
                 <TeamIcon
                   name={activeTeam.name}
@@ -168,10 +161,9 @@ export function Sidebar({ open, onClose }: SidebarProps) {
 
         {/* Everything below belongs to a team, so its links only exist with one. */}
         {!teamId ? (
-          <div className="flex min-h-0 flex-1 flex-col">
-            {isHome && <HomeChatDemo />}
+          <div className="flex-1 px-5 pt-2">
             {!teamsLoading && !teamsFailed && (
-              <p className={cn("px-5 pt-2 text-[13px] text-faint-foreground", isHome && "md:hidden")}>
+              <p className="text-[13px] text-faint-foreground">
                 {teams.length > 0
                   ? "Pick a team to see its channels and direct messages."
                   : "Channels and direct messages show up here once you're in a team."}
