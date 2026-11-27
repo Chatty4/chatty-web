@@ -1,4 +1,4 @@
-import { memo, useState } from "react"
+import { memo, useState, type ReactNode } from "react"
 import {
   Copy,
   Forward,
@@ -15,6 +15,7 @@ import { UserAvatar } from "@/components/app/user-avatar"
 import { Button } from "@/components/ui/button"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { EmojiPickerButton } from "@/components/ui/emoji-picker"
+import { Tooltip, TooltipGroup } from "@/components/ui/tooltip"
 import { ReadTicks, type Receipt } from "@/features/reads"
 import { useConfirm } from "@/hooks/use-confirm"
 import { toast } from "@/lib/toast"
@@ -53,6 +54,27 @@ function formatTime(iso: string): string {
     hour: "numeric",
     minute: "2-digit",
   }).format(new Date(iso))
+}
+
+/** An icon button of the hover toolbar; its label is the aria-label and shows on hover. */
+function ToolbarButton({
+  label,
+  disabled,
+  onClick,
+  children,
+}: {
+  label: string
+  disabled?: boolean
+  onClick: () => void
+  children: ReactNode
+}) {
+  return (
+    <Tooltip label={label}>
+      <Button variant="ghost" size="icon-sm" aria-label={label} disabled={disabled} onClick={onClick}>
+        {children}
+      </Button>
+    </Tooltip>
+  )
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -285,75 +307,56 @@ export const MessageItem = memo(function MessageItem({
         own ? "max-sm:right-0" : "max-sm:left-0",
       )}
     >
-      {canReact && (
-        <EmojiPickerButton
-          label="Add reaction"
-          icon={<SmilePlus />}
-          onOpenChange={setPickingReaction}
-          onSelect={(emoji) => void changeReaction(emoji, true)}
-        />
-      )}
-      {canReply && (
-        <Button variant="ghost" size="icon-sm" aria-label="Reply" onClick={() => onReply(message)}>
-          <Reply />
-        </Button>
-      )}
-      {canForward && (
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label="Forward message"
-          onClick={() => onForward(message.id)}
-        >
-          <Forward />
-        </Button>
-      )}
-      {canEdit && (
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label="Edit message"
-          onClick={() => setEditing(true)}
-        >
-          <Pencil />
-        </Button>
-      )}
-      {canDelete && (
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label="Delete message"
-          onClick={() => void handleDelete()}
-        >
-          <Trash2 />
-        </Button>
-      )}
-      {canPin && (
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label={isPinned ? "Unpin message" : "Pin message"}
-          disabled={!!pinBusyId}
-          onClick={() => void togglePin(message.id, !isPinned)}
-        >
-          {isPinned ? <PinOff /> : <Pin />}
-        </Button>
-      )}
-      {message.body && (
-        <Button variant="ghost" size="icon-sm" aria-label="Copy text" onClick={() => void copyText()}>
-          <Copy />
-        </Button>
-      )}
-      {receipt && (
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label="Message info"
-          onClick={() => onShowInfo(message.id)}
-        >
-          <Info />
-        </Button>
-      )}
+      <TooltipGroup>
+        {canReact && (
+          <EmojiPickerButton
+            label="Add reaction"
+            icon={<SmilePlus />}
+            showLabel
+            onOpenChange={setPickingReaction}
+            onSelect={(emoji) => void changeReaction(emoji, true)}
+          />
+        )}
+        {canReply && (
+          <ToolbarButton label="Reply" onClick={() => onReply(message)}>
+            <Reply />
+          </ToolbarButton>
+        )}
+        {canForward && (
+          <ToolbarButton label="Forward message" onClick={() => onForward(message.id)}>
+            <Forward />
+          </ToolbarButton>
+        )}
+        {canEdit && (
+          <ToolbarButton label="Edit message" onClick={() => setEditing(true)}>
+            <Pencil />
+          </ToolbarButton>
+        )}
+        {canDelete && (
+          <ToolbarButton label="Delete message" onClick={() => void handleDelete()}>
+            <Trash2 />
+          </ToolbarButton>
+        )}
+        {canPin && (
+          <ToolbarButton
+            label={isPinned ? "Unpin message" : "Pin message"}
+            disabled={!!pinBusyId}
+            onClick={() => void togglePin(message.id, !isPinned)}
+          >
+            {isPinned ? <PinOff /> : <Pin />}
+          </ToolbarButton>
+        )}
+        {message.body && (
+          <ToolbarButton label="Copy text" onClick={() => void copyText()}>
+            <Copy />
+          </ToolbarButton>
+        )}
+        {receipt && (
+          <ToolbarButton label="Message info" onClick={() => onShowInfo(message.id)}>
+            <Info />
+          </ToolbarButton>
+        )}
+      </TooltipGroup>
     </div>
   )
 

@@ -11,6 +11,7 @@ import { type ReactNode, type RefObject, useRef, useState } from "react"
 import { cn } from "@/lib/utils"
 
 import { Button } from "./button"
+import { Tooltip } from "./tooltip"
 
 function CategoryHeader({ category, className, ...props }: EmojiPickerListCategoryHeaderProps) {
   return (
@@ -107,6 +108,8 @@ type EmojiPickerButtonProps = {
   icon?: ReactNode
   /** Lets a parent stay visible while the picker is open, like a hover toolbar. */
   onOpenChange?: (open: boolean) => void
+  /** Shows the label on hover, like the other buttons of a toolbar. */
+  showLabel?: boolean
 }
 
 /** Button that opens the emoji picker in a popover. */
@@ -117,6 +120,7 @@ export function EmojiPickerButton({
   label = "Add emoji",
   icon = <Smile />,
   onOpenChange,
+  showLabel = false,
 }: EmojiPickerButtonProps) {
   const [open, setOpen] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
@@ -126,21 +130,25 @@ export function EmojiPickerButton({
     onOpenChange?.(next)
   }
 
+  const trigger = (
+    <Popover.Trigger
+      render={
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label={label}
+          disabled={disabled}
+          className={open ? "bg-surface-hover text-foreground" : undefined}
+        />
+      }
+    >
+      {icon}
+    </Popover.Trigger>
+  )
+
   return (
     <Popover.Root open={open} onOpenChange={changeOpen}>
-      <Popover.Trigger
-        render={
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={label}
-            disabled={disabled}
-            className={open ? "bg-surface-hover text-foreground" : undefined}
-          />
-        }
-      >
-        {icon}
-      </Popover.Trigger>
+      {showLabel ? <Tooltip label={label}>{trigger}</Tooltip> : trigger}
       <Popover.Portal>
         <Popover.Positioner side="top" align="start" sideOffset={8} className="z-50">
           <Popover.Popup
