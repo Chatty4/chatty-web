@@ -1,4 +1,4 @@
-// The Home sidebar's sample conversation and its loop, apart from the component so it can be tested.
+// The Home sidebar's sample conversation and its endless loop, apart from the component so it can be tested.
 
 // Sample people, not real users. `typing` shows the dots in the message's place first.
 export const MESSAGES = [
@@ -17,17 +17,19 @@ export const MESSAGES = [
 
 const TYPING_MS = 1400
 const MESSAGE_MS = 1300
-const HOLD_MS = 2500
-const LEAVE_MS = 900
 
-export type DemoState = { shown: number; typing: boolean; phase: "play" | "leave" | "reset" }
-export const START: DemoState = { shown: 0, typing: false, phase: "reset" }
+/** How many messages stay mounted: more than the tallest sidebar shows, so it never runs short. */
+export const WINDOW = 24
 
-/** The state after `state`, and how long to wait before switching to it. */
+/** `shown` counts every message so far and only grows; message i is the script's i % length. */
+export type DemoState = { shown: number; typing: boolean }
+// Start already full, so the panel never opens empty.
+export const START: DemoState = { shown: WINDOW, typing: false }
+
+export const messageAt = (i: number) => MESSAGES[i % MESSAGES.length]
+
+/** The state after `state`, and how long to wait before switching to it. Loops forever. */
 export function next(state: DemoState): [DemoState, number] {
-  if (state.phase === "reset") return [{ shown: 0, typing: false, phase: "play" }, 400]
-  if (state.phase === "leave") return [START, LEAVE_MS]
-  if (state.shown === MESSAGES.length) return [{ ...state, phase: "leave" }, HOLD_MS]
-  if (MESSAGES[state.shown].typing && !state.typing) return [{ ...state, typing: true }, TYPING_MS]
-  return [{ shown: state.shown + 1, typing: false, phase: "play" }, MESSAGE_MS]
+  if (messageAt(state.shown).typing && !state.typing) return [{ ...state, typing: true }, TYPING_MS]
+  return [{ shown: state.shown + 1, typing: false }, MESSAGE_MS]
 }
