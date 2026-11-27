@@ -21,6 +21,7 @@ export function apiMessage(seq: number, overrides: Partial<ApiMessage> = {}): Ap
     mentions: [],
     reactions: [],
     pinned: false,
+    forwarded: false,
     edited_at: null,
     deleted_at: null,
     created_at: "2026-10-05T14:00:00Z",
