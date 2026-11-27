@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { useAuth } from "@/features/auth"
 import { useChannels } from "@/features/channels/hooks/channels-context"
 import { JoinChannelBar } from "@/features/channels/ui/join-channel-bar"
+import { ForwardDialog } from "@/features/forward"
 import { usePresence } from "@/features/presence"
 import {
   receiptFor,
@@ -41,6 +42,7 @@ import { shouldWatch } from "../utils/watch"
 import {
   canDelete,
   canEdit,
+  canForward,
   canPin,
   canReact,
   canReply,
@@ -348,6 +350,17 @@ export function MessageList({
   )
   const replyTo = getReplyTarget(channelId)
 
+  // The message being forwarded. Kept with its channel, so switching closes the dialog.
+  const [forwarding, setForwarding] = useState<{ channelId: string; messageId: string } | null>(
+    null,
+  )
+  const onForward = useCallback(
+    (messageId: string) => setForwarding({ channelId, messageId }),
+    [channelId],
+  )
+  const closeForward = useCallback(() => setForwarding(null), [])
+  const forwardMessageId = forwarding?.channelId === channelId ? forwarding.messageId : null
+
   const archived = channel?.archived ?? false
 
   // ── Permissions (D-05) ───────────────────────────────────────────────────────
@@ -458,6 +471,8 @@ export function MessageList({
               canReply={replyable}
               onReply={onReply}
               onOpenQuote={onOpenQuote}
+              canForward={canForward(message)}
+              onForward={onForward}
               canPin={canPin(message, access)}
               onSetPinned={onSetPinned}
               onEdit={onEdit}
@@ -525,6 +540,10 @@ export function MessageList({
           previews={memberPreviews}
           onClose={() => setInfo(null)}
         />
+      )}
+
+      {forwardMessageId && (
+        <ForwardDialog key={forwardMessageId} messageId={forwardMessageId} onClose={closeForward} />
       )}
 
       {/* Composer, or Join for a channel I only view */}

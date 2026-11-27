@@ -1,6 +1,7 @@
 import { memo, useState } from "react"
 import {
   Copy,
+  Forward,
   Info,
   Pencil,
   Pin,
@@ -88,6 +89,10 @@ export type MessageItemProps = {
   onReply: (message: LocalMessage) => void
   /** Shows the message a reply quotes (a click on the quote). */
   onOpenQuote: (messageId: string, seq: number) => void
+  /** From canForward: any sent message I can see, also where I can't write. */
+  canForward: boolean
+  /** Opens the forward dialog for this message. */
+  onForward: (messageId: string) => void
   /** From canPin: a sent message in a channel I can write in. */
   canPin: boolean
   /** Pins or unpins. Rejects with ApiError on failure. */
@@ -128,6 +133,8 @@ export const MessageItem = memo(function MessageItem({
   canReply,
   onReply,
   onOpenQuote,
+  canForward,
+  onForward,
   canPin,
   onSetPinned,
   onEdit,
@@ -287,6 +294,16 @@ export const MessageItem = memo(function MessageItem({
       {canReply && (
         <Button variant="ghost" size="icon-sm" aria-label="Reply" onClick={() => onReply(message)}>
           <Reply />
+        </Button>
+      )}
+      {canForward && (
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Forward message"
+          onClick={() => onForward(message.id)}
+        >
+          <Forward />
         </Button>
       )}
       {canEdit && (

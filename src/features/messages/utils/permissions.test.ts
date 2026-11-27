@@ -4,6 +4,7 @@ import { ME, OTHER, localMessage, pendingMessage } from "../store/test-fixtures"
 import {
   canDelete,
   canEdit,
+  canForward,
   canPin,
   canReact,
   canReply,
@@ -53,6 +54,19 @@ describe("canReply", () => {
     expect(canReply(deleted, open)).toBe(false)
     expect(canReply(pendingMessage("c1"), open)).toBe(false)
     expect(canReply({ ...pendingMessage("c1"), status: "failed" }, open)).toBe(false)
+  })
+})
+
+describe("canForward", () => {
+  it("allows any sent message, mine or anyone's", () => {
+    expect(canForward(mine)).toBe(true)
+    expect(canForward(theirs)).toBe(true)
+  })
+
+  it("is off on deleted, pending and failed messages", () => {
+    expect(canForward(deleted)).toBe(false)
+    expect(canForward(pendingMessage("c1"))).toBe(false)
+    expect(canForward({ ...pendingMessage("c1"), status: "failed" })).toBe(false)
   })
 })
 
