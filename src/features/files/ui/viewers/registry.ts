@@ -3,13 +3,18 @@
 
 import { lazy, type ComponentType, type LazyExoticComponent } from "react"
 
+import { mediaKind } from "../../utils/media"
 import { previewKind, type PreviewKind } from "../../utils/preview"
 import type { ViewerProps } from "./types"
 
 type Viewer = LazyExoticComponent<ComponentType<ViewerProps>>
 
-/** True when the app can show the file itself, so opening it previews instead of downloading. */
+/**
+ * True when the app can show the file itself, so opening it previews instead of downloading.
+ * Sound and video play in the preview window (MediaPreview); the rest need a viewer here.
+ */
 export function canPreview(file: { mime: string; filename: string }): boolean {
+  if (mediaKind(file)) return true
   const kind = previewKind(file)
   return kind !== null && VIEWERS[kind] !== undefined
 }

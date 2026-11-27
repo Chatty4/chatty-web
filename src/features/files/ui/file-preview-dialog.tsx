@@ -1,12 +1,15 @@
 import { Suspense } from "react"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
-import { Download, FileText, X } from "lucide-react"
+import { Download, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 
 import { useFileBlob } from "../hooks/use-file-blob"
 import { formatFileSize } from "../utils/format"
+import { mediaKind } from "../utils/media"
 import { previewKind } from "../utils/preview"
+import { FileIcon } from "./file-icon"
+import { MediaPreview } from "./media-preview"
 import { PreviewErrorBoundary } from "./preview-error-boundary"
 import { VIEWERS } from "./viewers/registry"
 
@@ -32,7 +35,7 @@ export function FilePreviewDialog({ file, getUrl, onDownload, onClose }: FilePre
           {file && (
             <>
               <div className="flex shrink-0 items-center gap-2 border-b py-2 pr-2 pl-4">
-                <FileText className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <FileIcon file={file} className="size-5 shrink-0 text-muted-foreground" />
                 <div className="flex min-w-0 flex-1 flex-col">
                   <DialogPrimitive.Title className="truncate text-sm font-semibold">
                     {file.filename}
@@ -72,7 +75,25 @@ type PreviewBodyProps = {
   onDownload: () => void
 }
 
+/** Sound and video stream from their URL; every other file is downloaded and drawn. */
 function PreviewBody({ file, getUrl, onDownload }: PreviewBodyProps) {
+  const media = mediaKind(file)
+  if (media) {
+    return (
+      <MediaPreview
+        kind={media}
+        fileId={file.file_id}
+        filename={file.filename}
+        getUrl={getUrl}
+        loading={<PreviewLoading />}
+        failed={<PreviewMessage text="Couldn't play this file." onDownload={onDownload} />}
+      />
+    )
+  }
+  return <BlobPreview file={file} getUrl={getUrl} onDownload={onDownload} />
+}
+
+function BlobPreview({ file, getUrl, onDownload }: PreviewBodyProps) {
   const state = useFileBlob(file.file_id, getUrl)
   const kind = previewKind(file)
   const Viewer = kind ? VIEWERS[kind] : undefined
