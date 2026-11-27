@@ -168,7 +168,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
 
         {/* Everything below belongs to a team, so its links only exist with one. */}
         {!teamId ? (
-          <div className="flex-1">
+          <div className="flex min-h-0 flex-1 flex-col">
             {isHome && <HomeChatDemo />}
             {!teamsLoading && !teamsFailed && (
               <p className={cn("px-5 pt-2 text-[13px] text-faint-foreground", isHome && "md:hidden")}>
